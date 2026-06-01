@@ -1,0 +1,22 @@
+{
+  "name": "FSE Inspection Release Note",
+  "short_name": "FSE IRN",
+  "description": "FSE Electronic Inspection Release Note System",
+  "start_url": "/fse-irn-system/",
+  "display": "standalone",
+  "background_color": "#f4f4f0",
+  "theme_color": "#1a3a5c",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://eric0103360.github.io/fse-irn-system/icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://eric0103360.github.io/fse-irn-system/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

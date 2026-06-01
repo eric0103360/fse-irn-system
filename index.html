@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>FSE Inspection Release Note</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/tabler-icons.min.css">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FSE IRN">
+<meta name="application-name" content="FSE IRN">
+<meta name="theme-color" content="#1a3a5c">
+<link rel="manifest" href="manifest.json">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#1a1a1a;background:#f4f4f0;min-height:100vh}
@@ -517,7 +524,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 
 <script>
 const ENDPOINT='https://script.google.com/macros/s/AKfycbzh4TjDevXQsH3hNU9H7dsA2vrZlrK2ZpTostfKIVqtlIAd7bItAmsyFafGX5pqXzfI/exec';
-const ADMIN_CODE='min@fse';
+const ADMIN_CODE='ADMIN_CODE_HERE';
 const WA_GROUP='https://chat.whatsapp.com/DdCdi8Eto8PHEJ8sNsqqi0';
 
 // Get logo from hidden img element - avoids JS string issues with base64
@@ -844,7 +851,7 @@ function submitRequest(){
   msg+='Raised by: '+d.supervisor+' ('+d.supCode+')\n';
   if(d.photos>0)msg+='Photos: '+d.photos+' attached (see form)\n';
   msg+='\n*QC - please attend and complete IRN on release*';
-  window.open(WA_GROUP+'?text='+encodeURIComponent(msg));
+  window.open('https://wa.me/?text='+encodeURIComponent(msg));
   if(window.saveRequestToFirebase){
     window.saveRequestToFirebase(d).then(function(ok){
       toast(ok?'Request saved and sent to QC group':'Request sent - check connection for save','ok');
@@ -1208,7 +1215,7 @@ async function submitIRN(){
     }
     setTimeout(function(){
       var msg=buildWAMessage(d);
-      window.open(WA_GROUP+'?text='+encodeURIComponent(msg));
+      window.open('https://wa.me/?text='+encodeURIComponent(msg));
     },800);
     renderReg();
   }catch(e){
@@ -1320,7 +1327,7 @@ function waRec(book,no){
   msg+='SUP: '+r.supCode+' ('+r.supervisor+') | QC: '+r.qcCode+' ('+r.qc+')\n';
   if(r.snags&&r.snags!=='None')msg+='*SNAGS:* '+r.snags+'\n';
   if(!isPass)msg+='\n*Action required - see snags*';
-  window.open(WA_GROUP+'?text='+encodeURIComponent(msg));
+  window.open('https://wa.me/?text='+encodeURIComponent(msg));
 }
 function printRec(book,no){
   var r=reg.find(function(x){return x.reportNo===no&&x.bookRef===book;});if(!r)return;
