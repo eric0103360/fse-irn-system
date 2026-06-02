@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>FSE Inspection Release Note</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#1a1a1a;background:#f4f4f0;min-height:100vh}
+.app{max-width:480px;margin:0 auto;padding:12px}
+.nav{display:flex;border:0.5px solid #ddd;border-radius:12px;overflow:hidden;margin-bottom:12px;background:#fff}
+.nb{flex:1;padding:10px 4px;font-size:11px;font-weight:500;border:none;background:transparent;color:#666;cursor:pointer;border-right:0.5px solid #ddd;display:flex;align-items:center;justify-content:center;gap:4px;transition:all 0.15s}
+.nb:last-child{border-right:none}
+.nb.on{background:#1a3a5c;color:#fff}
+.view{display:none}.view.on{display:block}
+.hdr{background:#1a3a5c;color:#fff;border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.hdr-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.hdr-left{display:flex;align-items:center;gap:10px}
+.fse-logo{width:44px;height:44px;object-fit:contain;border-radius:4px;background:#fff;padding:2px}
+.hdr h1{font-size:14px;font-weight:500}
+.hdr-meta{font-size:10px;color:rgba(255,255,255,0.6);margin-top:1px}
+.irn-right{text-align:right}
+.irn-lbl{font-size:10px;color:rgba(255,255,255,0.6);margin-bottom:2px}
+.irn-row{display:flex;align-items:center;gap:4px;justify-content:flex-end}
+.irn-pre{font-size:12px;color:rgba(255,255,255,0.8)}
+.irn-in{background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.3);color:#fff;font-size:13px;font-weight:500;width:52px;text-align:center;outline:none;padding:1px 2px}
+.card{background:#fff;border:0.5px solid #ddd;border-radius:12px;margin-bottom:10px;overflow:hidden}
+.ct{background:#f9f9f7;padding:7px 14px;font-size:10px;font-weight:500;color:#666;text-transform:uppercase;letter-spacing:0.5px;border-bottom:0.5px solid #ddd;display:flex;align-items:center;gap:6px}
+.fr{display:grid;grid-template-columns:110px 1fr;align-items:center;padding:7px 14px;border-bottom:0.5px solid #eee;gap:8px}
+.fr:last-child{border-bottom:none}
+.fl{font-size:11px;color:#666;font-weight:500}
+.fi{background:transparent;border:none;border-bottom:0.5px solid #ccc;color:#1a1a1a;font-size:13px;padding:2px 4px;width:100%;outline:none;font-family:inherit}
+.fi:focus{border-bottom-color:#1a3a5c}
+.res-row{display:flex;gap:10px;padding:9px 14px;align-items:center}
+.rb{display:flex;align-items:center;gap:5px;padding:5px 14px;border-radius:20px;border:1.5px solid;font-size:12px;font-weight:500;cursor:pointer;background:transparent;transition:all 0.15s}
+.rb.acc{border-color:#639922;color:#639922}.rb.rej{border-color:#E24B4A;color:#E24B4A}
+.rb.acc.on{background:#639922;color:#fff}.rb.rej.on{background:#E24B4A;color:#fff}
+.item-row{display:grid;grid-template-columns:1fr 64px 30px;gap:6px;align-items:center;padding:7px 14px;border-bottom:0.5px solid #eee}
+.item-row:last-of-type{border-bottom:none}
+.db{background:none;border:none;cursor:pointer;color:#aaa;display:flex;align-items:center}
+.db:hover{color:#E24B4A}
+.add-btn{margin:7px 14px;font-size:12px;color:#1a3a5c;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px}
+.sb{border-bottom:0.5px solid #eee}.sb:last-child{border-bottom:none}
+.sh{display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;transition:background 0.1s}
+.sh:hover{background:#f9f9f7}
+.si{width:22px;height:22px;border-radius:50%;border:1.5px solid #ccc;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:10px;font-weight:500;color:#888;transition:all 0.2s}
+.si.gd{background:#1a3a5c;border-color:#1a3a5c;color:#fff}
+.si.cd{background:#3B6D11;border-color:#3B6D11;color:#fff}
+.sl{flex:1;font-size:12px;font-weight:500}
+.sm{font-size:10px;color:#888}
+.crit-tag{font-size:9px;padding:1px 5px;border-radius:8px;background:#FCEBEB;color:#A32D2D;font-weight:500;margin-left:4px}
+.sbdy{padding:10px 14px 12px;border-top:0.5px solid #eee;background:#f9f9f7}
+.sublbl{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px;display:flex;align-items:center;gap:4px}
+.sublbl.g{color:#1a3a5c}.sublbl.c{color:#666;margin-top:10px}.sublbl.d{color:#3B6D11;margin-top:10px}.sublbl.p{color:#185FA5;margin-top:10px}
+.gr{display:flex;align-items:flex-start;gap:8px;padding:7px 10px;background:#fff;border:0.5px solid #ddd;border-radius:8px;cursor:pointer;transition:border-color 0.15s}
+.gr.on{border-color:#1a3a5c;background:#E6F1FB}
+.gcb{width:17px;height:17px;border-radius:4px;border:1.5px solid #1a3a5c;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;transition:all 0.15s}
+.gcb.on{background:#1a3a5c}
+.gt{font-size:12px;line-height:1.3;color:#1a1a1a}
+.cg{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.ci{display:flex;align-items:flex-start;gap:5px;padding:5px 7px;border-radius:6px;cursor:pointer;background:#fff;border:0.5px solid #ddd;transition:all 0.12s}
+.ci.on{border-color:#185FA5;background:#E6F1FB}
+.ccb{width:13px;height:13px;border-radius:3px;border:1px solid #ccc;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;transition:all 0.12s}
+.ccb.on{background:#185FA5;border-color:#185FA5}
+.ct2{font-size:11px;color:#555;line-height:1.3}
+.wb{display:flex;align-items:flex-start;gap:7px;background:#FAEEDA;border:0.5px solid #EF9F27;border-radius:6px;padding:7px 9px;margin-bottom:8px;font-size:11px;color:#633806}
+.nab{font-size:11px;padding:4px 10px;border-radius:10px;border:0.5px solid #ccc;background:#fff;color:#666;cursor:pointer;margin-top:8px}
+.nab.on{background:#f4f4f0;color:#aaa}
+.dt{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:4px}
+.dt th{font-size:10px;color:#666;font-weight:500;padding:4px 6px;border-bottom:0.5px solid #ddd;text-align:left}
+.dt td{padding:4px 6px;border-bottom:0.5px solid #eee}
+.dt tr:last-child td{border-bottom:none}
+.di{background:transparent;border:none;border-bottom:0.5px solid #ccc;font-size:12px;padding:1px 3px;width:100%;outline:none;color:#1a1a1a;font-family:inherit;text-align:center}
+.di:focus{border-bottom-color:#1a3a5c}
+.dflag{font-size:10px;color:#E24B4A;font-weight:500;text-align:center}
+.dok{font-size:10px;color:#3B6D11;text-align:center}
+.add-dim{font-size:11px;color:#3B6D11;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:3px;padding:5px 0 0}
+.photo-btn{display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;border:0.5px solid #25D366;background:#f0fdf4;color:#166534;font-size:12px;font-weight:500;cursor:pointer;width:100%;margin-top:8px}
+.photo-btn:hover{background:#dcfce7}
+.ag{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.ab{padding:10px 6px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;border:0.5px solid #ddd;background:#fff;color:#1a1a1a;transition:all 0.12s}
+.ab.pri{background:#1a3a5c;color:#fff;border-color:#1a3a5c}
+.ab.wa{background:#25D366;color:#fff;border:none}
+.ab.ncr{background:#E24B4A;color:#fff;border:none}
+.ab.pr{background:#185FA5;color:#fff;border:none}
+.ab.sub{background:#3B6D11;color:#fff;border:none}
+.ab:disabled{opacity:0.45;cursor:not-allowed}
+.ssum{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#eee;margin-top:4px}
+.ssc{background:#fff;padding:6px 12px;display:flex;align-items:center;justify-content:space-between}
+.pill{font-size:10px;padding:2px 7px;border-radius:10px;font-weight:500}
+.pill.complete{background:#EAF3DE;color:#27500A}
+.pill.partial{background:#FAEEDA;color:#633806}
+.pill.empty{background:#f4f4f0;color:#888}
+.pill.na{background:#f4f4f0;color:#aaa}
+.signoff-block{padding:12px 14px;border-bottom:0.5px solid #eee}
+.signoff-block:last-child{border-bottom:none}
+.so-role{font-size:12px;font-weight:500;margin-bottom:3px;display:flex;align-items:center;gap:6px}
+.so-sub{font-size:11px;color:#888;margin-bottom:8px}
+.code-in{padding:8px 12px;border:1.5px solid #ccc;border-radius:8px;font-size:14px;font-weight:500;background:#f9f9f7;color:#1a1a1a;outline:none;font-family:monospace;letter-spacing:2px;width:100%}
+.code-in:focus{border-color:#1a3a5c}
+.code-in.valid{border-color:#639922;background:#EAF3DE;color:#27500A}
+.code-in.invalid{border-color:#E24B4A;background:#FCEBEB;color:#A32D2D}
+.code-status{margin-top:6px;font-size:12px;font-weight:500;min-height:18px}
+.optional-tag{font-size:10px;padding:1px 7px;border-radius:10px;background:#f4f4f0;color:#888;border:0.5px solid #ddd;font-weight:400}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:20px;font-size:13px;font-weight:500;z-index:999;display:none;max-width:340px;text-align:center;color:#fff;box-shadow:0 4px 12px rgba(0,0,0,0.2)}
+.toast.show{display:block}
+.toast.err{background:#E24B4A}.toast.ok{background:#3B6D11}.toast.info{background:#1a3a5c}
+.reg-card{background:#fff;border:0.5px solid #ddd;border-radius:12px;margin-bottom:10px;overflow:hidden}
+.rc-hdr{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-bottom:0.5px solid #eee}
+.rn{font-size:13px;font-weight:500;color:#1a3a5c;min-width:90px}
+.ri{flex:1}
+.rj{font-size:13px;font-weight:500;margin-bottom:2px}
+.rs{font-size:11px;color:#888;line-height:1.7}
+.rp{font-size:11px;padding:3px 10px;border-radius:10px;font-weight:500;display:inline-block;margin-top:2px}
+.rp.pass{background:#EAF3DE;color:#27500A}
+.rp.fail{background:#FCEBEB;color:#A32D2D}
+.rc-stages{padding:8px 12px;border-bottom:0.5px solid #eee}
+.stage-pills{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.sp{font-size:10px;padding:2px 7px;border-radius:8px;font-weight:500}
+.sp.ok{background:#EAF3DE;color:#27500A}
+.sp.fail{background:#FCEBEB;color:#A32D2D}
+.sp.part{background:#FAEEDA;color:#633806}
+.sp.na{background:#f4f4f0;color:#aaa}
+.rc-snags{padding:8px 12px;border-bottom:0.5px solid #eee;font-size:11px;color:#A32D2D}
+.rc-acts{display:flex;gap:6px;padding:8px 12px;flex-wrap:wrap}
+.ra{font-size:11px;padding:5px 10px;border-radius:6px;border:0.5px solid #ddd;background:#fff;cursor:pointer;color:#666;display:flex;align-items:center;gap:4px}
+.ra.bl{border-color:#185FA5;color:#185FA5}
+.ra.wa{border-color:#25D366;color:#25D366}
+.sg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.sc2{background:#f4f4f0;border-radius:8px;padding:8px 10px;text-align:center}
+.filt-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.filt-btn{font-size:11px;padding:4px 10px;border-radius:10px;border:0.5px solid #ddd;background:#fff;color:#666;cursor:pointer}
+.filt-btn.on{background:#1a3a5c;color:#fff;border-color:#1a3a5c}
+.admin-locked{padding:40px 20px;text-align:center}
+.admin-code-input{padding:10px 14px;border:1.5px solid #ccc;border-radius:8px;font-size:14px;font-family:monospace;letter-spacing:2px;width:100%;outline:none;text-align:center;margin:12px 0;background:#f9f9f7}
+.admin-code-input:focus{border-color:#1a3a5c}
+.code-table{width:100%;border-collapse:collapse}
+.code-table th{font-size:10px;font-weight:500;color:#666;padding:6px 10px;border-bottom:0.5px solid #ddd;text-align:left;background:#f9f9f7}
+.code-table td{padding:6px 10px;border-bottom:0.5px solid #eee;font-size:12px}
+.code-table tr:last-child td{border-bottom:none}
+.cbadge{font-size:10px;padding:2px 7px;border-radius:10px;font-weight:500;font-family:monospace}
+.cbadge.active{background:#EAF3DE;color:#27500A}
+.cbadge.avail{background:#f4f4f0;color:#888}
+.cbadge.inactive{background:#FCEBEB;color:#A32D2D}
+.name-in{background:transparent;border:none;border-bottom:0.5px solid #ccc;font-size:12px;padding:1px 4px;width:140px;outline:none;color:#1a1a1a;font-family:inherit}
+.name-in:focus{border-bottom-color:#1a3a5c}
+.toggle-btn{font-size:10px;padding:2px 8px;border-radius:8px;border:0.5px solid #ddd;cursor:pointer;background:#fff;color:#666}
+@media print{.no-print{display:none}}
+</style>
+
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FSE IRN">
+<meta name="theme-color" content="#1a3a5c">
+<link rel="manifest" href="manifest.json">
+<script type="module">
+import{initializeApp}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
+import{getFirestore,doc,getDoc,addDoc,collection,query,orderBy,onSnapshot,runTransaction}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
+const app=initializeApp({apiKey:"AIzaSyC3sKMm02GnikBdgXPd4RUm7RxnsR90A_I",authDomain:"fse-irn-system.firebaseapp.com",projectId:"fse-irn-system",storageBucket:"fse-irn-system.firebasestorage.app",messagingSenderId:"1097944808267",appId:"1:1097944808267:web:d8f1f3a52e2223253f86ce"});
+const db=getFirestore(app);
+window.peekNextIRN=async function(){try{const r=doc(db,'counters','irn');const d=await getDoc(r);const c=d.exists()?d.data().count:0;return String(c+1).padStart(4,'0');}catch(e){return'----';}};
+window.getNextIRN=async function(){try{const r=doc(db,'counters','irn');const n=await runTransaction(db,async(t)=>{const d=await t.get(r);const c=d.exists()?d.data().count:0;const x=c+1;t.set(r,{count:x});return x;});return String(n).padStart(4,'0');}catch(e){return String(Date.now()).slice(-4);}};
+window.saveIRNToFirebase=async function(data){try{var s=Object.assign({},data);if(s.stageStates){var cs={};Object.keys(s.stageStates).forEach(function(k){var st=Object.assign({},s.stageStates[k]);st.photos=st.photos?st.photos.length+' photo(s)':'0';cs[k]=st;});s.stageStates=cs;}s.timestamp=new Date().toISOString();await addDoc(collection(db,'irns'),s);return true;}catch(e){return false;}};
+window.saveRequestToFirebase=async function(data){try{var s=Object.assign({},data);s.timestamp=new Date().toISOString();await addDoc(collection(db,'requests'),s);return true;}catch(e){return false;}};
+window.loadIRNsFromFirebase=function(cb){try{var q=query(collection(db,'irns'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);});}catch(e){cb([]);}};
+window.addEventListener('DOMContentLoaded',async function(){var n=await window.peekNextIRN();window._nextIRNNum=n;var el=document.getElementById('reportNo');if(el&&!el.value){el.value=n;el.style.color='rgba(255,255,255,0.6)';}});
+</script>
+</head>
+<body><script>
+(function(){
+  var start=new Date('2026-06-02');
+  var expiry=new Date('2026-07-02');
+  var today=new Date();
+  today.setHours(0,0,0,0);
+  if(today>expiry){
+    document.body.innerHTML='';
+    document.body.style.cssText='margin:0;padding:0;background:#0d2137;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:-apple-system,sans-serif';
+    document.body.innerHTML='<div style="text-align:center;max-width:320px;padding:40px 24px;color:#fff"><div style="width:80px;height:80px;background:#E24B4A;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;font-size:36px">&#128274;</div><div style="font-size:11px;color:rgba(255,255,255,0.5);letter-spacing:3px;text-transform:uppercase;margin-bottom:8px">Field Services &amp; Engineering</div><div style="font-size:22px;font-weight:600;margin-bottom:8px">Trial Period Expired</div><div style="font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:32px">Your 30-day trial of the FSE IRN System ended on 2 July 2026. Contact Xtreme SHEQ Solutions to activate your licence and retain all your data.</div><div style="background:rgba(255,255,255,0.08);border-radius:12px;padding:16px;margin-bottom:16px;border:0.5px solid rgba(255,255,255,0.15)"><div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Contact</div><div style="font-size:14px;font-weight:500;margin-bottom:4px">Xtreme SHEQ Solutions</div><div style="font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:4px">Eric Fredericks</div><div style="font-size:13px;color:#4FC3F7">083 764 5717</div></div><div style="font-size:11px;color:rgba(255,255,255,0.3)">Your inspection data is safe and will be restored on activation.</div></div>';
+  }
+})();
+</script><div id="splashScreen" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0d2137;padding:40px 24px;box-sizing:border-box">
+<div style="text-align:center;max-width:320px;width:100%">
+<div style="width:100px;height:100px;background:#fff;border-radius:20px;display:flex;align-items:center;justify-content:center;margin:0 auto 24px"><img src="data:image/png;base64,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" style="width:80px;height:80px;object-fit:contain" alt="FSE"></div>
+<div style="font-size:11px;color:rgba(255,255,255,0.5);letter-spacing:3px;text-transform:uppercase;margin-bottom:6px;font-family:-apple-system,sans-serif">Field Services &amp; Engineering</div>
+<div style="font-size:26px;font-weight:600;color:#fff;margin:0 0 6px;font-family:-apple-system,sans-serif">IRN System</div>
+<div style="font-size:13px;color:rgba(255,255,255,0.55);margin-bottom:40px;font-family:-apple-system,sans-serif">Inspection Release Note Platform</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:40px">
+<div style="background:rgba(255,255,255,0.08);border-radius:12px;padding:12px 8px;text-align:center;border:0.5px solid rgba(255,255,255,0.1)"><div style="font-size:18px;font-weight:600;color:#fff;font-family:-apple-system,sans-serif">IRN</div><div style="font-size:10px;color:rgba(255,255,255,0.5);font-family:-apple-system,sans-serif">Release</div></div>
+<div style="background:rgba(255,255,255,0.08);border-radius:12px;padding:12px 8px;text-align:center;border:0.5px solid rgba(255,255,255,0.1)"><div style="font-size:18px;font-weight:600;color:#fff;font-family:-apple-system,sans-serif">QC</div><div style="font-size:10px;color:rgba(255,255,255,0.5);font-family:-apple-system,sans-serif">Inspect</div></div>
+<div style="background:rgba(255,255,255,0.08);border-radius:12px;padding:12px 8px;text-align:center;border:0.5px solid rgba(255,255,255,0.1)"><div style="font-size:18px;font-weight:600;color:#fff;font-family:-apple-system,sans-serif">ISO</div><div style="font-size:10px;color:rgba(255,255,255,0.5);font-family:-apple-system,sans-serif">9001</div></div>
+</div>
+<button onclick="enterApp()" style="width:100%;padding:16px;background:#E24B4A;border:none;border-radius:14px;font-size:16px;font-weight:600;color:#fff;cursor:pointer;font-family:-apple-system,sans-serif">Open FSE IRN System</button>
+<div style="margin-top:16px;font-size:11px;color:rgba(255,255,255,0.3);font-family:-apple-system,sans-serif">ISO9001 &middot; ISO14001 &middot; ISO45001 &middot; ISO3834-2</div>
+</div>
+</div>
+<!-- Logo stored as hidden element - referenced by JS via element not string -->
+<img id="fseLogo" src="data:image/png;base64,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" style="display:none" alt="FSE">
+<div class="app">
+  <div class="nav no-print">
+    <button class="nb on" onclick="showV('form',this)"><i class="ti ti-file-plus" style="font-size:12px"></i> New IRN</button>
+    <button class="nb" onclick="showV('request',this)"><i class="ti ti-bell" style="font-size:12px"></i> Inspect Req</button>
+    <button class="nb" onclick="showV('register',this)"><i class="ti ti-list" style="font-size:12px"></i> Register</button>
+    <button class="nb" onclick="showV('admin',this)"><i class="ti ti-settings" style="font-size:12px"></i> Admin</button>
+  </div>
+
+  <div id="v-form" class="view on">
+    <div class="hdr">
+      <div class="hdr-top">
+        <div class="hdr-left">
+          <img id="hdrLogo" class="fse-logo" alt="FSE">
+          <div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.55);margin-bottom:1px">FIELD SERVICES &amp; ENGINEERING</div>
+            <h1>Inspection Release Note</h1>
+            <div class="hdr-meta">FSE-QR-IRN.038 &middot; Rev 02 &middot; ISO9001 / ISO3834-2</div>
+          </div>
+        </div>
+        <div class="irn-right">
+          <div class="irn-lbl">REPORT NO</div>
+          <div class="irn-row"><span class="irn-pre">INS-C</span><input class="irn-in" id="reportNo" placeholder="0000"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><i class="ti ti-id-badge" style="font-size:13px"></i> Inspector &amp; book reference</div>
+      <div class="fr"><div class="fl">Inspector name</div><input class="fi" id="inspector" placeholder="Full name"></div>
+      <div class="fr"><div class="fl">Book reference</div><input class="fi" id="bookRef" placeholder="e.g. B03" oninput="suggestNext()"></div>
+      <div class="fr"><div class="fl">Next IRN no.</div><div id="irnSuggest" style="font-size:12px;color:#888">Enter book ref above</div></div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><i class="ti ti-briefcase" style="font-size:13px"></i> Job details</div>
+      <div class="fr"><div class="fl">PO number</div><input class="fi" id="po" placeholder="e.g. 20840/2130/519"></div>
+      <div class="fr"><div class="fl">Job number</div><input class="fi" id="job" placeholder="e.g. FSJ507"></div>
+      <div class="fr"><div class="fl">Project desc.</div><input class="fi" id="project" placeholder="e.g. DRYTECH-519-130"></div>
+      <div class="fr"><div class="fl">Drawing / Rev</div><input class="fi" id="drawing" placeholder="e.g. A1-519-130-19-08"></div>
+      <div class="fr"><div class="fl">Artisan</div><input class="fi" id="artisan" placeholder="Name"></div>
+      <div class="fr"><div class="fl">Date</div><input class="fi" type="date" id="irnDate"></div>
+      <div class="res-row">
+        <div style="font-size:11px;color:#666;font-weight:500;margin-right:4px">Overall result:</div>
+        <button class="rb acc" id="btnAcc" onclick="setRes('accept')"><i class="ti ti-check"></i> Accept</button>
+        <button class="rb rej" id="btnRej" onclick="setRes('reject')"><i class="ti ti-x"></i> Reject</button>
+        <div style="font-size:10px;color:#888;margin-left:4px">Auto-set from stages</div>
+      </div>
+      <div id="rejectionPanel" style="display:none;margin:0 14px 12px;padding:12px;background:#FCEBEB;border:1px solid #E24B4A;border-radius:8px">
+        <div style="font-size:11px;font-weight:500;color:#A32D2D;margin-bottom:8px;display:flex;align-items:center;gap:5px"><i class="ti ti-alert-circle" style="font-size:14px"></i> Rejection details required before submission</div>
+        <div style="margin-bottom:8px">
+          <div style="font-size:10px;font-weight:500;color:#A32D2D;margin-bottom:4px">Rejection reason <span style="color:#E24B4A">*</span></div>
+          <textarea id="rejectionReason" style="width:100%;padding:8px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:60px;background:#fff;outline:none" placeholder="Describe what was found and why this is being rejected..."></textarea>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:500;color:#A32D2D;margin-bottom:4px">Action required <span style="color:#E24B4A">*</span></div>
+          <textarea id="rejectionAction" style="width:100%;padding:8px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:60px;background:#fff;outline:none" placeholder="What must be done before re-inspection and release..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><i class="ti ti-list" style="font-size:13px"></i> Items being released</div>
+      <div id="itemList"></div>
+      <button class="add-btn" onclick="addItem()"><i class="ti ti-plus"></i> Add item</button>
+    </div>
+
+    <div class="card">
+      <div class="ct"><i class="ti ti-shield-check" style="font-size:13px"></i> Inspection stages</div>
+      <div style="padding:7px 14px 3px;font-size:11px;color:#666">
+        <span style="display:inline-flex;align-items:center;gap:3px;margin-right:10px"><span style="width:10px;height:10px;border-radius:2px;background:#1a3a5c;display:inline-block"></span> Gate</span>
+        <span style="display:inline-flex;align-items:center;gap:3px;margin-right:10px"><span style="width:10px;height:10px;border-radius:2px;background:#185FA5;display:inline-block"></span> Criteria</span>
+        <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:10px;height:10px;border-radius:2px;background:#25D366;display:inline-block"></span> Photo</span>
+      </div>
+      <div id="stageList"></div>
+      <div class="ssum" id="stageSummary"></div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><i class="ti ti-ruler" style="font-size:13px"></i> Fabrication dimensions</div>
+      <div style="padding:4px 14px 10px">
+        <table class="dt"><thead><tr><th style="width:24px">Dim</th><th>Drawing</th><th>Measured</th><th style="width:36px"></th></tr></thead>
+        <tbody id="fabBody"></tbody></table>
+        <button class="add-dim" onclick="addFab()"><i class="ti ti-plus" style="font-size:11px"></i> Add row</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><i class="ti ti-note" style="font-size:13px"></i> Inspection notes</div>
+      <textarea style="width:100%;padding:10px 14px;background:transparent;border:none;resize:vertical;min-height:68px;font-size:13px;color:#1a1a1a;font-family:inherit;outline:none" id="notes" placeholder="Record findings, observations, deviations..."></textarea>
+    </div>
+
+    <div class="card">
+      <div class="ct"><i class="ti ti-lock" style="font-size:13px"></i> Sign-off &mdash; codes required</div>
+      <div class="signoff-block">
+        <div class="so-role"><i class="ti ti-hard-hat" style="font-size:14px;color:#1a3a5c"></i> Supervisor <span style="font-size:10px;color:#E24B4A;font-weight:400">* Required</span></div>
+        <div class="so-sub">Enter SUP code to authorise release</div>
+        <input class="code-in" id="supCode" placeholder="SUP-000" maxlength="7" oninput="validateCode('sup')">
+        <div class="code-status" id="supStatus"></div>
+      </div>
+      <div class="signoff-block">
+        <div class="so-role"><i class="ti ti-eye-check" style="font-size:14px;color:#185FA5"></i> Quality (QC) <span style="font-size:10px;color:#E24B4A;font-weight:400">* Required</span></div>
+        <div class="so-sub">Enter QC code to authorise release</div>
+        <input class="code-in" id="qcCode" placeholder="QC-000" maxlength="6" oninput="validateCode('qc')">
+        <div class="code-status" id="qcStatus"></div>
+      </div>
+      <div class="signoff-block">
+        <div class="so-role"><i class="ti ti-building" style="font-size:14px;color:#888"></i> Client <span class="optional-tag">If applicable</span></div>
+        <div class="so-sub">Print report for wet signature if required</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+          <div><div style="font-size:10px;color:#666;margin-bottom:3px">Client name</div><input class="fi" id="clientName" placeholder="Full name"></div>
+          <div><div style="font-size:10px;color:#666;margin-bottom:3px">Company</div><input class="fi" id="clientCo" placeholder="Company"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ag no-print">
+      <button class="ab pr" onclick="printIRN()"><i class="ti ti-printer"></i> Print IRN</button>
+      <button class="ab wa" onclick="sendWA()"><i class="ti ti-brand-whatsapp"></i> WhatsApp</button>
+    </div>
+    <div class="ag no-print" style="margin-top:8px">
+      <button class="ab sub" id="submitBtn" onclick="submitIRN()" style="grid-column:1/-1;padding:12px"><i class="ti ti-cloud-upload"></i> Submit &amp; notify FSE QC Releases</button>
+    </div>
+    <div style="height:16px"></div>
+  </div>
+
+  <div id="v-request" class="view">
+    <div class="hdr">
+      <div class="hdr-top">
+        <div class="hdr-left">
+          <img id="reqLogo" class="fse-logo" alt="FSE">
+          <div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.55);margin-bottom:1px">FIELD SERVICES &amp; ENGINEERING</div>
+            <h1>Inspection Request</h1>
+            <div class="hdr-meta">Raised by Supervisor &mdash; QC to attend and release</div>
+          </div>
+        </div>
+        <div class="irn-right">
+          <div class="irn-lbl">REQ NO</div>
+          <div class="irn-row"><span class="irn-pre">IRQ-</span><input class="irn-in" id="reqNo" placeholder="0000"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><i class="ti ti-briefcase" style="font-size:13px"></i> Job details</div>
+      <div class="fr"><div class="fl">Order / Job no.</div><input class="fi" id="reqJob" placeholder="e.g. F52551 / FSJ507"></div>
+      <div class="fr"><div class="fl">Client</div><input class="fi" id="reqClient" placeholder="e.g. TLT Bulyanhulu"></div>
+      <div class="fr"><div class="fl">Date</div><input class="fi" type="date" id="reqDate"></div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><i class="ti ti-list" style="font-size:13px"></i> Items for inspection</div>
+      <div id="reqItemList"></div>
+      <button class="add-btn" onclick="addReqItem()"><i class="ti ti-plus"></i> Add item</button>
+    </div>
+
+    <div class="card">
+      <div class="ct"><i class="ti ti-shield-check" style="font-size:13px"></i> Inspection type requested</div>
+      <div style="padding:10px 14px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px" id="inspTypeGrid"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><i class="ti ti-note" style="font-size:13px"></i> Special instructions</div>
+      <textarea style="width:100%;padding:10px 14px;background:transparent;border:none;resize:vertical;min-height:80px;font-size:13px;color:#1a1a1a;font-family:inherit;outline:none" id="reqInstructions" placeholder="e.g. Access doors to be fitted after initial weld. Inspect prior to closing..."></textarea>
+    </div>
+
+    <div class="card">
+      <div class="ct"><i class="ti ti-camera" style="font-size:13px"></i> Photos of item</div>
+      <div style="padding:10px 14px">
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px" id="reqPhotoGrid"></div>
+        <label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;border:0.5px solid #185FA5;background:#f0f6ff;color:#185FA5;font-size:12px;font-weight:500;cursor:pointer">
+          <i class="ti ti-camera" style="font-size:16px"></i> Take / add photo
+          <input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="addReqPhoto(this)">
+        </label>
+        <div style="font-size:10px;color:#888;margin-top:4px">Attach photos of the item requiring inspection</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><i class="ti ti-alert-circle" style="font-size:13px"></i> Urgency</div>
+      <div style="display:flex;gap:10px;padding:10px 14px">
+        <button class="rb acc" id="urgNormal" onclick="setUrgency('normal')" style="border-color:#1a3a5c;color:#1a3a5c"><i class="ti ti-clock"></i> Normal</button>
+        <button class="rb rej" id="urgUrgent" onclick="setUrgency('urgent')" style="border-color:#E24B4A;color:#E24B4A"><i class="ti ti-urgent"></i> Urgent</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><i class="ti ti-lock" style="font-size:13px"></i> Raised by — SUP code required</div>
+      <div style="padding:12px 14px">
+        <div style="font-size:11px;color:#888;margin-bottom:8px">Only supervisors can raise an inspection request</div>
+        <input class="code-in" id="reqSupCode" placeholder="SUP-000" maxlength="7" oninput="validateReqSup()">
+        <div class="code-status" id="reqSupStatus"></div>
+      </div>
+    </div>
+
+    <div style="margin-top:10px">
+      <button class="ab sub" id="reqSubmitBtn" onclick="submitRequest()" style="width:100%;padding:12px;border-radius:8px"><i class="ti ti-send"></i> Submit request &amp; notify QC group</button>
+    </div>
+
+    <div style="margin-top:8px">
+      <button class="ab pr" onclick="printRequest()" style="width:100%;padding:10px;border-radius:8px"><i class="ti ti-printer"></i> Print request</button>
+    </div>
+
+    <div style="height:16px"></div>
+  </div>
+
+  <div id="v-register" class="view">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:14px;font-weight:500">IRN Register</div>
+      <button class="ab pri" onclick="showV('form',document.querySelectorAll('.nb')[0])" style="font-size:11px;padding:5px 10px"><i class="ti ti-plus"></i> New IRN</button>
+    </div>
+    <div class="sg">
+      <div class="sc2"><div style="font-size:22px;font-weight:500" id="statT">0</div><div style="font-size:10px;color:#666">Total</div></div>
+      <div style="background:#EAF3DE;border-radius:8px;padding:8px 10px;text-align:center"><div style="font-size:22px;font-weight:500;color:#27500A" id="statP">0</div><div style="font-size:10px;color:#3B6D11">Passed</div></div>
+      <div style="background:#FCEBEB;border-radius:8px;padding:8px 10px;text-align:center"><div style="font-size:22px;font-weight:500;color:#A32D2D" id="statF">0</div><div style="font-size:10px;color:#A32D2D">Failed</div></div>
+    </div>
+    <div class="filt-row">
+      <button class="filt-btn on" onclick="setFilt('all',this)">All</button>
+      <button class="filt-btn" onclick="setFilt('pass',this)">Passed</button>
+      <button class="filt-btn" onclick="setFilt('fail',this)">Failed</button>
+      <button class="filt-btn" onclick="setFilt('partial',this)">Incomplete</button>
+    </div>
+    <div id="regList"><div style="text-align:center;padding:32px 16px;color:#888;font-size:13px"><i class="ti ti-clipboard-list" style="font-size:32px;display:block;margin-bottom:8px"></i>No IRNs submitted yet.</div></div>
+  </div>
+
+  <div id="v-admin" class="view">
+    <div id="adminLocked">
+      <div class="admin-locked">
+        <i class="ti ti-lock" style="font-size:40px;color:#aaa;display:block;margin-bottom:12px"></i>
+        <div style="font-size:14px;font-weight:500;margin-bottom:6px">Admin access required</div>
+        <div style="font-size:12px;color:#888;margin-bottom:16px">Enter your admin code to manage codes</div>
+        <input class="admin-code-input" id="adminCodeIn" type="password" placeholder="Enter admin code" maxlength="20">
+        <button class="ab pri" style="width:100%;margin-top:8px" onclick="unlockAdmin()"><i class="ti ti-lock-open"></i> Unlock admin panel</button>
+      </div>
+    </div>
+    <div id="adminPanel" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-size:14px;font-weight:500">Admin panel</div>
+        <button class="ab" onclick="lockAdmin()" style="font-size:11px;padding:5px 10px"><i class="ti ti-lock"></i> Lock</button>
+      </div>
+      <div class="card">
+        <div class="ct"><i class="ti ti-eye-check" style="font-size:13px"></i> QC inspector codes</div>
+        <div style="overflow-x:auto"><table class="code-table" id="qcTable"></table></div>
+        <div style="padding:8px 14px"><button class="add-btn" onclick="addSlot('qc')"><i class="ti ti-plus"></i> Add QC slot</button></div>
+      </div>
+      <div class="card">
+        <div class="ct"><i class="ti ti-hard-hat" style="font-size:13px"></i> Supervisor codes</div>
+        <div style="overflow-x:auto"><table class="code-table" id="supTable"></table></div>
+        <div style="padding:8px 14px"><button class="add-btn" onclick="addSlot('sup')"><i class="ti ti-plus"></i> Add SUP slot</button></div>
+      </div>
+      <div style="padding:8px 0 16px;font-size:11px;color:#888;text-align:center">Deactivated codes cannot sign off new IRNs.</div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const ENDPOINT='https://script.google.com/macros/s/AKfycbzh4TjDevXQsH3hNU9H7dsA2vrZlrK2ZpTostfKIVqtlIAd7bItAmsyFafGX5pqXzfI/exec';
+const ADMIN_CODE='min@fse';
+const WA_GROUP='https://chat.whatsapp.com/DdCdi8Eto8PHEJ8sNsqqi0';
+
+// Get logo from hidden img element - avoids JS string issues with base64
+function getLogoSrc(){return document.getElementById('fseLogo').src;}
+
+// Set visible logo
+window.addEventListener('DOMContentLoaded',function(){
+  document.getElementById('hdrLogo').src=getLogoSrc();
+});
+
+var codes={
+  qc:Array.from({length:12},function(_,i){return{code:'QC-'+String(i+1).padStart(3,'0'),name:'',active:false};}),
+  sup:Array.from({length:10},function(_,i){return{code:'SUP-'+String(i+1).padStart(3,'0'),name:'',active:false};})
+};
+var supValidated=false,qcValidated=false,supName='',qcName='';
+var iRes=null,openS=null,iCnt=3,tdCnt=0,reg=[],regFilt='all';
+var items=[{id:'i1',desc:'',qty:''},{id:'i2',desc:'',qty:''}];
+var ss={};
+var fabDims=['A','B','C','D','E','F','G','H','I','J','K','L','M'].map(function(l){return{label:l,draw:'',meas:''};});
+var lastIRNs={};
+
+var STAGES=[
+  {id:'s1',num:1,label:'After tack welding',gate:'Inspection after tack welding - 100% visual and dimensional',criteria:['Level','Square','Dimensional','PCD correct','Stiffeners fitted','Dog tags attached']},
+  {id:'s2',num:2,label:'After welding',gate:'Inspection after welding - 100% visual and dimensional',criteria:['Weld size correct','Weld profile ok','No mis-welds','Smalls fitted','No overgrinding','Stop starts ok','No pinholes']},
+  {id:'s3',num:3,label:'Trial assembly',isCritical:true,gate:'Trial assembly performed - all holes bolt-verified and match marked',criteria:['All holes drilled per drawing','Every hole bolt-verified (not 2nd/3rd)','No misaligned holes','Match marks applied','Marks correspond to mating part','Support feet drilled and verified','Assembly fits without forcing']},
+  {id:'s4',num:4,label:'Match-marking',gate:'Match-marking completed after trial assembly',criteria:['Sequential numbering correct','Colour coded where applicable','Marks clearly visible','Marks on mating faces only']},
+  {id:'s5',num:5,label:'Cleaning and NDT',gate:'Inspection after cleaning and NDT - 100% visual',criteria:['Spatter removed','Holes de-burred','No pinholes','No porosity','No structural defects']},
+  {id:'s6',num:6,label:'After primer',gate:'Inspection after primer - 100% visual',criteria:['Coverage uniform','No bare metal','DFT within spec','Surface prep confirmed']},
+  {id:'s7',num:7,label:'Final paint',gate:'Final inspection after paint - 100% visual',criteria:['Smooth and uniform finish','DFT correct','No pinholes','Colour correct','Touch-up checked']}
+];
+STAGES.forEach(function(s){ss[s.id]={gate:false,na:false,crit:new Array(s.criteria.length).fill(false),tdims:[],result:null,rejectReason:'',rejectAction:'',photos:[]};});
+
+function toast(msg,type){
+  if(!type)type='info';
+  var t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast show '+type;
+  setTimeout(function(){t.classList.remove('show');},3500);
+}
+function showV(v,btn){
+  document.querySelectorAll('.view').forEach(function(x){x.classList.remove('on');});
+  document.querySelectorAll('.nb').forEach(function(x){x.classList.remove('on');});
+  document.getElementById('v-'+v).classList.add('on');
+  if(btn)btn.classList.add('on');
+  if(v==='register'){if(window.loadIRNsFromFirebase&&!window._fbL){window._fbL=window.loadIRNsFromFirebase(function(r){if(r.length>0)reg=r;renderReg();});}else{renderReg();}}
+  if(v==='request'){document.getElementById('reqLogo').src=getLogoSrc();}
+}
+function capturePhoto(input,sid){
+  if(!input.files||!input.files[0])return;
+  var file=input.files[0];
+  var reader=new FileReader();
+  reader.onload=function(e){
+    if(!ss[sid].photos)ss[sid].photos=[];
+    ss[sid].photos.push(e.target.result);
+    renderStages();
+    toast('Photo added to '+STAGES.find(function(s){return s.id===sid;}).label,'ok');
+  };
+  reader.readAsDataURL(file);
+  input.value='';
+}
+function removePhoto(sid,pi){
+  if(ss[sid].photos)ss[sid].photos.splice(pi,1);
+  renderStages();
+}
+function viewPhoto(sid,pi){
+  var src=ss[sid].photos[pi];
+  var overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:pointer';
+  var img=document.createElement('img');
+  img.src=src;
+  img.style.cssText='max-width:95%;max-height:95%;object-fit:contain;border-radius:8px';
+  overlay.appendChild(img);
+  overlay.onclick=function(){document.body.removeChild(overlay);};
+  document.body.appendChild(overlay);
+}
+function showStageReject(sid){
+  document.getElementById('sr_reject_'+sid).style.display='block';
+}
+function clearStageResult(sid){
+  ss[sid].result=null;
+  ss[sid].rejectReason='';
+  ss[sid].rejectAction='';
+  // Recalculate overall
+  iRes=null;
+  document.getElementById('btnAcc').className='rb acc';
+  document.getElementById('btnRej').className='rb rej';
+  document.getElementById('rejectionPanel').style.display='none';
+  renderStages();
+}
+function setRes(r){
+  iRes=r;
+  document.getElementById('btnAcc').className='rb acc'+(r==='accept'?' on':'');
+  document.getElementById('btnRej').className='rb rej'+(r==='reject'?' on':'');
+  document.getElementById('rejectionPanel').style.display=r==='reject'?'block':'none';
+  if(r==='accept'){
+    document.getElementById('rejectionReason').value='';
+    document.getElementById('rejectionAction').value='';
+  }
+}
+function suggestNext(){
+  var book=document.getElementById('bookRef').value.trim().toUpperCase();
+  var el=document.getElementById('irnSuggest');
+  if(!book){el.textContent='Enter book ref above';el.style.color='#888';return;}
+  var last=lastIRNs[book]||0;
+  var next=String(last+1).padStart(3,'0');
+  el.innerHTML='<strong style="color:#1a3a5c">'+book+'/'+next+'</strong> &mdash; tap to use';
+  el.style.cursor='pointer';
+  el.onclick=function(){document.getElementById('reportNo').value=next;toast('IRN number set to '+next,'info');};
+}
+function validateCode(role){
+  var inp=document.getElementById(role+'Code');
+  var stat=document.getElementById(role+'Status');
+  var val=inp.value.trim().toUpperCase();
+  var list=role==='sup'?codes.sup:codes.qc;
+  var match=null;
+  for(var i=0;i<list.length;i++){if(list[i].code===val&&list[i].active&&list[i].name){match=list[i];break;}}
+  if(val.length<5){
+    inp.className='code-in';stat.innerHTML='';
+    if(role==='sup'){supValidated=false;supName='';}else{qcValidated=false;qcName='';}
+    return;
+  }
+  if(match){
+    inp.className='code-in valid';
+    stat.innerHTML='<span style="color:#27500A">&#10003; Authorised - '+match.name+'</span>';
+    if(role==='sup'){supValidated=true;supName=match.name;}else{qcValidated=true;qcName=match.name;}
+  }else{
+    inp.className='code-in invalid';
+    stat.innerHTML='<span style="color:#A32D2D">&#10007; Invalid or inactive code</span>';
+    if(role==='sup'){supValidated=false;supName='';}else{qcValidated=false;qcName='';}
+  }
+}
+function unlockAdmin(){
+  if(document.getElementById('adminCodeIn').value===ADMIN_CODE){
+    document.getElementById('adminLocked').style.display='none';
+    document.getElementById('adminPanel').style.display='block';
+    renderCodeTables();
+  }else{toast('Incorrect admin code','err');document.getElementById('adminCodeIn').value='';}
+}
+function lockAdmin(){
+  document.getElementById('adminLocked').style.display='block';
+  document.getElementById('adminPanel').style.display='none';
+  document.getElementById('adminCodeIn').value='';
+}
+function renderCodeTables(){
+  ['qc','sup'].forEach(function(role){
+    var list=role==='qc'?codes.qc:codes.sup;
+    var rows='<tr><th>Code</th><th>Name assigned</th><th>Status</th><th>Action</th></tr>';
+    list.forEach(function(c,i){
+      rows+='<tr><td><span class="cbadge '+(c.active&&c.name?'active':'avail')+'">'+c.code+'</span></td>';
+      rows+='<td><input class="name-in" value="'+c.name+'" placeholder="Assign name..." oninput="updateName(this,'+i+')"></td>';
+      rows+='<td><span class="cbadge '+(c.active&&c.name?'active':c.name&&!c.active?'inactive':'avail')+'">'+(c.active&&c.name?'Active':c.name&&!c.active?'Inactive':'Available')+'</span></td>';
+      rows+='<td><button class="toggle-btn" data-role="'+role+'" data-idx="'+i+'" onclick="toggleCode(this)">'+(c.active?'Deactivate':'Activate')+'</button></td></tr>';
+    });
+    document.getElementById(role+'Table').innerHTML=rows;
+  });
+}
+function updateName(el,i){
+  var val=el.value;
+  var role=el.closest('table').id.replace('Table','');
+  if(role==='qc')codes.qc[i].name=val;else codes.sup[i].name=val;
+  renderCodeTables();
+}
+function toggleCode(el){
+  var role=el.dataset.role;
+  var i=parseInt(el.dataset.idx);
+  var list=role==='qc'?codes.qc:codes.sup;
+  if(!list[i].name){toast('Assign a name first','err');return;}
+  list[i].active=!list[i].active;
+  renderCodeTables();
+  toast(list[i].code+' '+(list[i].active?'activated':'deactivated'));
+}
+function addSlot(role){
+  var prefix=role==='qc'?'QC-':'SUP-';
+  var list=role==='qc'?codes.qc:codes.sup;
+  list.push({code:prefix+String(list.length+1).padStart(3,'0'),name:'',active:false});
+  renderCodeTables();
+}
+// Inspection Request state
+var reqItems=[{id:'r1',desc:'',qty:''}];
+var reqPhotos=[];
+var reqUrgency='normal';
+var reqSupValidated=false;
+var reqSupName='';
+var reqItemCnt=2;
+var REQ_INSP_TYPES=['Prior to welding (pre-stage)','S1: After tack welding','S2: After welding','S3: Trial assembly','S4: Match-marking','S5: Cleaning and NDT','S6: After primer','S7: Final paint','Final release / despatch'];
+
+function initRequest(){
+  document.getElementById('reqDate').value=new Date().toISOString().split('T')[0];
+  document.getElementById('reqLogo').src=getLogoSrc();
+  renderReqItems();
+  renderInspTypes();
+  renderReqPhotos();
+}
+function addReqItem(){reqItems.push({id:'r'+reqItemCnt++,desc:'',qty:''});renderReqItems();}
+function removeReqItem(id){if(reqItems.length<=1)return;reqItems=reqItems.filter(function(i){return i.id!==id;});renderReqItems();}
+function upReqItem(id,f,v){var it=reqItems.find(function(i){return i.id===id;});if(it)it[f]=v;}
+function renderReqItems(){
+  var html='';
+  reqItems.forEach(function(it,idx){
+    html+='<div class="item-row">';
+    html+='<div><div style="font-size:10px;color:#666;margin-bottom:2px">Item '+(idx+1)+'</div>';
+    html+='<input class="fi" value="'+it.desc+'" placeholder="e.g. Diffuser N°1" data-id="'+it.id+'" data-field="desc" oninput="upReqItemEl(this)"></div>';
+    html+='<div><div style="font-size:10px;color:#666;margin-bottom:2px">Qty off</div>';
+    html+='<input class="fi" value="'+it.qty+'" placeholder="2" style="text-align:center" data-id="'+it.id+'" data-field="qty" oninput="upReqItemEl(this)"></div>';
+    html+='<button class="db" data-id="'+it.id+'" onclick="removeReqItem(this.dataset.id)"><i class="ti ti-trash" style="font-size:14px"></i></button>';
+    html+='</div>';
+  });
+  document.getElementById('reqItemList').innerHTML=html;
+}
+function upReqItemEl(el){upReqItem(el.getAttribute('data-id'),el.getAttribute('data-field'),el.value);}
+
+var selectedInspTypes=[];
+function renderInspTypes(){
+  var html='';
+  REQ_INSP_TYPES.forEach(function(t){
+    var on=selectedInspTypes.indexOf(t)>=0;
+    html+='<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;border:0.5px solid '+(on?'#1a3a5c':'#ddd')+';background:'+(on?'#E6F1FB':'#fff')+';cursor:pointer" data-type="'+t+'" onclick="toggleInspType(this.dataset.type)">';
+    html+='<div style="width:14px;height:14px;border-radius:3px;border:1.5px solid '+(on?'#1a3a5c':'#ccc')+';background:'+(on?'#1a3a5c':'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0">';
+    html+=(on?'<i class="ti ti-check" style="font-size:9px;color:#fff"></i>':'')+'</div>';
+    html+='<span style="font-size:12px;color:'+(on?'#1a3a5c':'#555')+'">'+t+'</span></div>';
+  });
+  document.getElementById('inspTypeGrid').innerHTML=html;
+}
+function toggleInspType(t){
+  var idx=selectedInspTypes.indexOf(t);
+  if(idx>=0)selectedInspTypes.splice(idx,1);else selectedInspTypes.push(t);
+  renderInspTypes();
+}
+function addReqPhoto(input){
+  if(!input.files)return;
+  Array.from(input.files).forEach(function(file){
+    var reader=new FileReader();
+    reader.onload=function(e){reqPhotos.push(e.target.result);renderReqPhotos();};
+    reader.readAsDataURL(file);
+  });
+  input.value='';
+}
+function removeReqPhoto(pi){reqPhotos.splice(pi,1);renderReqPhotos();}
+function renderReqPhotos(){
+  var html='';
+  reqPhotos.forEach(function(p,pi){
+    html+='<div style="position:relative">';
+    html+='<img src="'+p+'" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:0.5px solid #ddd;cursor:pointer" data-pi="'+pi+'" onclick="viewReqPhoto(parseInt(this.dataset.pi))">';
+    html+='<button style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;color:#fff;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center" data-pi="'+pi+'" onclick="removeReqPhoto(parseInt(this.dataset.pi))">x</button>';
+    html+='</div>';
+  });
+  document.getElementById('reqPhotoGrid').innerHTML=html;
+}
+function viewReqPhoto(pi){
+  var overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:pointer';
+  var img=document.createElement('img');img.src=reqPhotos[pi];
+  img.style.cssText='max-width:95%;max-height:95%;object-fit:contain;border-radius:8px';
+  overlay.appendChild(img);overlay.onclick=function(){document.body.removeChild(overlay);};
+  document.body.appendChild(overlay);
+}
+function setUrgency(u){
+  reqUrgency=u;
+  document.getElementById('urgNormal').className='rb acc'+(u==='normal'?' on':'');
+  document.getElementById('urgUrgent').className='rb rej'+(u==='urgent'?' on':'');
+  document.getElementById('urgNormal').style.borderColor=u==='normal'?'':'#1a3a5c';
+  document.getElementById('urgNormal').style.color=u==='normal'?'':'#1a3a5c';
+}
+function validateReqSup(){
+  var inp=document.getElementById('reqSupCode');
+  var stat=document.getElementById('reqSupStatus');
+  var val=inp.value.trim().toUpperCase();
+  var match=null;
+  for(var i=0;i<codes.sup.length;i++){if(codes.sup[i].code===val&&codes.sup[i].active&&codes.sup[i].name){match=codes.sup[i];break;}}
+  if(val.length<5){inp.className='code-in';stat.innerHTML='';reqSupValidated=false;reqSupName='';return;}
+  if(match){
+    inp.className='code-in valid';
+    stat.innerHTML='<span style="color:#27500A">&#10003; Authorised &mdash; '+match.name+'</span>';
+    reqSupValidated=true;reqSupName=match.name;
+  }else{
+    inp.className='code-in invalid';
+    stat.innerHTML='<span style="color:#A32D2D">&#10007; Invalid or inactive SUP code</span>';
+    reqSupValidated=false;reqSupName='';
+  }
+}
+function getRequestData(){
+  return{
+    reqNo:document.getElementById('reqNo').value||'--',
+    job:document.getElementById('reqJob').value,
+    client:document.getElementById('reqClient').value,
+    date:document.getElementById('reqDate').value||new Date().toLocaleDateString('en-ZA'),
+    items:JSON.parse(JSON.stringify(reqItems)),
+    inspTypes:selectedInspTypes.join(', ')||'Not specified',
+    instructions:document.getElementById('reqInstructions').value,
+    urgency:reqUrgency,
+    supCode:document.getElementById('reqSupCode').value.toUpperCase(),
+    supervisor:reqSupName,
+    photos:reqPhotos.length
+  };
+}
+function submitRequest(){
+  var d=getRequestData();
+  if(!d.job){toast('Enter order/job number','err');return;}
+  if(reqItems.filter(function(i){return i.desc;}).length===0){toast('Add at least one item','err');return;}
+  if(selectedInspTypes.length===0){toast('Select at least one inspection type','err');return;}
+  if(!reqSupValidated){toast('Supervisor code required','err');return;}
+  var urgIcon=d.urgency==='urgent'?'URGENT - ':'';
+  var itemList=reqItems.filter(function(i){return i.desc;}).map(function(i,idx){return '  '+(idx+1)+'. '+i.desc+(i.qty?' x'+i.qty:'');}).join('\n');
+  var msg='*FSE INSPECTION REQUEST*\n';
+  msg+=(d.urgency==='urgent'?'*================================*\n*            URGENT REQUEST          *\n':'');
+  msg+='*================================*\n';
+  msg+='Req No: *IRQ-'+d.reqNo+'*\n';
+  msg+='Job/Order: *'+d.job+'*\n';
+  msg+='Client: '+(d.client||'--')+'\n';
+  msg+='Date: '+d.date+'\n';
+  msg+='================================\n';
+  msg+='*Items for inspection:*\n'+itemList+'\n';
+  msg+='*Inspection type:* '+d.inspTypes+'\n';
+  if(d.instructions)msg+='*Special instructions:* '+d.instructions+'\n';
+  msg+='================================\n';
+  msg+='Raised by: '+d.supervisor+' ('+d.supCode+')\n';
+  if(d.photos>0)msg+='Photos: '+d.photos+' attached (see form)\n';
+  msg+='\n*QC - please attend and complete IRN on release*';
+  window.open('https://wa.me/?text='+encodeURIComponent(msg));
+  toast('Request submitted to QC group','ok');
+}
+function printRequest(){
+  var d=getRequestData();
+  if(!d.job){toast('Enter order/job number first','err');return;}
+  var itemRows=reqItems.filter(function(i){return i.desc;}).map(function(i,idx){
+    return '<tr><td style="padding:4px 8px;border:1px solid #ccc">'+(idx+1)+'</td><td style="padding:4px 8px;border:1px solid #ccc">'+i.desc+'</td><td style="padding:4px 8px;border:1px solid #ccc;text-align:center">'+(i.qty||'--')+'</td></tr>';
+  }).join('');
+  var photoHtml=reqPhotos.length?'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">'+reqPhotos.map(function(p){return '<img src="'+p+'" style="width:150px;height:150px;object-fit:cover;border-radius:4px;border:1px solid #ddd">';}).join('')+'</div>':'<p style="color:#888;font-size:12px">No photos attached</p>';
+  var pw=window.open('','_blank');
+  var html='<!DOCTYPE html><html><head><title>Inspection Request IRQ-'+d.reqNo+'</title>';
+  html+='<style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#1a1a1a}h1{font-size:16px;margin:0}h2{font-size:13px;margin:12px 0 6px;border-bottom:1px solid #ccc;padding-bottom:3px}table{border-collapse:collapse;width:100%}th{background:#1a3a5c;color:#fff;padding:4px 8px;text-align:left;font-size:11px}.urgent{background:#FCEBEB;border:1.5px solid #E24B4A;border-radius:6px;padding:8px 12px;margin-bottom:12px;color:#A32D2D;font-weight:bold;text-align:center}@media print{.np{display:none}}</style>';
+  html+='</head><body>';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #1a3a5c;padding-bottom:10px;margin-bottom:12px">';
+  html+='<div style="display:flex;align-items:center;gap:12px"><img src="'+getLogoSrc()+'" style="width:48px;height:48px;object-fit:contain">';
+  html+='<div><div style="font-size:10px;color:#666">FIELD SERVICES &amp; ENGINEERING</div><h1>Inspection Request</h1><div style="font-size:10px;color:#666">Please attend and complete IRN on release</div></div></div>';
+  html+='<div style="text-align:right"><div style="font-size:10px;color:#666">REQUEST NO</div><div style="font-size:20px;font-weight:bold;color:#1a3a5c">IRQ-'+d.reqNo+'</div>';
+  html+=(d.urgency==='urgent'?'<div style="background:#E24B4A;color:#fff;border-radius:10px;padding:2px 10px;font-size:11px;font-weight:500;margin-top:4px">URGENT</div>':'')+'</div></div>';
+  if(d.urgency==='urgent')html+='<div class="urgent">URGENT INSPECTION REQUEST - PLEASE ATTEND IMMEDIATELY</div>';
+  html+='<h2>Job details</h2><table>';
+  html+='<tr><th>Order / Job no.</th><td style="padding:4px 8px;border:1px solid #ccc">'+d.job+'</td><th>Client</th><td style="padding:4px 8px;border:1px solid #ccc">'+(d.client||'--')+'</td></tr>';
+  html+='<tr><th>Date requested</th><td style="padding:4px 8px;border:1px solid #ccc">'+d.date+'</td><th>Raised by</th><td style="padding:4px 8px;border:1px solid #ccc">'+d.supervisor+' ('+d.supCode+')</td></tr></table>';
+  html+='<h2>Items for inspection</h2><table><tr><th>#</th><th>Item description</th><th>Qty off</th></tr>'+itemRows+'</table>';
+  html+='<h2>Inspection type requested</h2><p style="border:1px solid #ccc;padding:6px 8px;border-radius:4px">'+d.inspTypes+'</p>';
+  if(d.instructions)html+='<h2>Special instructions</h2><p style="border:1px solid #ccc;padding:6px 8px;border-radius:4px;background:#FAEEDA">'+d.instructions+'</p>';
+  html+='<h2>Photos ('+reqPhotos.length+')</h2>'+photoHtml;
+  html+='<h2>QC sign-off</h2><table><tr><th>QC Inspector</th><th>Date attended</th><th>IRN number</th><th>Signature</th></tr>';
+  html+='<tr><td style="padding:8px;border:1px solid #ccc;height:40px"></td><td style="padding:8px;border:1px solid #ccc"></td><td style="padding:8px;border:1px solid #ccc"></td><td style="padding:8px;border:1px solid #ccc;width:180px"></td></tr></table>';
+  html+='<div style="margin-top:16px;font-size:9px;color:#999;border-top:1px solid #eee;padding-top:6px">FSE eIRN System &middot; '+new Date().toLocaleString('en-ZA')+'</div>';
+  html+='<div class="np" style="margin-top:16px;text-align:center"><button onclick="window.print()" style="padding:8px 24px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">Print / Save as PDF</button></div>';
+  html+='</body></html>';
+  pw.document.write(html);pw.document.close();
+}
+
+function addItem(){items.push({id:'i'+iCnt++,desc:'',qty:''});renderItems();}
+function removeItem(id){if(items.length<=1)return;items=items.filter(function(i){return i.id!==id;});renderItems();}
+function upItem(id,f,v){var it=items.find(function(i){return i.id===id;});if(it)it[f]=v;}
+function upItemEl(el){upItem(el.getAttribute('data-id'),el.getAttribute('data-field'),el.value);}
+function removeItemEl(el){removeItem(el.getAttribute('data-id'));}
+function renderItems(){
+  var html='';
+  items.forEach(function(it,idx){
+    html+='<div class="item-row">';
+    html+='<div><div style="font-size:10px;color:#666;margin-bottom:2px">Item '+(idx+1)+'</div>';
+    html+='<input class="fi" value="'+it.desc+'" placeholder="Description" data-id="'+it.id+'" data-field="desc" oninput="upItemEl(this)"></div>';
+    html+='<div><div style="font-size:10px;color:#666;margin-bottom:2px">Qty off</div>';
+    html+='<input class="fi" value="'+it.qty+'" placeholder="2" style="text-align:center" data-id="'+it.id+'" data-field="qty" oninput="upItemEl(this)"></div>';
+    html+='<button class="db" data-id="'+it.id+'" onclick="removeItemEl(this)"><i class="ti ti-trash" style="font-size:14px"></i></button>';
+    html+='</div>';
+  });
+  document.getElementById('itemList').innerHTML=html;
+}
+function toggleS(sid){openS=openS===sid?null:sid;renderStages();}
+function toggleG(sid,e){e.stopPropagation();ss[sid].gate=!ss[sid].gate;renderStages();}
+function toggleC(sid,ci,e){e.stopPropagation();ss[sid].crit[ci]=!ss[sid].crit[ci];renderStages();}
+function toggleNA(sid,e){e.stopPropagation();ss[sid].na=!ss[sid].na;if(ss[sid].na){ss[sid].gate=false;ss[sid].crit=ss[sid].crit.map(function(){return false;});}renderStages();}
+function addTD(sid){ss[sid].tdims.push({id:'td'+(++tdCnt),lbl:'',draw:'',meas:''});renderStages();}
+function upTD(sid,id,f,v){var d=ss[sid].tdims.find(function(x){return x.id===id;});if(d)d[f]=v;}
+function upTDEl(el){upTD(el.getAttribute('data-sid'),el.getAttribute('data-did'),el.getAttribute('data-f'),el.value);}
+function sendStagePhoto(stageLabel){
+  var d=getFormBasic();
+  var irn=(d.bookRef&&d.reportNo)?d.bookRef+'/'+d.reportNo:'(IRN pending)';
+  var msg='*FSE IRN PHOTO*\nIRN: '+irn+'\nJob: '+(d.job||'pending')+'\nStage: '+stageLabel+'\nInspector: '+(d.inspector||'--')+'\nDate: '+d.date+'\n\n[Attach photo here]';
+  window.open('https://wa.me/?text='+encodeURIComponent(msg));
+}
+function setStageResult(sid,r){
+  if(r==='reject'){
+    var reasonEl=document.getElementById('sr_reason_'+sid);
+    var actionEl=document.getElementById('sr_action_'+sid);
+    if(!reasonEl){showStageReject(sid);return;}
+    var reason=reasonEl.value.trim();
+    var action=actionEl.value.trim();
+    if(!reason){toast('Enter stage rejection reason','err');reasonEl.focus();return;}
+    if(!action){toast('Enter action required for stage','err');actionEl.focus();return;}
+    ss[sid].rejectReason=reason;
+    ss[sid].rejectAction=action;
+  }
+  ss[sid].result=r;
+  // Auto-calculate overall result
+  var stageResults=STAGES.filter(function(s){return !ss[s.id].na;}).map(function(s){return ss[s.id].result;});
+  var allSet=stageResults.every(function(r){return r==='accept'||r==='reject';});
+  var anyFail=stageResults.some(function(r){return r==='reject';});
+  if(allSet){
+    var overall=anyFail?'reject':'accept';
+    iRes=overall;
+    document.getElementById('btnAcc').className='rb acc'+(overall==='accept'?' on':'');
+    document.getElementById('btnRej').className='rb rej'+(overall==='reject'?' on':'');
+    document.getElementById('rejectionPanel').style.display=overall==='reject'?'block':'none';
+    if(overall==='reject'){
+      // Auto-populate overall rejection from stage rejections
+      var reasons=STAGES.filter(function(s){return ss[s.id].result==='reject';}).map(function(s){return s.label+': '+ss[s.id].rejectReason;}).join(' | ');
+      var actions=STAGES.filter(function(s){return ss[s.id].result==='reject';}).map(function(s){return s.label+': '+ss[s.id].rejectAction;}).join(' | ');
+      document.getElementById('rejectionReason').value=reasons;
+      document.getElementById('rejectionAction').value=actions;
+    }
+    toast(overall==='accept'?'All stages passed - IRN accepted':'One or more stages failed - IRN rejected',overall==='accept'?'ok':'err');
+  }
+  renderStages();
+}
+function stSt(sid){
+  var st=ss[sid];if(st.na)return'na';
+  var cd=st.crit.filter(Boolean).length;
+  var s=STAGES.find(function(x){return x.id===sid;});
+  if(st.gate&&cd===s.criteria.length)return'complete';
+  if(st.gate||cd>0)return'partial';return'empty';
+}
+function renderStages(){
+  var html='';
+  STAGES.forEach(function(s){
+    var st=ss[s.id],open=openS===s.id;
+    var cd=st.crit.filter(Boolean).length,status=stSt(s.id);
+    var ic='si',ico=''+s.num;
+    if(st.na){ic+=' na';ico='&mdash;';}
+    else if(status==='complete'){ic+=' cd';ico='<i class="ti ti-check" style="font-size:11px"></i>';}
+    else if(st.gate){ic+=' gd';}
+    var meta=st.na?'N/A':st.gate?(cd+'/'+s.criteria.length+' criteria'):'Gate not confirmed';
+    html+='<div class="sb">';
+    html+='<div class="sh" data-sid="'+s.id+'" onclick="toggleS(this.dataset.sid)">';
+    html+='<div class="'+ic+'">'+ico+'</div>';
+    html+='<div class="sl">'+s.label+(s.isCritical?'<span class="crit-tag">&#9650; Critical</span>':'')+'</div>';
+    html+='<div class="sm">'+meta+'</div>';
+    html+='<i class="ti ti-chevron-'+(open?'up':'down')+'" style="font-size:14px;color:#aaa;flex-shrink:0"></i>';
+    html+='</div>';
+    if(open){
+      html+='<div class="sbdy">';
+      if(s.isCritical&&!st.na){
+        html+='<div class="wb"><i class="ti ti-alert-triangle" style="font-size:15px;flex-shrink:0"></i>';
+        html+='<div><strong>Critical checkpoint:</strong> Every hole must have a bolt during trial assembly. Verify all holes - not every 2nd or 3rd.</div></div>';
+      }
+      html+='<div class="sublbl g"><i class="ti ti-lock-open" style="font-size:11px"></i> Stage gate</div>';
+      html+='<div class="gr'+(st.gate&&!st.na?' on':'')+'" data-sid="'+s.id+'" onclick="toggleG(this.dataset.sid,event)">';
+      html+='<div class="gcb'+(st.gate&&!st.na?' on':'')+'">'+(st.gate&&!st.na?'<i class="ti ti-check" style="font-size:10px;color:#fff"></i>':'')+'</div>';
+      html+='<div class="gt">'+s.gate+'</div></div>';
+      html+='<div class="sublbl c"><i class="ti ti-list-check" style="font-size:11px"></i> Criteria checked and findings</div>';
+      html+='<div class="cg">';
+      s.criteria.forEach(function(c,ci){
+        html+='<div class="ci'+(st.crit[ci]&&!st.na?' on':'')+'" data-sid="'+s.id+'" data-ci="'+ci+'" onclick="toggleC(this.dataset.sid,parseInt(this.dataset.ci),event)">';
+        html+='<div class="ccb'+(st.crit[ci]&&!st.na?' on':'')+'">'+(st.crit[ci]&&!st.na?'<i class="ti ti-check" style="font-size:8px;color:#fff"></i>':'')+'</div>';
+        html+='<span class="ct2">'+c+'</span></div>';
+      });
+      html+='</div>';
+      if(s.id==='s3'&&!st.na){
+        html+='<div class="sublbl d"><i class="ti ti-ruler" style="font-size:11px"></i> Trial assembly dimensions</div>';
+        html+='<table class="dt"><thead><tr><th style="width:20px">#</th><th>Description</th><th>Drawing</th><th>Measured</th><th style="width:30px"></th></tr></thead><tbody>';
+        st.tdims.forEach(function(d){
+          var diff=d.draw&&d.meas?Math.abs(parseFloat(d.draw)-parseFloat(d.meas)).toFixed(1):'';
+          var cls=d.draw&&d.meas?(parseFloat(d.draw)===parseFloat(d.meas)?'dok':'dflag'):'';
+          var val=d.draw&&d.meas?(parseFloat(d.draw)===parseFloat(d.meas)?'&#10003;':'&plusmn;'+diff):'';
+          html+='<tr><td style="font-size:11px;color:#888">'+d.id.replace('td','')+'</td>';
+          html+='<td><input class="di" value="'+d.lbl+'" placeholder="e.g. Hole diam." data-sid="'+s.id+'" data-did="'+d.id+'" data-f="lbl" oninput="upTDEl(this)" style="text-align:left"></td>';
+          html+='<td><input class="di" value="'+d.draw+'" placeholder="--" data-sid="'+s.id+'" data-did="'+d.id+'" data-f="draw" oninput="upTDEl(this)"></td>';
+          html+='<td><input class="di" value="'+d.meas+'" placeholder="--" data-sid="'+s.id+'" data-did="'+d.id+'" data-f="meas" oninput="upTDEl(this)"></td>';
+          html+='<td class="'+cls+'">'+val+'</td></tr>';
+        });
+        html+='</tbody></table>';
+        html+='<button class="add-dim" data-sid="'+s.id+'" onclick="addTD(this.dataset.sid)"><i class="ti ti-plus" style="font-size:11px"></i> Add dimension</button>';
+      }
+      html+='<div class="sublbl p"><i class="ti ti-camera" style="font-size:11px"></i> Stage photos ('+(st.photos?st.photos.length:0)+')</div>';
+      html+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">';
+      if(st.photos&&st.photos.length){
+        st.photos.forEach(function(p,pi){
+          html+='<div style="position:relative">';
+          html+='<img src="'+p+'" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:0.5px solid #ddd;cursor:pointer" data-sid="'+s.id+'" data-pi="'+pi+'" onclick="viewPhoto(this.dataset.sid,parseInt(this.dataset.pi))">';
+          html+='<button style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;color:#fff;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center" data-sid="'+s.id+'" data-pi="'+pi+'" onclick="removePhoto(this.dataset.sid,parseInt(this.dataset.pi))">x</button>';
+          html+='</div>';
+        });
+      }
+      html+='</div>';
+      html+='<label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;border:0.5px solid #185FA5;background:#f0f6ff;color:#185FA5;font-size:12px;font-weight:500;cursor:pointer">';
+      html+='<i class="ti ti-camera" style="font-size:16px"></i> Take photo';
+      html+='<input type="file" accept="image/*" capture="environment" style="display:none" data-sid="'+s.id+'" onchange="capturePhoto(this,this.dataset.sid)">';
+      html+='</label>';
+      html+='<div style="font-size:10px;color:#888;margin-top:4px">Opens camera directly on mobile</div>';
+      // Stage result
+      if(!st.na){
+        html+='<div style="margin-top:10px;border-top:0.5px solid #ddd;padding-top:10px">';
+        html+='<div style="font-size:10px;font-weight:500;color:#666;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:7px">Stage result</div>';
+        if(st.result==='accept'){
+          html+='<div style="display:flex;align-items:center;gap:6px;padding:8px 10px;background:#EAF3DE;border-radius:8px;font-size:12px;font-weight:500;color:#27500A">';
+          html+='<i class="ti ti-circle-check" style="font-size:16px"></i> Stage accepted';
+          html+='<button style="margin-left:auto;font-size:11px;padding:2px 8px;border-radius:6px;border:0.5px solid #639922;background:transparent;color:#639922;cursor:pointer" data-sid="'+s.id+'" onclick="clearStageResult(this.dataset.sid)">Change</button>';
+          html+='</div>';
+        } else if(st.result==='reject'){
+          html+='<div style="padding:8px 10px;background:#FCEBEB;border-radius:8px">';
+          html+='<div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:#A32D2D;margin-bottom:4px">';
+          html+='<i class="ti ti-circle-x" style="font-size:16px"></i> Stage rejected';
+          html+='<button style="margin-left:auto;font-size:11px;padding:2px 8px;border-radius:6px;border:0.5px solid #E24B4A;background:transparent;color:#E24B4A;cursor:pointer" data-sid="'+s.id+'" onclick="clearStageResult(this.dataset.sid)">Change</button>';
+          html+='</div>';
+          html+='<div style="font-size:11px;color:#A32D2D;margin-bottom:2px"><strong>Reason:</strong> '+st.rejectReason+'</div>';
+          html+='<div style="font-size:11px;color:#A32D2D"><strong>Action:</strong> '+st.rejectAction+'</div>';
+          html+='</div>';
+        } else {
+          // Not yet set - show accept/reject buttons + reject fields
+          html+='<div style="display:flex;gap:8px;margin-bottom:6px">';
+          html+='<button style="flex:1;padding:8px;border-radius:8px;border:1.5px solid #639922;color:#639922;background:transparent;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" data-res="accept" onclick="setStageResult(this.dataset.sid,this.dataset.res)"><i class="ti ti-check"></i> Accept stage</button>';
+          html+='<button style="flex:1;padding:8px;border-radius:8px;border:1.5px solid #E24B4A;color:#E24B4A;background:transparent;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" onclick="showStageReject(this.dataset.sid)"><i class="ti ti-x"></i> Reject stage</button>';
+          html+='</div>';
+          html+='<div id="sr_reject_'+s.id+'" style="display:none;padding:8px;background:#FCEBEB;border-radius:8px;border:0.5px solid #E24B4A">';
+          html+='<div style="font-size:10px;font-weight:500;color:#A32D2D;margin-bottom:4px">Rejection reason *</div>';
+          html+='<textarea id="sr_reason_'+s.id+'" style="width:100%;padding:6px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:50px;background:#fff;outline:none" placeholder="What failed at this stage..."></textarea>';
+          html+='<div style="font-size:10px;font-weight:500;color:#A32D2D;margin:6px 0 4px">Action required *</div>';
+          html+='<textarea id="sr_action_'+s.id+'" style="width:100%;padding:6px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:50px;background:#fff;outline:none" placeholder="What must be corrected..."></textarea>';
+          html+='<button style="width:100%;margin-top:6px;padding:7px;border-radius:6px;border:1.5px solid #E24B4A;color:#fff;background:#E24B4A;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" data-res="reject" onclick="setStageResult(this.dataset.sid,this.dataset.res)">Confirm rejection</button>';
+          html+='</div>';
+        }
+        html+='</div>';
+      }
+      html+='<button class="nab'+(st.na?' on':'')+'" data-sid="'+s.id+'" onclick="toggleNA(this.dataset.sid,event)">'+(st.na?'Undo N/A':'Mark N/A')+'</button>';
+      html+='</div>';
+    }
+    html+='</div>';
+  });
+  document.getElementById('stageList').innerHTML=html;
+  var map={complete:'Complete',partial:'Partial',empty:'Not started',na:'N/A'};
+  var sumHtml='';
+  STAGES.forEach(function(s){
+    var st=stSt(s.id);
+    sumHtml+='<div class="ssc"><span style="font-size:11px">'+s.label+'</span><span class="pill '+st+'">'+map[st]+'</span></div>';
+  });
+  document.getElementById('stageSummary').innerHTML=sumHtml;
+}
+function addFab(){fabDims.push({label:String.fromCharCode(65+fabDims.length),draw:'',meas:''});renderFab();}
+function upFab(i,f,v){fabDims[i][f]=v;}
+function upFabEl(el){upFab(parseInt(el.dataset.idx),el.getAttribute('data-f'),el.value);}
+function renderFab(){
+  var html='';
+  fabDims.forEach(function(d,i){
+    var diff=d.draw&&d.meas?Math.abs(parseFloat(d.draw)-parseFloat(d.meas)).toFixed(1):'';
+    var cls=d.draw&&d.meas?(parseFloat(d.draw)===parseFloat(d.meas)?'dok':'dflag'):'';
+    var val=d.draw&&d.meas?(parseFloat(d.draw)===parseFloat(d.meas)?'&#10003;':'&plusmn;'+diff):'';
+    html+='<tr><td style="font-size:11px;font-weight:500;color:#888">'+d.label+'</td>';
+    html+='<td><input class="di" value="'+d.draw+'" placeholder="--" data-idx="'+i+'" data-f="draw" oninput="upFabEl(this)"></td>';
+    html+='<td><input class="di" value="'+d.meas+'" placeholder="--" data-idx="'+i+'" data-f="meas" oninput="upFabEl(this)"></td>';
+    html+='<td class="'+cls+'">'+val+'</td></tr>';
+  });
+  document.getElementById('fabBody').innerHTML=html;
+}
+function getSnags(){
+  var s=[];
+  STAGES.forEach(function(st){
+    var state=ss[st.id];
+    if(!state.na&&!state.gate)s.push(st.label+': gate not confirmed');
+    else if(!state.na&&state.gate){
+      var m=st.criteria.filter(function(_,i){return !state.crit[i];});
+      if(m.length)s.push(st.label+': '+m.join(', '));
+    }
+  });
+  return s.join(' | ')||'None';
+}
+function getFormBasic(){
+  return{
+    reportNo:document.getElementById('reportNo').value||'--',
+    bookRef:document.getElementById('bookRef').value.toUpperCase(),
+    inspector:document.getElementById('inspector').value,
+    po:document.getElementById('po').value,
+    job:document.getElementById('job').value,
+    project:document.getElementById('project').value,
+    drawing:document.getElementById('drawing').value,
+    artisan:document.getElementById('artisan').value,
+    date:document.getElementById('irnDate').value||new Date().toLocaleDateString('en-ZA'),
+    result:iRes||'not set',
+    rejectionReason:iRes==='reject'?document.getElementById('rejectionReason').value:'',
+    rejectionAction:iRes==='reject'?document.getElementById('rejectionAction').value:'',
+    notes:document.getElementById('notes').value,
+    supervisor:supName,supCode:document.getElementById('supCode').value.toUpperCase(),
+    qc:qcName,qcCode:document.getElementById('qcCode').value.toUpperCase(),
+    client:document.getElementById('clientName').value,
+    clientCo:document.getElementById('clientCo').value
+  };
+}
+function getForm(){
+  var b=getFormBasic();
+  b.stagesComplete=STAGES.filter(function(s){return stSt(s.id)==='complete';}).length+'/'+STAGES.length;
+  b.trialAssyPass=ss['s3'].na?'N/A':(ss['s3'].gate&&ss['s3'].crit.every(Boolean)?'Pass':'Fail/Incomplete');
+  b.snags=getSnags();
+  b.items=JSON.parse(JSON.stringify(items));
+  b.stageStates=JSON.parse(JSON.stringify(ss));
+  b.fabDims=JSON.parse(JSON.stringify(fabDims));
+  return b;
+}
+function buildWAMessage(d){
+  var isPass=d.result==='accept';
+  var stagesComplete=STAGES.filter(function(s){return stSt(s.id)==='complete';}).length;
+  var trialSt=ss['s3'].na?'N/A':(ss['s3'].gate&&ss['s3'].crit.every(Boolean)?'Pass':'FAIL');
+  var itemList=items.filter(function(i){return i.desc;}).map(function(i,idx){return '  '+(idx+1)+'. '+i.desc+(i.qty?' x'+i.qty:'');}).join('\n');
+  var snags=getSnags();
+  var msg='';
+  if(isPass){
+    msg+='*FSE FIELD SERVICES & ENGINEERING*\n';
+    msg+='*================================*\n';
+    msg+='*           QC RELEASED          *\n';
+    msg+='*================================*\n';
+  }else{
+    msg+='*FSE FIELD SERVICES & ENGINEERING*\n';
+    msg+='*================================*\n';
+    msg+='*           QC REJECTED          *\n';
+    msg+='*================================*\n';
+  }
+  msg+='Report: *'+d.bookRef+'/'+d.reportNo+'*\n';
+  msg+='Job: *'+d.job+'*'+(d.po?' | PO: '+d.po:'')+'\n';
+  msg+='Project: '+(d.project||'--')+'\n';
+  msg+='Drawing: '+(d.drawing||'--')+'\n';
+  msg+='Artisan: '+(d.artisan||'--')+'\n';
+  msg+='Inspector: '+d.inspector+(d.bookRef?' (Book: '+d.bookRef+')':'')+'\n';
+  msg+='Date: '+d.date+'\n';
+  msg+='================================\n';
+  if(itemList)msg+='*Items:*\n'+itemList+'\n';
+  msg+='Stages complete: '+stagesComplete+'/'+STAGES.length+'\n';
+  msg+='Trial assembly: *'+trialSt+'*\n';
+  if(snags!=='None')msg+='*SNAGS:* '+snags+'\n';
+  msg+='================================\n';
+  msg+='*Authorised by:*\n';
+  msg+='  SUP: '+d.supCode+' ('+d.supervisor+')\n';
+  msg+='  QC: '+d.qcCode+' ('+d.qc+')\n';
+  if(!isPass){
+    if(d.rejectionReason)msg+='\n*Rejection reason:* '+d.rejectionReason+'\n';
+    if(d.rejectionAction)msg+='*Action required:* '+d.rejectionAction+'\n';
+  }
+  return msg;
+}
+function sendWA(){
+  var d=getFormBasic();
+  var msg='FSE IRN: '+d.bookRef+'/'+d.reportNo+'\nJob: '+d.job+' | PO: '+d.po+'\nResult: '+d.result.toUpperCase()+'\nDate: '+d.date;
+  window.open('https://wa.me/?text='+encodeURIComponent(msg));
+}
+async function submitIRN(){
+  var d=getForm();
+  if(!d.reportNo||d.reportNo==='--'){toast('Enter a report number','err');return;}
+  if(!d.job){toast('Enter a job number','err');return;}
+  if(!d.bookRef){toast('Enter book reference','err');return;}
+  if(d.result==='not set'){toast('Set Accept or Reject','err');return;}
+  if(d.result==='reject'){
+    var reason=document.getElementById('rejectionReason').value.trim();
+    var action=document.getElementById('rejectionAction').value.trim();
+    if(!reason){toast('Enter rejection reason before submitting','err');document.getElementById('rejectionReason').focus();return;}
+    if(!action){toast('Enter action required before submitting','err');document.getElementById('rejectionAction').focus();return;}
+  }
+  if(!supValidated){toast('Supervisor code required','err');return;}
+  if(!qcValidated){toast('QC code required','err');return;}
+  var btn=document.getElementById('submitBtn');
+  btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Submitting...';
+  try{
+    await fetch(ENDPOINT,{method:'POST',body:JSON.stringify(d),mode:'no-cors'});
+    var ex=reg.findIndex(function(r){return r.reportNo===d.reportNo&&r.bookRef===d.bookRef;});
+    if(ex>=0)reg[ex]=d;else reg.unshift(d);
+    lastIRNs[d.bookRef]=(lastIRNs[d.bookRef]||0)+1;
+    if(window.saveIRNToFirebase)window.saveIRNToFirebase(d);
+    toast(d.reportNo+' submitted and saved','ok');
+    setTimeout(function(){
+      var msg=buildWAMessage(d);
+      window.open('https://wa.me/?text='+encodeURIComponent(msg));
+    },800);
+    renderReg();
+  }catch(e){
+    toast('Saved locally - check connection','err');
+    reg.unshift(d);renderReg();
+  }finally{
+    btn.disabled=false;
+    btn.innerHTML='<i class="ti ti-cloud-upload"></i> Submit and notify FSE QC Releases';
+  }
+}
+function setFilt(f,btn){
+  regFilt=f;
+  document.querySelectorAll('.filt-btn').forEach(function(b){b.classList.remove('on');});
+  btn.classList.add('on');
+  renderReg();
+}
+function stStFromSaved(st,s){
+  if(!st)return'empty';if(st.na)return'na';
+  var cd=st.crit.filter(Boolean).length;
+  if(st.gate&&cd===s.criteria.length)return'complete';
+  if(st.gate||cd>0)return'partial';return'empty';
+}
+function renderReg(){
+  document.getElementById('statT').textContent=reg.length;
+  document.getElementById('statP').textContent=reg.filter(function(r){return r.result==='accept';}).length;
+  document.getElementById('statF').textContent=reg.filter(function(r){return r.result==='reject';}).length;
+  var filtered=reg;
+  if(regFilt==='pass')filtered=reg.filter(function(r){return r.result==='accept';});
+  else if(regFilt==='fail')filtered=reg.filter(function(r){return r.result==='reject';});
+  else if(regFilt==='partial')filtered=reg.filter(function(r){
+    var sc=parseInt(r.stagesComplete);var st=parseInt((r.stagesComplete||'0/7').split('/')[1]);return sc<st;
+  });
+  if(!filtered.length){
+    document.getElementById('regList').innerHTML='<div style="text-align:center;padding:32px 16px;color:#888;font-size:13px"><i class="ti ti-clipboard-list" style="font-size:32px;display:block;margin-bottom:8px"></i>No records found.</div>';
+    return;
+  }
+  var stMap={complete:'ok',partial:'part',empty:'fail',na:'na'};
+  var html='';
+  filtered.forEach(function(r){
+    var stagePills='';
+    STAGES.forEach(function(s){
+      var st=r.stageStates?stStFromSaved(r.stageStates[s.id],s):'empty';
+      stagePills+='<span class="sp '+stMap[st]+'">'+s.label+'</span>';
+    });
+    var snags=r.snags&&r.snags!=='None'?r.snags:'';
+    var itemSummary=r.items?r.items.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', '):'--';
+    html+='<div class="reg-card">';
+    // Header - IRN number + result pill
+    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:0.5px solid #eee;background:'+(r.result==='accept'?'#f0fdf4':'#fff8f8')+'">';
+    html+='<div style="font-size:14px;font-weight:600;color:#1a3a5c">'+r.bookRef+'/'+r.reportNo+'</div>';
+    html+='<span class="rp '+(r.result==='accept'?'pass':'fail')+'" style="font-size:12px;padding:4px 12px">'+(r.result==='accept'?'QC RELEASED':'QC REJECTED')+'</span>';
+    html+='</div>';
+    // Job details grid
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:0.5px solid #eee">';
+    html+='<div style="padding:7px 12px;border-right:0.5px solid #eee"><div style="font-size:9px;color:#888;font-weight:500;text-transform:uppercase;margin-bottom:2px">Job number</div><div style="font-size:12px;font-weight:500">'+(r.job||'--')+'</div></div>';
+    html+='<div style="padding:7px 12px"><div style="font-size:9px;color:#888;font-weight:500;text-transform:uppercase;margin-bottom:2px">PO number</div><div style="font-size:12px">'+(r.po||'--')+'</div></div>';
+    html+='<div style="padding:7px 12px;border-right:0.5px solid #eee;border-top:0.5px solid #eee"><div style="font-size:9px;color:#888;font-weight:500;text-transform:uppercase;margin-bottom:2px">Project</div><div style="font-size:12px">'+(r.project||'--')+'</div></div>';
+    html+='<div style="padding:7px 12px;border-top:0.5px solid #eee"><div style="font-size:9px;color:#888;font-weight:500;text-transform:uppercase;margin-bottom:2px">Drawing / Rev</div><div style="font-size:12px">'+(r.drawing||'--')+'</div></div>';
+    html+='<div style="padding:7px 12px;border-right:0.5px solid #eee;border-top:0.5px solid #eee"><div style="font-size:9px;color:#888;font-weight:500;text-transform:uppercase;margin-bottom:2px">Date</div><div style="font-size:12px">'+r.date+'</div></div>';
+    html+='<div style="padding:7px 12px;border-top:0.5px solid #eee"><div style="font-size:9px;color:#888;font-weight:500;text-transform:uppercase;margin-bottom:2px">Artisan</div><div style="font-size:12px">'+(r.artisan||'--')+'</div></div>';
+    html+='</div>';
+    // Inspector + authorisation
+    html+='<div style="padding:8px 12px;border-bottom:0.5px solid #eee;background:#f9f9f7">';
+    html+='<div style="font-size:9px;color:#888;font-weight:500;text-transform:uppercase;margin-bottom:5px">Authorisation</div>';
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">';
+    html+='<div style="font-size:11px"><span style="color:#888">Inspector:</span> '+(r.inspector||'--')+' <span style="color:#1a3a5c;font-family:monospace">('+r.bookRef+')</span></div>';
+    html+='<div style="font-size:11px"><span style="color:#888">SUP:</span> <span style="font-family:monospace">'+r.supCode+'</span> '+r.supervisor+'</div>';
+    html+='<div style="font-size:11px"><span style="color:#888">QC:</span> <span style="font-family:monospace">'+r.qcCode+'</span> '+r.qc+'</div>';
+    html+='</div></div>';
+    // Items released
+    html+='<div style="padding:8px 12px;border-bottom:0.5px solid #eee">';
+    html+='<div style="font-size:9px;color:#888;font-weight:500;text-transform:uppercase;margin-bottom:4px">Items released</div>';
+    html+='<div style="font-size:12px">'+itemSummary+'</div></div>';
+    // Stages
+    html+='<div class="rc-stages">';
+    html+='<div style="font-size:9px;color:#888;font-weight:500;text-transform:uppercase;margin-bottom:5px">Inspection stages &mdash; '+(r.stagesComplete||'?')+' complete &middot; Trial assy: <strong>'+(r.trialAssyPass||'?')+'</strong></div>';
+    html+='<div class="stage-pills">'+stagePills+'</div></div>';
+    // Snags
+    if(snags)html+='<div class="rc-snags"><strong>SNAGS:</strong> '+snags+'</div>';
+    // Rejection details if rejected
+    if(r.result==='reject'&&(r.rejectionReason||r.rejectionAction)){
+      html+='<div style="padding:8px 12px;background:#FCEBEB;border-top:0.5px solid #E24B4A">';
+      html+='<div style="font-size:9px;color:#A32D2D;font-weight:500;text-transform:uppercase;margin-bottom:5px">Rejection details</div>';
+      if(r.rejectionReason)html+='<div style="font-size:11px;color:#A32D2D;margin-bottom:3px"><strong>Reason:</strong> '+r.rejectionReason+'</div>';
+      if(r.rejectionAction)html+='<div style="font-size:11px;color:#A32D2D"><strong>Action required:</strong> '+r.rejectionAction+'</div>';
+      html+='</div>';
+    }
+    // Actions
+    html+='<div class="rc-acts">';
+    html+='<button class="ra bl" data-book="'+r.bookRef+'" data-no="'+r.reportNo+'" onclick="printRec(this.dataset.book,this.dataset.no)"><i class="ti ti-printer" style="font-size:13px"></i> Print</button>';
+    html+='<button class="ra wa" data-book="'+r.bookRef+'" data-no="'+r.reportNo+'" onclick="waRec(this.dataset.book,this.dataset.no)"><i class="ti ti-brand-whatsapp" style="font-size:13px"></i> Send WA</button>';
+    html+='</div></div>';
+  });
+  document.getElementById('regList').innerHTML=html;
+}
+function waRec(book,no){
+  var r=reg.find(function(x){return x.reportNo===no&&x.bookRef===book;});if(!r)return;
+  var isPass=r.result==='accept';
+  var msg='*FSE FIELD SERVICES & ENGINEERING*\n';
+  msg+='*================================*\n';
+  msg+=(isPass?'*           QC RELEASED          *':'*           QC REJECTED          *')+'\n';
+  msg+='*================================*\n';
+  msg+='Report: *'+r.bookRef+'/'+r.reportNo+'*\n';
+  msg+='Job: *'+r.job+'* | PO: '+(r.po||'--')+'\n';
+  msg+='Project: '+(r.project||'--')+'\n';
+  msg+='Inspector: '+(r.inspector||'--')+' ('+r.bookRef+')\n';
+  msg+='Date: '+r.date+'\n';
+  msg+='Stages: '+r.stagesComplete+' | Trial assy: '+r.trialAssyPass+'\n';
+  msg+='SUP: '+r.supCode+' ('+r.supervisor+') | QC: '+r.qcCode+' ('+r.qc+')\n';
+  if(r.snags&&r.snags!=='None')msg+='*SNAGS:* '+r.snags+'\n';
+  if(!isPass)msg+='\n*Action required - see snags*';
+  window.open('https://wa.me/?text='+encodeURIComponent(msg));
+}
+function printRec(book,no){
+  var r=reg.find(function(x){return x.reportNo===no&&x.bookRef===book;});if(!r)return;
+  var logoSrc=getLogoSrc();
+  var stageRows='';
+  STAGES.forEach(function(s){
+    var st=r.stageStates[s.id];
+    var checked=st.crit.map(function(c,i){return c?s.criteria[i]:null;}).filter(Boolean);
+    var stRes=st.result?('<strong style="color:'+(st.result==='accept'?'#27500A':'#A32D2D')+'">'+(st.result==='accept'?'ACCEPTED':'REJECTED')+'</strong>'):'--';
+    stageRows+='<tr><td style="padding:4px 8px;border:1px solid #ccc;font-weight:bold">'+s.label+(s.isCritical?' (Critical)':'')+'</td>';
+    stageRows+='<td style="padding:4px 8px;border:1px solid #ccc">'+(st.na?'N/A':st.gate?'Confirmed':'Not confirmed')+'</td>';
+    stageRows+='<td style="padding:4px 8px;border:1px solid #ccc">'+(st.na?'--':checked.join(', ')||'--')+'</td>';
+    stageRows+='<td style="padding:4px 8px;border:1px solid #ccc">'+stRes+'</td></tr>';
+    if(st.photos&&st.photos.length){
+      stageRows+='<tr><td colspan="4" style="padding:6px 8px;border:1px solid #ccc;background:#f9f9f7">';
+      stageRows+='<div style="font-size:10px;color:#666;margin-bottom:4px">PHOTOS ('+st.photos.length+')</div><div style="display:flex;flex-wrap:wrap;gap:6px">';
+      st.photos.forEach(function(p){stageRows+='<img src="'+p+'" style="width:110px;height:110px;object-fit:cover;border-radius:4px;border:1px solid #ddd">';});
+      stageRows+='</div></td></tr>';
+    }
+    if(st.result==='reject'){
+      stageRows+='<tr><td colspan="4" style="padding:6px 8px;border:1px solid #ccc;background:#FCEBEB">';
+      if(st.rejectReason)stageRows+='<div style="font-size:11px;color:#A32D2D"><strong>Reason:</strong> '+st.rejectReason+'</div>';
+      if(st.rejectAction)stageRows+='<div style="font-size:11px;color:#A32D2D;margin-top:2px"><strong>Action:</strong> '+st.rejectAction+'</div>';
+      stageRows+='</td></tr>';
+    }
+  });
+var fabRows='';
+  r.fabDims.filter(function(d){return d.draw||d.meas;}).forEach(function(d){
+    var diff=d.draw&&d.meas?Math.abs(parseFloat(d.draw)-parseFloat(d.meas)).toFixed(1):'';
+    fabRows+='<tr><td style="padding:4px 8px;border:1px solid #ccc">'+d.label+'</td>';
+    fabRows+='<td style="padding:4px 8px;border:1px solid #ccc;text-align:center">'+(d.draw||'--')+'</td>';
+    fabRows+='<td style="padding:4px 8px;border:1px solid #ccc;text-align:center">'+(d.meas||'--')+'</td>';
+    fabRows+='<td style="padding:4px 8px;border:1px solid #ccc;text-align:center;color:'+(d.draw&&d.meas&&parseFloat(d.draw)!==parseFloat(d.meas)?'#E24B4A':'#3B6D11')+'">'+(d.draw&&d.meas?(parseFloat(d.draw)===parseFloat(d.meas)?'OK':'+-'+diff):'--')+'</td></tr>';
+  });
+  var itemRows='';
+  r.items.filter(function(i){return i.desc;}).forEach(function(i,idx){
+    itemRows+='<tr><td style="padding:4px 8px;border:1px solid #ccc">'+(idx+1)+'</td>';
+    itemRows+='<td style="padding:4px 8px;border:1px solid #ccc">'+i.desc+'</td>';
+    itemRows+='<td style="padding:4px 8px;border:1px solid #ccc;text-align:center">'+(i.qty||'--')+'</td></tr>';
+  });
+  var pw=window.open('','_blank');
+  var html='<!DOCTYPE html><html><head><title>IRN '+r.bookRef+'/'+r.reportNo+'</title>';
+  html+='<style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#1a1a1a}h1{font-size:16px;margin:0}h2{font-size:13px;margin:12px 0 6px;border-bottom:1px solid #ccc;padding-bottom:3px}table{border-collapse:collapse;width:100%}th{background:#1a3a5c;color:#fff;padding:4px 8px;text-align:left;font-size:11px}.pass{color:#27500A;font-weight:bold}.fail{color:#A32D2D;font-weight:bold}@media print{.np{display:none}}</style>';
+  html+='</head><body>';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #1a3a5c;padding-bottom:10px;margin-bottom:12px">';
+  html+='<div style="display:flex;align-items:center;gap:12px"><img src="'+logoSrc+'" style="width:48px;height:48px;object-fit:contain">';
+  html+='<div><div style="font-size:10px;color:#666">FIELD SERVICES AND ENGINEERING</div><h1>Inspection Release Note</h1>';
+  html+='<div style="font-size:10px;color:#666">FSE-QR-IRN.038 Rev 02 ISO9001/ISO3834-2</div></div></div>';
+  html+='<div style="text-align:right"><div style="font-size:10px;color:#666">REPORT NO</div>';
+  html+='<div style="font-size:20px;font-weight:bold;color:#1a3a5c">'+r.bookRef+'/'+r.reportNo+'</div></div></div>';
+  html+='<h2>Job details</h2><table>';
+  html+='<tr><th>PO</th><td style="padding:4px 8px;border:1px solid #ccc">'+(r.po||'--')+'</td><th>Job</th><td style="padding:4px 8px;border:1px solid #ccc">'+(r.job||'--')+'</td></tr>';
+  html+='<tr><th>Project</th><td colspan="3" style="padding:4px 8px;border:1px solid #ccc">'+(r.project||'--')+'</td></tr>';
+  html+='<tr><th>Drawing</th><td style="padding:4px 8px;border:1px solid #ccc">'+(r.drawing||'--')+'</td><th>Artisan</th><td style="padding:4px 8px;border:1px solid #ccc">'+(r.artisan||'--')+'</td></tr>';
+  html+='<tr><th>Inspector</th><td style="padding:4px 8px;border:1px solid #ccc">'+(r.inspector||'--')+' ('+(r.bookRef||'--')+')</td>';
+  html+='<th>Result</th><td class="'+(r.result==='accept'?'pass':'fail')+'" style="padding:4px 8px;border:1px solid #ccc">'+(r.result==='accept'?'ACCEPTED':'REJECTED')+'</td></tr></table>';
+  if(r.result==='reject'&&(r.rejectionReason||r.rejectionAction)){
+    html+='<div style="margin:10px 0;padding:10px 12px;background:#FCEBEB;border:1.5px solid #E24B4A;border-radius:6px">';
+    html+='<div style="font-size:12px;font-weight:bold;color:#A32D2D;margin-bottom:6px">REJECTION DETAILS</div>';
+    if(r.rejectionReason)html+='<div style="margin-bottom:6px"><span style="font-size:11px;font-weight:bold;color:#A32D2D">Reason: </span><span style="font-size:12px">'+r.rejectionReason+'</span></div>';
+    if(r.rejectionAction)html+='<div><span style="font-size:11px;font-weight:bold;color:#A32D2D">Action required: </span><span style="font-size:12px">'+r.rejectionAction+'</span></div>';
+    html+='</div>';
+  }
+  html+='<h2>Items released</h2><table><tr><th>#</th><th>Description</th><th>Qty off</th></tr>'+itemRows+'</table>';
+  html+='<h2>Inspection stages</h2><table><tr><th>Stage</th><th>Gate</th><th>Criteria confirmed</th><th>Stage result</th></tr>'+stageRows+'</table>';
+  html+='<h2>Fabrication dimensions</h2><table><tr><th>Dim</th><th>Drawing</th><th>Measured</th><th>Status</th></tr>'+(fabRows||'<tr><td colspan="4" style="padding:4px 8px;border:1px solid #ccc">No dimensions recorded</td></tr>')+'</table>';
+  if(r.notes)html+='<h2>Inspection notes</h2><p style="border:1px solid #ccc;padding:6px 8px">'+r.notes+'</p>';
+  html+='<h2>Authorisation</h2><table><tr><th>Role</th><th>Name</th><th>Code</th><th>Status</th></tr>';
+  html+='<tr><td style="padding:6px 8px;border:1px solid #ccc">Supervisor</td><td style="padding:6px 8px;border:1px solid #ccc">'+(r.supervisor||'--')+'</td>';
+  html+='<td style="padding:6px 8px;border:1px solid #ccc;font-family:monospace;font-weight:500">'+(r.supCode||'--')+'</td>';
+  html+='<td style="padding:6px 8px;border:1px solid #ccc;color:#27500A;font-weight:500">Verified</td></tr>';
+  html+='<tr><td style="padding:6px 8px;border:1px solid #ccc">QC Inspector</td><td style="padding:6px 8px;border:1px solid #ccc">'+(r.qc||'--')+'</td>';
+  html+='<td style="padding:6px 8px;border:1px solid #ccc;font-family:monospace;font-weight:500">'+(r.qcCode||'--')+'</td>';
+  html+='<td style="padding:6px 8px;border:1px solid #ccc;color:#27500A;font-weight:500">Verified</td></tr></table>';
+  if(r.client){
+    html+='<h2>Client sign-off (if applicable)</h2><table><tr><th>Name</th><th>Company</th><th>Date</th><th>Signature</th></tr>';
+    html+='<tr><td style="padding:8px;border:1px solid #ccc">'+r.client+'</td><td style="padding:8px;border:1px solid #ccc">'+(r.clientCo||'--')+'</td>';
+    html+='<td style="padding:8px;border:1px solid #ccc">_______________</td><td style="padding:8px;border:1px solid #ccc;height:50px;width:180px"></td></tr></table>';
+  }
+  html+='<div style="margin-top:16px;font-size:9px;color:#999;border-top:1px solid #eee;padding-top:6px">FSE eIRN System - Generated '+new Date().toLocaleString('en-ZA')+' - FSE-QR-IRN.038 - Controlled document</div>';
+  html+='<div class="np" style="margin-top:16px;text-align:center"><button onclick="window.print()" style="padding:8px 24px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">Print / Save as PDF</button></div>';
+  html+='</body></html>';
+  pw.document.write(html);pw.document.close();
+}
+function printIRN(){
+  var d=getForm();
+  if(!d.reportNo||d.reportNo==='--'){toast('Enter a report number','err');return;}
+  var ex=reg.findIndex(function(r){return r.reportNo===d.reportNo&&r.bookRef===d.bookRef;});
+  if(ex<0)reg.unshift(d);
+  printRec(d.bookRef,d.reportNo);
+}
+
+
+function enterApp(){
+  var sp=document.getElementById('splashScreen');
+  if(!sp)return;
+  sp.style.transition='opacity 0.5s';
+  sp.style.opacity='0';
+  setTimeout(function(){sp.style.display='none';},500);
+}
+// Always show splash for 2.5 seconds then auto-enter
+setTimeout(function(){enterApp();},2500);
+// Auto IRN on load
+setTimeout(function(){
+  if(window.peekNextIRN){window.peekNextIRN().then(function(n){var el=document.getElementById('reportNo');if(el&&!el.value){el.value=n;el.style.color='rgba(255,255,255,0.6)';}});}
+},600);
+renderItems();renderStages();renderFab();
+document.getElementById('irnDate').value=new Date().toISOString().split('T')[0];
+initRequest();
+setUrgency('normal');
+</script>
+</body>
+</html>
