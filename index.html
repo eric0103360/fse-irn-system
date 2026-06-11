@@ -315,18 +315,13 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
       </div>
       <div style="padding:0 14px 12px">
         <div style="font-size:10px;color:#666;margin-bottom:8px;font-weight:500">Sign-off codes</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div>
-            <div style="font-size:10px;color:#666;margin-bottom:3px"><i class="ti ti-eye-check" style="font-size:12px;color:#185FA5"></i> QC inspector <span style="color:#E24B4A">*</span></div>
-            <input class="code-in" id="qcCode" placeholder="QC-000" maxlength="6" oninput="validateCode('qc')" style="width:100%">
-            <div class="code-status" id="qcStatus"></div>
-          </div>
-          <div>
-            <div style="font-size:10px;color:#666;margin-bottom:3px"><i class="ti ti-hard-hat" style="font-size:12px;color:#1a3a5c"></i> Supervisor <span style="color:#E24B4A">*</span></div>
-            <input class="code-in" id="supCode" placeholder="SUP-000" maxlength="7" oninput="validateCode('sup')" style="width:100%">
-            <div class="code-status" id="supStatus"></div>
-          </div>
+        <div>
+          <div style="font-size:10px;color:#666;margin-bottom:3px"><i class="ti ti-eye-check" style="font-size:12px;color:#185FA5"></i> QC inspector <span style="color:#E24B4A">*</span></div>
+          <input class="code-in" id="qcCode" placeholder="QC-000" maxlength="6" oninput="validateCode('qc')" style="width:100%">
+          <div class="code-status" id="qcStatus"></div>
         </div>
+        <input type="hidden" id="supCode" value="">
+        <div id="supStatus"></div>
         <div style="margin-top:10px">
           <div style="font-size:10px;color:#888;margin-bottom:4px"><i class="ti ti-building" style="font-size:12px"></i> Client sign-off (if applicable)</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -592,8 +587,8 @@ function showV(v,btn){
   // Save codes before switching away from form
   var qcEl=document.getElementById('qcCode');
   var supEl=document.getElementById('supCode');
-  if(qcEl&&qcEl.value)window._savedQC=qcEl.value;
-  if(supEl&&supEl.value)window._savedSUP=supEl.value;
+  if(qcEl&&qcEl.value){window._savedQC=qcEl.value;window._savedQCv=qcValidated;window._savedQCn=qcName;}
+  if(supEl&&supEl.value){window._savedSUP=supEl.value;window._savedSUPv=supValidated;window._savedSUPn=supName;}
   document.querySelectorAll('.view').forEach(function(x){x.classList.remove('on');});
   document.querySelectorAll('.nb').forEach(function(x){x.classList.remove('on');});
   document.getElementById('v-'+v).classList.add('on');
@@ -603,8 +598,8 @@ function showV(v,btn){
     setTimeout(function(){
       var qc=document.getElementById('qcCode');
       var sup=document.getElementById('supCode');
-      if(qc&&window._savedQC&&!qc.value){qc.value=window._savedQC;validateCode('qc');}
-      if(sup&&window._savedSUP&&!sup.value){sup.value=window._savedSUP;validateCode('sup');}
+      if(qc&&window._savedQC){qc.value=window._savedQC;qcValidated=window._savedQCv||false;qcName=window._savedQCn||'';validateCode('qc');}
+      if(sup&&window._savedSUP){sup.value=window._savedSUP;supValidated=window._savedSUPv||false;supName=window._savedSUPn||'';validateCode('sup');}
     },150);
   }
   if(v==='register'){
@@ -1085,31 +1080,39 @@ function renderStages(){
   var html='';
   var stagesToShow=activeStageFilter?STAGES.filter(function(s){return activeStageFilter.indexOf(s.id)!==-1;}):STAGES;
 
-  // SIMPLE MODE — one stage, flat tick boxes, no gates no collapse
   if(activeStageFilter&&stagesToShow.length>0){
     var s=stagesToShow[0];
     var st=ss[s.id];
-    html+='<div style="padding:6px 14px 4px;font-size:11px;color:#185FA5;background:#E6F1FB;border-bottom:0.5px solid #B5D4F4;display:flex;justify-content:space-between;align-items:center">';
-    html+='<span><i class="ti ti-filter" style="font-size:12px"></i> '+s.label+'</span>';
-    html+='<a href="javascript:void(0)" onclick="activeStageFilter=null;renderStages()" style="color:#185FA5;font-size:10px">Show all stages</a>';
+    var tickedCount=st.crit.filter(Boolean).length;
+    html+='<div style="background:#1a3a5c;border-radius:8px 8px 0 0;padding:10px 14px;display:flex;align-items:center;justify-content:space-between">';
+    html+='<div style="font-size:13px;font-weight:500;color:#fff"><i class="ti ti-clipboard-check" style="font-size:14px;margin-right:6px"></i>'+s.label+'</div>';
+    html+='<div style="font-size:11px;color:rgba(255,255,255,0.7)">'+tickedCount+'/'+s.criteria.length+' checked</div>';
     html+='</div>';
-    html+='<div style="padding:8px 14px">';
+    html+='<div style="border:1.5px solid #1a3a5c;border-top:none;border-radius:0 0 8px 8px;overflow:hidden">';
     s.criteria.forEach(function(c,ci){
       var checked=st.crit[ci];
-      html+='<div onclick="toggleC(\''+s.id+'\','+ci+',event)" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid #f0f0f0;cursor:pointer">';
-      html+='<div style="width:24px;height:24px;border-radius:6px;border:2px solid '+(checked?'#1D9E75':'#ccc')+';background:'+(checked?'#1D9E75':'#fff')+';display:flex;align-items:center;justify-content:center;flex-shrink:0">';
-      html+=(checked?'<i class="ti ti-check" style="font-size:13px;color:#fff"></i>':'');
+      var isLast=ci===s.criteria.length-1;
+      html+='<div data-sid="'+s.id+'" data-ci="'+ci+'" onclick="toggleC(this.dataset.sid,parseInt(this.dataset.ci),event)" style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:'+(checked?'#f0faf5':'#fff')+';border-bottom:'+(isLast?'none':'0.5px solid #eee')+';cursor:pointer">';
+      html+='<div style="width:26px;height:26px;border-radius:6px;border:2px solid '+(checked?'#1D9E75':'#ddd')+';background:'+(checked?'#1D9E75':'#fff')+';display:flex;align-items:center;justify-content:center;flex-shrink:0">';
+      html+=(checked?'<i class="ti ti-check" style="font-size:14px;color:#fff"></i>':'');
       html+='</div>';
-      html+='<span style="font-size:13px;color:#1a1a1a">'+c+'</span>';
+      html+='<span style="font-size:13px;color:'+(checked?'#27500A':'#1a1a1a')+';font-weight:'+(checked?'500':'400')+'">'+c+'</span>';
       html+='</div>';
     });
     html+='</div>';
+    html+='<div style="margin-top:8px;text-align:center"><button onclick="activeStageFilter=null;renderStages()" style="font-size:11px;color:#888;background:none;border:0.5px solid #ddd;border-radius:6px;padding:5px 14px;cursor:pointer"><i class="ti ti-list" style="font-size:12px"></i> Show all stages</button></div>';
     document.getElementById('stageList').innerHTML=html;
     document.getElementById('stageSummary').innerHTML='';
     return;
   }
 
-  // FULL MODE — all stages, expandable (used when no filter)
+  if(!activeStageFilter&&_irqParam){
+    var irqType=_urlP?_urlP.get('type'):'';
+    if(irqType){
+      html+='<div style="margin-bottom:8px;text-align:center"><button onclick="activeStageFilter=null;if(_urlP){var t=_urlP.get(\'type\');if(t&&INSP_TYPE_STAGE_MAP[t])activeStageFilter=INSP_TYPE_STAGE_MAP[t];}renderStages()" style="font-size:11px;color:#185FA5;background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:6px;padding:5px 14px;cursor:pointer"><i class="ti ti-filter" style="font-size:12px"></i> Show relevant stage only</button></div>';
+    }
+  }
+
   STAGES.forEach(function(s){
     var st=ss[s.id],open=openS===s.id;
     var cd=st.crit.filter(Boolean).length,status=stSt(s.id);
@@ -1118,61 +1121,25 @@ function renderStages(){
     else if(status==='complete'){ic+=' cd';ico='<i class="ti ti-check" style="font-size:11px"></i>';}
     else if(st.gate){ic+=' gd';}
     var meta=st.na?'N/A':st.gate?(cd+'/'+s.criteria.length+' criteria'):'Gate not confirmed';
-    html+='<div class="sb">';
-    html+='<div class="sh" data-sid="'+s.id+'" onclick="toggleS(this.dataset.sid)">';
-    html+='<div class="'+ic+'">'+ico+'</div>';
-    html+='<div class="sl">'+s.label+(s.isCritical?'<span class="crit-tag">&#9650; Critical</span>':'')+'</div>';
-    html+='<div class="sm">'+meta+'</div>';
-    html+='<i class="ti ti-chevron-'+(open?'up':'down')+'" style="font-size:14px;color:#aaa;flex-shrink:0"></i>';
-    html+='</div>';
+    html+='<div class="sb"><div class="sh" data-sid="'+s.id+'" onclick="toggleS(this.dataset.sid)"><div class="'+ic+'">'+ico+'</div><div class="sl">'+s.label+(s.isCritical?'<span class="crit-tag">&#9650; Critical</span>':'')+'</div><div class="sm">'+meta+'</div><i class="ti ti-chevron-'+(open?'up':'down')+'" style="font-size:14px;color:#aaa;flex-shrink:0"></i></div>';
     if(open){
       html+='<div class="sbdy">';
-      if(s.isCritical&&!st.na){
-        html+='<div class="wb"><i class="ti ti-alert-triangle" style="font-size:15px;flex-shrink:0"></i>';
-        html+='<div><strong>Critical checkpoint:</strong> Every hole must have a bolt during trial assembly. Verify all holes - not every 2nd or 3rd.</div></div>';
-      }
-      html+='<div class="sublbl g"><i class="ti ti-lock-open" style="font-size:11px"></i> Stage gate</div>';
-      html+='<div class="gr'+(st.gate&&!st.na?' on':'')+'" data-sid="'+s.id+'" onclick="toggleG(this.dataset.sid,event)">';
-      html+='<div class="gcb'+(st.gate&&!st.na?' on':'')+'">'+(st.gate&&!st.na?'<i class="ti ti-check" style="font-size:10px;color:#fff"></i>':'')+'</div>';
-      html+='<div class="gt">'+s.gate+'</div></div>';
-      html+='<div class="sublbl c"><i class="ti ti-list-check" style="font-size:11px"></i> Criteria</div>';
-      html+='<div class="cg">';
-      s.criteria.forEach(function(c,ci){
-        html+='<div class="ci'+(st.crit[ci]&&!st.na?' on':'')+'" data-sid="'+s.id+'" data-ci="'+ci+'" onclick="toggleC(this.dataset.sid,parseInt(this.dataset.ci),event)">';
-        html+='<div class="ccb'+(st.crit[ci]&&!st.na?' on':'')+'">'+(st.crit[ci]&&!st.na?'<i class="ti ti-check" style="font-size:8px;color:#fff"></i>':'')+'</div>';
-        html+='<span class="ct2">'+c+'</span></div>';
-      });
+      if(s.isCritical&&!st.na){html+='<div class="wb"><i class="ti ti-alert-triangle" style="font-size:15px;flex-shrink:0"></i><div><strong>Critical checkpoint:</strong> Every hole must have a bolt during trial assembly.</div></div>';}
+      html+='<div class="sublbl g"><i class="ti ti-lock-open" style="font-size:11px"></i> Stage gate</div><div class="gr'+(st.gate&&!st.na?' on':'')+'" data-sid="'+s.id+'" onclick="toggleG(this.dataset.sid,event)"><div class="gcb'+(st.gate&&!st.na?' on':'')+'">'+(st.gate&&!st.na?'<i class="ti ti-check" style="font-size:10px;color:#fff"></i>':'')+'</div><div class="gt">'+s.gate+'</div></div>';
+      html+='<div class="sublbl c"><i class="ti ti-list-check" style="font-size:11px"></i> Criteria</div><div class="cg">';
+      s.criteria.forEach(function(c,ci){html+='<div class="ci'+(st.crit[ci]&&!st.na?' on':'')+'" data-sid="'+s.id+'" data-ci="'+ci+'" onclick="toggleC(this.dataset.sid,parseInt(this.dataset.ci),event)"><div class="ccb'+(st.crit[ci]&&!st.na?' on':'')+'">'+(st.crit[ci]&&!st.na?'<i class="ti ti-check" style="font-size:8px;color:#fff"></i>':'')+'</div><span class="ct2">'+c+'</span></div>';});
       html+='</div>';
-      html+='<div class="sublbl p"><i class="ti ti-camera" style="font-size:11px"></i> Photos ('+(st.photos?st.photos.length:0)+')</div>';
-      html+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">';
-      if(st.photos&&st.photos.length){
-        st.photos.forEach(function(p,pi){
-          html+='<div style="position:relative">';
-          html+='<img src="'+p+'" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:0.5px solid #ddd;cursor:pointer" data-sid="'+s.id+'" data-pi="'+pi+'" onclick="viewPhoto(this.dataset.sid,parseInt(this.dataset.pi))">';
-          html+='<button style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;color:#fff;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center" data-sid="'+s.id+'" data-pi="'+pi+'" onclick="removePhoto(this.dataset.sid,parseInt(this.dataset.pi))">x</button>';
-          html+='</div>';
-        });
-      }
-      html+='</div>';
-      html+='<label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;border:0.5px solid #185FA5;background:#f0f6ff;color:#185FA5;font-size:12px;font-weight:500;cursor:pointer">';
-      html+='<i class="ti ti-camera" style="font-size:16px"></i> Take photo';
-      html+='<input type="file" accept="image/*" capture="environment" style="display:none" data-sid="'+s.id+'" onchange="capturePhoto(this,this.dataset.sid)">';
-      html+='</label>';
+      html+='<div class="sublbl p"><i class="ti ti-camera" style="font-size:11px"></i> Photos ('+(st.photos?st.photos.length:0)+')</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">';
+      if(st.photos&&st.photos.length){st.photos.forEach(function(p,pi){html+='<div style="position:relative"><img src="'+p+'" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:0.5px solid #ddd" data-sid="'+s.id+'" data-pi="'+pi+'" onclick="viewPhoto(this.dataset.sid,parseInt(this.dataset.pi))"><button style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;color:#fff;font-size:10px;cursor:pointer" data-sid="'+s.id+'" data-pi="'+pi+'" onclick="removePhoto(this.dataset.sid,parseInt(this.dataset.pi))">x</button></div>';});}
+      html+='</div><label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;border:0.5px solid #185FA5;background:#f0f6ff;color:#185FA5;font-size:12px;font-weight:500;cursor:pointer"><i class="ti ti-camera" style="font-size:16px"></i> Take photo<input type="file" accept="image/*" capture="environment" style="display:none" data-sid="'+s.id+'" onchange="capturePhoto(this,this.dataset.sid)"></label>';
       if(!st.na){
-        html+='<div style="margin-top:10px;border-top:0.5px solid #ddd;padding-top:10px">';
-        html+='<div style="font-size:10px;font-weight:500;color:#666;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:7px">Stage result</div>';
-        if(st.result==='accept'){
-          html+='<div style="display:flex;align-items:center;gap:6px;padding:8px 10px;background:#EAF3DE;border-radius:8px;font-size:12px;font-weight:500;color:#27500A"><i class="ti ti-circle-check" style="font-size:16px"></i> Stage accepted<button style="margin-left:auto;font-size:11px;padding:2px 8px;border-radius:6px;border:0.5px solid #639922;background:transparent;color:#639922;cursor:pointer" data-sid="'+s.id+'" onclick="clearStageResult(this.dataset.sid)">Change</button></div>';
-        } else if(st.result==='reject'){
-          html+='<div style="padding:8px 10px;background:#FCEBEB;border-radius:8px"><div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:#A32D2D;margin-bottom:4px"><i class="ti ti-circle-x" style="font-size:16px"></i> Stage rejected<button style="margin-left:auto;font-size:11px;padding:2px 8px;border-radius:6px;border:0.5px solid #E24B4A;background:transparent;color:#E24B4A;cursor:pointer" data-sid="'+s.id+'" onclick="clearStageResult(this.dataset.sid)">Change</button></div><div style="font-size:11px;color:#A32D2D"><strong>Reason:</strong> '+st.rejectReason+'</div><div style="font-size:11px;color:#A32D2D"><strong>Action:</strong> '+st.rejectAction+'</div></div>';
-        } else {
-          html+='<div style="display:flex;gap:8px;margin-bottom:6px"><button style="flex:1;padding:8px;border-radius:8px;border:1.5px solid #639922;color:#639922;background:transparent;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" data-res="accept" onclick="setStageResult(this.dataset.sid,this.dataset.res)"><i class="ti ti-check"></i> Accept</button><button style="flex:1;padding:8px;border-radius:8px;border:1.5px solid #E24B4A;color:#E24B4A;background:transparent;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" onclick="showStageReject(this.dataset.sid)"><i class="ti ti-x"></i> Reject</button></div>';
-          html+='<div id="sr_reject_'+s.id+'" style="display:none;padding:8px;background:#FCEBEB;border-radius:8px;border:0.5px solid #E24B4A"><textarea id="sr_reason_'+s.id+'" style="width:100%;padding:6px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:50px;background:#fff;outline:none" placeholder="What failed..."></textarea><textarea id="sr_action_'+s.id+'" style="width:100%;margin-top:6px;padding:6px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:50px;background:#fff;outline:none" placeholder="What must be corrected..."></textarea><button style="width:100%;margin-top:6px;padding:7px;border-radius:6px;border:1.5px solid #E24B4A;color:#fff;background:#E24B4A;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" data-res="reject" onclick="setStageResult(this.dataset.sid,this.dataset.res)">Confirm rejection</button></div>';
-        }
+        html+='<div style="margin-top:10px;border-top:0.5px solid #ddd;padding-top:10px"><div style="font-size:10px;font-weight:500;color:#666;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:7px">Stage result</div>';
+        if(st.result==='accept'){html+='<div style="display:flex;align-items:center;gap:6px;padding:8px 10px;background:#EAF3DE;border-radius:8px;font-size:12px;font-weight:500;color:#27500A"><i class="ti ti-circle-check" style="font-size:16px"></i> Stage accepted<button style="margin-left:auto;font-size:11px;padding:2px 8px;border-radius:6px;border:0.5px solid #639922;background:transparent;color:#639922;cursor:pointer" data-sid="'+s.id+'" onclick="clearStageResult(this.dataset.sid)">Change</button></div>';}
+        else if(st.result==='reject'){html+='<div style="padding:8px 10px;background:#FCEBEB;border-radius:8px"><div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:#A32D2D;margin-bottom:4px"><i class="ti ti-circle-x" style="font-size:16px"></i> Stage rejected<button style="margin-left:auto;font-size:11px;padding:2px 8px;border-radius:6px;border:0.5px solid #E24B4A;background:transparent;color:#E24B4A;cursor:pointer" data-sid="'+s.id+'" onclick="clearStageResult(this.dataset.sid)">Change</button></div><div style="font-size:11px;color:#A32D2D"><strong>Reason:</strong> '+st.rejectReason+'</div><div style="font-size:11px;color:#A32D2D"><strong>Action:</strong> '+st.rejectAction+'</div></div>';}
+        else{html+='<div style="display:flex;gap:8px;margin-bottom:6px"><button style="flex:1;padding:8px;border-radius:8px;border:1.5px solid #639922;color:#639922;background:transparent;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" data-res="accept" onclick="setStageResult(this.dataset.sid,this.dataset.res)"><i class="ti ti-check"></i> Accept</button><button style="flex:1;padding:8px;border-radius:8px;border:1.5px solid #E24B4A;color:#E24B4A;background:transparent;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" onclick="showStageReject(this.dataset.sid)"><i class="ti ti-x"></i> Reject</button></div><div id="sr_reject_'+s.id+'" style="display:none;padding:8px;background:#FCEBEB;border-radius:8px;border:0.5px solid #E24B4A"><textarea id="sr_reason_'+s.id+'" style="width:100%;padding:6px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:50px;background:#fff;outline:none" placeholder="What failed..."></textarea><textarea id="sr_action_'+s.id+'" style="width:100%;margin-top:6px;padding:6px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:50px;background:#fff;outline:none" placeholder="What must be corrected..."></textarea><button style="width:100%;margin-top:6px;padding:7px;border-radius:6px;border:1.5px solid #E24B4A;color:#fff;background:#E24B4A;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" data-res="reject" onclick="setStageResult(this.dataset.sid,this.dataset.res)">Confirm rejection</button></div>';}
         html+='</div>';
       }
-      html+='<button class="nab'+(st.na?' on':'')+'" data-sid="'+s.id+'" onclick="toggleNA(this.dataset.sid,event)">'+(st.na?'Undo N/A':'Mark N/A')+'</button>';
-      html+='</div>';
+      html+='<button class="nab'+(st.na?' on':'')+'" data-sid="'+s.id+'" onclick="toggleNA(this.dataset.sid,event)">'+(st.na?'Undo N/A':'Mark N/A')+'</button></div>';
     }
     html+='</div>';
   });
@@ -1180,10 +1147,7 @@ function renderStages(){
   var sumEl=document.getElementById('stageSummary');
   var map={complete:'Complete',partial:'Partial',empty:'Not started',na:'N/A'};
   var sumHtml='';
-  STAGES.forEach(function(s){
-    var st=stSt(s.id);
-    sumHtml+='<div class="ssc"><span style="font-size:11px">'+s.label+'</span><span class="pill '+st+'">'+map[st]+'</span></div>';
-  });
+  STAGES.forEach(function(s){var st=stSt(s.id);sumHtml+='<div class="ssc"><span style="font-size:11px">'+s.label+'</span><span class="pill '+st+'">'+map[st]+'</span></div>';});
   sumEl.innerHTML=sumHtml;
 }
 function addFab(){fabDims.push({label:String.fromCharCode(65+fabDims.length),draw:'',meas:''});renderFab();}
@@ -1294,7 +1258,6 @@ async function submitIRN(){
   var d=getForm();
   if(!d.reportNo||d.reportNo==='--'){toast('Enter a report number','err');return;}
   if(!d.job){toast('Enter a job number','err');return;}
-  if(!d.bookRef){toast('Enter book reference','err');return;}
   if(d.result==='not set'){toast('Set Accept or Reject','err');return;}
   if(d.result==='reject'){
     var reason=document.getElementById('rejectionReason').value.trim();
@@ -1302,24 +1265,41 @@ async function submitIRN(){
     if(!reason){toast('Enter rejection reason before submitting','err');document.getElementById('rejectionReason').focus();return;}
     if(!action){toast('Enter action required before submitting','err');document.getElementById('rejectionAction').focus();return;}
   }
-  if(!supValidated){toast('Supervisor code required','err');return;}
   if(!qcValidated){toast('QC code required','err');return;}
   var btn=document.getElementById('submitBtn');
   btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Submitting...';
   try{
     await fetch(ENDPOINT,{method:'POST',body:JSON.stringify(d),mode:'no-cors'});
-    var ex=reg.findIndex(function(r){return r.reportNo===d.reportNo&&r.bookRef===d.bookRef;});
+    var ex=reg.findIndex(function(r){return r.reportNo===d.reportNo;});
     if(ex>=0)reg[ex]=d;else reg.unshift(d);
-    lastIRNs[d.bookRef]=(lastIRNs[d.bookRef]||0)+1;
     if(window.saveIRNToFirebase)window.saveIRNToFirebase(d);
-    // If rejected, mark the linked request as rework
     if(d.result==='reject'&&_irqParam){
       var linkedReq=reqs.find(function(x){return x.reqNo===_irqParam;});
       if(linkedReq&&linkedReq.firebaseId&&window.markRequestRework)window.markRequestRework(linkedReq.firebaseId);
     }
-    toast(d.reportNo+' submitted and saved','ok');
+    toast(d.reportNo+' submitted','ok');
+    // Send WhatsApp back to supervisor with result
     setTimeout(function(){
-      var msg=buildWAMessage(d);
+      var isPass=d.result==='accept';
+      var irqRef=_irqParam?'IRQ-'+_irqParam:'';
+      var resultLine=isPass?'PASSED - Released':'FAILED - Rework required';
+      var resultIcon=isPass?'[PASS]':'[FAIL]';
+      var msg='*FSE INSPECTION RESULT*\n';
+      msg+='================================\n';
+      msg+='*'+resultIcon+' '+resultLine+'*\n';
+      msg+='================================\n';
+      msg+='IRN: *INS-C '+d.reportNo+'*'+(irqRef?' ('+irqRef+')':'')+'\n';
+      msg+='Job: *'+d.job+'*\n';
+      msg+='Client: '+(d.project||'--')+'\n';
+      msg+='Date: '+d.date+'\n';
+      msg+='QC Inspector: '+d.qc+' ('+d.qcCode+')\n';
+      msg+='================================\n';
+      if(!isPass){
+        msg+='*Reason:* '+(document.getElementById('rejectionReason').value||'--')+'\n';
+        msg+='*Action required:* '+(document.getElementById('rejectionAction').value||'--')+'\n';
+        msg+='================================\n';
+      }
+      msg+='View register: https://eric0103360.github.io/fse-irn-system';
       window.open('https://wa.me/?text='+encodeURIComponent(msg));
     },800);
     renderReg();
@@ -1328,7 +1308,7 @@ async function submitIRN(){
     reg.unshift(d);renderReg();
   }finally{
     btn.disabled=false;
-    btn.innerHTML='<i class="ti ti-cloud-upload"></i> Submit and notify FSE QC Releases';
+    btn.innerHTML='<i class="ti ti-cloud-upload"></i> Submit &amp; notify FSE QC Releases';
   }
 }
 function setFilt(f,btn){
