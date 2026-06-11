@@ -589,10 +589,24 @@ function toast(msg,type){
   setTimeout(function(){t.classList.remove('show');},3500);
 }
 function showV(v,btn){
+  // Save codes before switching away from form
+  var qcEl=document.getElementById('qcCode');
+  var supEl=document.getElementById('supCode');
+  if(qcEl&&qcEl.value)window._savedQC=qcEl.value;
+  if(supEl&&supEl.value)window._savedSUP=supEl.value;
   document.querySelectorAll('.view').forEach(function(x){x.classList.remove('on');});
   document.querySelectorAll('.nb').forEach(function(x){x.classList.remove('on');});
   document.getElementById('v-'+v).classList.add('on');
   if(btn)btn.classList.add('on');
+  // Restore codes when returning to form
+  if(v==='form'){
+    setTimeout(function(){
+      var qc=document.getElementById('qcCode');
+      var sup=document.getElementById('supCode');
+      if(qc&&window._savedQC&&!qc.value){qc.value=window._savedQC;validateCode('qc');}
+      if(sup&&window._savedSUP&&!sup.value){sup.value=window._savedSUP;validateCode('sup');}
+    },150);
+  }
   if(v==='register'){
     if(window.loadIRNsFromFirebase){
       if(!window._fbL){window._fbL=window.loadIRNsFromFirebase(function(r){reg=r;renderReg();});}
@@ -1070,10 +1084,33 @@ function stSt(sid){
 function renderStages(){
   var html='';
   var stagesToShow=activeStageFilter?STAGES.filter(function(s){return activeStageFilter.indexOf(s.id)!==-1;}):STAGES;
+
+  // SIMPLE MODE — one stage, flat tick boxes, no gates no collapse
   if(activeStageFilter&&stagesToShow.length>0){
-    html+='<div style="padding:6px 14px;font-size:11px;color:#185FA5;background:#E6F1FB;border-bottom:0.5px solid #B5D4F4"><i class="ti ti-filter" style="font-size:12px"></i> Showing stage relevant to this request — <a href="javascript:void(0)" onclick="activeStageFilter=null;renderStages()" style="color:#185FA5;font-weight:500">show all</a></div>';
+    var s=stagesToShow[0];
+    var st=ss[s.id];
+    html+='<div style="padding:6px 14px 4px;font-size:11px;color:#185FA5;background:#E6F1FB;border-bottom:0.5px solid #B5D4F4;display:flex;justify-content:space-between;align-items:center">';
+    html+='<span><i class="ti ti-filter" style="font-size:12px"></i> '+s.label+'</span>';
+    html+='<a href="javascript:void(0)" onclick="activeStageFilter=null;renderStages()" style="color:#185FA5;font-size:10px">Show all stages</a>';
+    html+='</div>';
+    html+='<div style="padding:8px 14px">';
+    s.criteria.forEach(function(c,ci){
+      var checked=st.crit[ci];
+      html+='<div onclick="toggleC(\''+s.id+'\','+ci+',event)" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid #f0f0f0;cursor:pointer">';
+      html+='<div style="width:24px;height:24px;border-radius:6px;border:2px solid '+(checked?'#1D9E75':'#ccc')+';background:'+(checked?'#1D9E75':'#fff')+';display:flex;align-items:center;justify-content:center;flex-shrink:0">';
+      html+=(checked?'<i class="ti ti-check" style="font-size:13px;color:#fff"></i>':'');
+      html+='</div>';
+      html+='<span style="font-size:13px;color:#1a1a1a">'+c+'</span>';
+      html+='</div>';
+    });
+    html+='</div>';
+    document.getElementById('stageList').innerHTML=html;
+    document.getElementById('stageSummary').innerHTML='';
+    return;
   }
-  stagesToShow.forEach(function(s){
+
+  // FULL MODE — all stages, expandable (used when no filter)
+  STAGES.forEach(function(s){
     var st=ss[s.id],open=openS===s.id;
     var cd=st.crit.filter(Boolean).length,status=stSt(s.id);
     var ic='si',ico=''+s.num;
@@ -1098,7 +1135,7 @@ function renderStages(){
       html+='<div class="gr'+(st.gate&&!st.na?' on':'')+'" data-sid="'+s.id+'" onclick="toggleG(this.dataset.sid,event)">';
       html+='<div class="gcb'+(st.gate&&!st.na?' on':'')+'">'+(st.gate&&!st.na?'<i class="ti ti-check" style="font-size:10px;color:#fff"></i>':'')+'</div>';
       html+='<div class="gt">'+s.gate+'</div></div>';
-      html+='<div class="sublbl c"><i class="ti ti-list-check" style="font-size:11px"></i> Criteria checked and findings</div>';
+      html+='<div class="sublbl c"><i class="ti ti-list-check" style="font-size:11px"></i> Criteria</div>';
       html+='<div class="cg">';
       s.criteria.forEach(function(c,ci){
         html+='<div class="ci'+(st.crit[ci]&&!st.na?' on':'')+'" data-sid="'+s.id+'" data-ci="'+ci+'" onclick="toggleC(this.dataset.sid,parseInt(this.dataset.ci),event)">';
@@ -1106,23 +1143,7 @@ function renderStages(){
         html+='<span class="ct2">'+c+'</span></div>';
       });
       html+='</div>';
-      if(s.id==='s3'&&!st.na){
-        html+='<div class="sublbl d"><i class="ti ti-ruler" style="font-size:11px"></i> Trial assembly dimensions</div>';
-        html+='<table class="dt"><thead><tr><th style="width:20px">#</th><th>Description</th><th>Drawing</th><th>Measured</th><th style="width:30px"></th></tr></thead><tbody>';
-        st.tdims.forEach(function(d){
-          var diff=d.draw&&d.meas?Math.abs(parseFloat(d.draw)-parseFloat(d.meas)).toFixed(1):'';
-          var cls=d.draw&&d.meas?(parseFloat(d.draw)===parseFloat(d.meas)?'dok':'dflag'):'';
-          var val=d.draw&&d.meas?(parseFloat(d.draw)===parseFloat(d.meas)?'&#10003;':'&plusmn;'+diff):'';
-          html+='<tr><td style="font-size:11px;color:#888">'+d.id.replace('td','')+'</td>';
-          html+='<td><input class="di" value="'+d.lbl+'" placeholder="e.g. Hole diam." data-sid="'+s.id+'" data-did="'+d.id+'" data-f="lbl" oninput="upTDEl(this)" style="text-align:left"></td>';
-          html+='<td><input class="di" value="'+d.draw+'" placeholder="--" data-sid="'+s.id+'" data-did="'+d.id+'" data-f="draw" oninput="upTDEl(this)"></td>';
-          html+='<td><input class="di" value="'+d.meas+'" placeholder="--" data-sid="'+s.id+'" data-did="'+d.id+'" data-f="meas" oninput="upTDEl(this)"></td>';
-          html+='<td class="'+cls+'">'+val+'</td></tr>';
-        });
-        html+='</tbody></table>';
-        html+='<button class="add-dim" data-sid="'+s.id+'" onclick="addTD(this.dataset.sid)"><i class="ti ti-plus" style="font-size:11px"></i> Add dimension</button>';
-      }
-      html+='<div class="sublbl p"><i class="ti ti-camera" style="font-size:11px"></i> Stage photos ('+(st.photos?st.photos.length:0)+')</div>';
+      html+='<div class="sublbl p"><i class="ti ti-camera" style="font-size:11px"></i> Photos ('+(st.photos?st.photos.length:0)+')</div>';
       html+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">';
       if(st.photos&&st.photos.length){
         st.photos.forEach(function(p,pi){
@@ -1137,38 +1158,16 @@ function renderStages(){
       html+='<i class="ti ti-camera" style="font-size:16px"></i> Take photo';
       html+='<input type="file" accept="image/*" capture="environment" style="display:none" data-sid="'+s.id+'" onchange="capturePhoto(this,this.dataset.sid)">';
       html+='</label>';
-      html+='<div style="font-size:10px;color:#888;margin-top:4px">Opens camera directly on mobile</div>';
-      // Stage result
       if(!st.na){
         html+='<div style="margin-top:10px;border-top:0.5px solid #ddd;padding-top:10px">';
         html+='<div style="font-size:10px;font-weight:500;color:#666;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:7px">Stage result</div>';
         if(st.result==='accept'){
-          html+='<div style="display:flex;align-items:center;gap:6px;padding:8px 10px;background:#EAF3DE;border-radius:8px;font-size:12px;font-weight:500;color:#27500A">';
-          html+='<i class="ti ti-circle-check" style="font-size:16px"></i> Stage accepted';
-          html+='<button style="margin-left:auto;font-size:11px;padding:2px 8px;border-radius:6px;border:0.5px solid #639922;background:transparent;color:#639922;cursor:pointer" data-sid="'+s.id+'" onclick="clearStageResult(this.dataset.sid)">Change</button>';
-          html+='</div>';
+          html+='<div style="display:flex;align-items:center;gap:6px;padding:8px 10px;background:#EAF3DE;border-radius:8px;font-size:12px;font-weight:500;color:#27500A"><i class="ti ti-circle-check" style="font-size:16px"></i> Stage accepted<button style="margin-left:auto;font-size:11px;padding:2px 8px;border-radius:6px;border:0.5px solid #639922;background:transparent;color:#639922;cursor:pointer" data-sid="'+s.id+'" onclick="clearStageResult(this.dataset.sid)">Change</button></div>';
         } else if(st.result==='reject'){
-          html+='<div style="padding:8px 10px;background:#FCEBEB;border-radius:8px">';
-          html+='<div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:#A32D2D;margin-bottom:4px">';
-          html+='<i class="ti ti-circle-x" style="font-size:16px"></i> Stage rejected';
-          html+='<button style="margin-left:auto;font-size:11px;padding:2px 8px;border-radius:6px;border:0.5px solid #E24B4A;background:transparent;color:#E24B4A;cursor:pointer" data-sid="'+s.id+'" onclick="clearStageResult(this.dataset.sid)">Change</button>';
-          html+='</div>';
-          html+='<div style="font-size:11px;color:#A32D2D;margin-bottom:2px"><strong>Reason:</strong> '+st.rejectReason+'</div>';
-          html+='<div style="font-size:11px;color:#A32D2D"><strong>Action:</strong> '+st.rejectAction+'</div>';
-          html+='</div>';
+          html+='<div style="padding:8px 10px;background:#FCEBEB;border-radius:8px"><div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:#A32D2D;margin-bottom:4px"><i class="ti ti-circle-x" style="font-size:16px"></i> Stage rejected<button style="margin-left:auto;font-size:11px;padding:2px 8px;border-radius:6px;border:0.5px solid #E24B4A;background:transparent;color:#E24B4A;cursor:pointer" data-sid="'+s.id+'" onclick="clearStageResult(this.dataset.sid)">Change</button></div><div style="font-size:11px;color:#A32D2D"><strong>Reason:</strong> '+st.rejectReason+'</div><div style="font-size:11px;color:#A32D2D"><strong>Action:</strong> '+st.rejectAction+'</div></div>';
         } else {
-          // Not yet set - show accept/reject buttons + reject fields
-          html+='<div style="display:flex;gap:8px;margin-bottom:6px">';
-          html+='<button style="flex:1;padding:8px;border-radius:8px;border:1.5px solid #639922;color:#639922;background:transparent;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" data-res="accept" onclick="setStageResult(this.dataset.sid,this.dataset.res)"><i class="ti ti-check"></i> Accept stage</button>';
-          html+='<button style="flex:1;padding:8px;border-radius:8px;border:1.5px solid #E24B4A;color:#E24B4A;background:transparent;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" onclick="showStageReject(this.dataset.sid)"><i class="ti ti-x"></i> Reject stage</button>';
-          html+='</div>';
-          html+='<div id="sr_reject_'+s.id+'" style="display:none;padding:8px;background:#FCEBEB;border-radius:8px;border:0.5px solid #E24B4A">';
-          html+='<div style="font-size:10px;font-weight:500;color:#A32D2D;margin-bottom:4px">Rejection reason *</div>';
-          html+='<textarea id="sr_reason_'+s.id+'" style="width:100%;padding:6px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:50px;background:#fff;outline:none" placeholder="What failed at this stage..."></textarea>';
-          html+='<div style="font-size:10px;font-weight:500;color:#A32D2D;margin:6px 0 4px">Action required *</div>';
-          html+='<textarea id="sr_action_'+s.id+'" style="width:100%;padding:6px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:50px;background:#fff;outline:none" placeholder="What must be corrected..."></textarea>';
-          html+='<button style="width:100%;margin-top:6px;padding:7px;border-radius:6px;border:1.5px solid #E24B4A;color:#fff;background:#E24B4A;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" data-res="reject" onclick="setStageResult(this.dataset.sid,this.dataset.res)">Confirm rejection</button>';
-          html+='</div>';
+          html+='<div style="display:flex;gap:8px;margin-bottom:6px"><button style="flex:1;padding:8px;border-radius:8px;border:1.5px solid #639922;color:#639922;background:transparent;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" data-res="accept" onclick="setStageResult(this.dataset.sid,this.dataset.res)"><i class="ti ti-check"></i> Accept</button><button style="flex:1;padding:8px;border-radius:8px;border:1.5px solid #E24B4A;color:#E24B4A;background:transparent;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" onclick="showStageReject(this.dataset.sid)"><i class="ti ti-x"></i> Reject</button></div>';
+          html+='<div id="sr_reject_'+s.id+'" style="display:none;padding:8px;background:#FCEBEB;border-radius:8px;border:0.5px solid #E24B4A"><textarea id="sr_reason_'+s.id+'" style="width:100%;padding:6px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:50px;background:#fff;outline:none" placeholder="What failed..."></textarea><textarea id="sr_action_'+s.id+'" style="width:100%;margin-top:6px;padding:6px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:50px;background:#fff;outline:none" placeholder="What must be corrected..."></textarea><button style="width:100%;margin-top:6px;padding:7px;border-radius:6px;border:1.5px solid #E24B4A;color:#fff;background:#E24B4A;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" data-res="reject" onclick="setStageResult(this.dataset.sid,this.dataset.res)">Confirm rejection</button></div>';
         }
         html+='</div>';
       }
@@ -1179,17 +1178,13 @@ function renderStages(){
   });
   document.getElementById('stageList').innerHTML=html;
   var sumEl=document.getElementById('stageSummary');
-  if(activeStageFilter){
-    sumEl.innerHTML='';
-  } else {
-    var map={complete:'Complete',partial:'Partial',empty:'Not started',na:'N/A'};
-    var sumHtml='';
-    STAGES.forEach(function(s){
-      var st=stSt(s.id);
-      sumHtml+='<div class="ssc"><span style="font-size:11px">'+s.label+'</span><span class="pill '+st+'">'+map[st]+'</span></div>';
-    });
-    sumEl.innerHTML=sumHtml;
-  }
+  var map={complete:'Complete',partial:'Partial',empty:'Not started',na:'N/A'};
+  var sumHtml='';
+  STAGES.forEach(function(s){
+    var st=stSt(s.id);
+    sumHtml+='<div class="ssc"><span style="font-size:11px">'+s.label+'</span><span class="pill '+st+'">'+map[st]+'</span></div>';
+  });
+  sumEl.innerHTML=sumHtml;
 }
 function addFab(){fabDims.push({label:String.fromCharCode(65+fabDims.length),draw:'',meas:''});renderFab();}
 function upFab(i,f,v){fabDims[i][f]=v;}
