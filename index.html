@@ -230,59 +230,59 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
     </div>
 
     <div class="card">
-      <div class="ct"><i class="ti ti-id-badge" style="font-size:13px"></i> Inspector &amp; book reference</div>
-      <div class="fr"><div class="fl">Inspector name</div><input class="fi" id="inspector" placeholder="Full name"></div>
-      <div class="fr"><div class="fl">Book reference</div><input class="fi" id="bookRef" placeholder="e.g. B03" oninput="suggestNext()"></div>
-      <div class="fr"><div class="fl">Next IRN no.</div><div id="irnSuggest" style="font-size:12px;color:#888">Enter book ref above</div></div>
-    </div>
-
-    <div class="card">
-      <div class="ct"><i class="ti ti-briefcase" style="font-size:13px"></i> Job details</div>
+      <div class="ct"><i class="ti ti-briefcase" style="font-size:13px"></i> Step 1 — Job details</div>
+      <div id="inheritedBanner" style="display:none;background:#E6F1FB;border-radius:6px;padding:6px 10px;margin:0 14px 8px;font-size:11px;color:#0C447C"><i class="ti ti-link" style="font-size:13px"></i> Pre-filled from inspection request</div>
+      <div class="fr"><div class="fl">Job / order no.</div><input class="fi" id="job" placeholder="e.g. F52573"></div>
+      <div class="fr"><div class="fl">Client</div><input class="fi" id="project" placeholder="e.g. TLT Lobster Bend VS2"></div>
       <div class="fr"><div class="fl">PO number</div><input class="fi" id="po" placeholder="e.g. 20840/2130/519"></div>
-      <div class="fr"><div class="fl">Job number</div><input class="fi" id="job" placeholder="e.g. FSJ507"></div>
-      <div class="fr"><div class="fl">Project desc.</div><input class="fi" id="project" placeholder="e.g. DRYTECH-519-130"></div>
-      <div class="fr"><div class="fl">Drawing / Rev</div><input class="fi" id="drawing" placeholder="e.g. A1-519-130-19-08"></div>
-      <div class="fr"><div class="fl">Artisan</div><input class="fi" id="artisan" placeholder="Name"></div>
+      <div class="fr"><div class="fl">Artisan name</div><input class="fi" id="artisan" placeholder="Name (optional)"></div>
       <div class="fr"><div class="fl">Date</div><input class="fi" type="date" id="irnDate"></div>
-      <div class="res-row">
-        <div style="font-size:11px;color:#666;font-weight:500;margin-right:4px">Overall result:</div>
-        <button class="rb acc" id="btnAcc" onclick="setRes('accept')"><i class="ti ti-check"></i> Accept</button>
-        <button class="rb rej" id="btnRej" onclick="setRes('reject')"><i class="ti ti-x"></i> Reject</button>
-        <div style="font-size:10px;color:#888;margin-left:4px">Auto-set from stages</div>
-      </div>
-      <div id="rejectionPanel" style="display:none;margin:0 14px 12px;padding:12px;background:#FCEBEB;border:1px solid #E24B4A;border-radius:8px">
-        <div style="font-size:11px;font-weight:500;color:#A32D2D;margin-bottom:8px;display:flex;align-items:center;gap:5px"><i class="ti ti-alert-circle" style="font-size:14px"></i> Rejection details required before submission</div>
-        <div style="margin-bottom:8px">
-          <div style="font-size:10px;font-weight:500;color:#A32D2D;margin-bottom:4px">Rejection reason <span style="color:#E24B4A">*</span></div>
-          <textarea id="rejectionReason" style="width:100%;padding:8px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:60px;background:#fff;outline:none" placeholder="Describe what was found and why this is being rejected..."></textarea>
-        </div>
-        <div>
-          <div style="font-size:10px;font-weight:500;color:#A32D2D;margin-bottom:4px">Action required <span style="color:#E24B4A">*</span></div>
-          <textarea id="rejectionAction" style="width:100%;padding:8px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:60px;background:#fff;outline:none" placeholder="What must be done before re-inspection and release..."></textarea>
-        </div>
-      </div>
     </div>
 
     <div class="card">
-      <div class="ct"><i class="ti ti-list" style="font-size:13px"></i> Items being released</div>
-      <div id="itemList"></div>
-      <button class="add-btn" onclick="addItem()"><i class="ti ti-plus"></i> Add item</button>
-    </div>
-
-    <div class="card">
-      <div class="ct"><i class="ti ti-shield-check" style="font-size:13px"></i> Inspection stages</div>
-      <div style="padding:7px 14px 3px;font-size:11px;color:#666">
-        <span style="display:inline-flex;align-items:center;gap:3px;margin-right:10px"><span style="width:10px;height:10px;border-radius:2px;background:#1a3a5c;display:inline-block"></span> Gate</span>
-        <span style="display:inline-flex;align-items:center;gap:3px;margin-right:10px"><span style="width:10px;height:10px;border-radius:2px;background:#185FA5;display:inline-block"></span> Criteria</span>
-        <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:10px;height:10px;border-radius:2px;background:#25D366;display:inline-block"></span> Photo</span>
-      </div>
-      <div id="stageList"></div>
-      <div class="ssum" id="stageSummary"></div>
-    </div>
-
-    <div class="card">
-      <div class="ct"><i class="ti ti-ruler" style="font-size:13px"></i> Fabrication dimensions</div>
+      <div class="ct"><i class="ti ti-file-description" style="font-size:13px"></i> Step 2 — Drawing confirmation</div>
       <div style="padding:4px 14px 10px">
+        <div style="font-size:11px;color:#666;margin-bottom:8px">Inspector confirms correct drawing and revision is being used</div>
+        <div class="fr"><div class="fl">Drawing no. &amp; Rev</div><input class="fi" id="drawing" placeholder="e.g. A1-519-130-19-08 Rev 0"></div>
+        <div style="display:flex;gap:8px;margin-top:8px;padding:0">
+          <button id="drawOkBtn" onclick="setDrawing('ok')" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid #ccc;background:#fff;font-size:12px;font-weight:500;cursor:pointer;color:#666;text-align:center">
+            <i class="ti ti-circle-check" style="font-size:16px;display:block;margin:0 auto 3px"></i>Drawing correct
+          </button>
+          <button id="drawFlagBtn" onclick="setDrawing('flag')" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid #ccc;background:#fff;font-size:12px;font-weight:500;cursor:pointer;color:#666;text-align:center">
+            <i class="ti ti-alert-triangle" style="font-size:16px;display:block;margin:0 auto 3px"></i>Wrong drawing
+          </button>
+        </div>
+        <div id="drawFlagNote" style="display:none;margin-top:8px;padding:8px;background:#FAEEDA;border:1px solid #BA7517;border-radius:6px">
+          <div style="font-size:11px;color:#633806;margin-bottom:4px;font-weight:500">Specify the issue</div>
+          <textarea id="drawingNote" style="width:100%;padding:6px 8px;border:1px solid #BA7517;border-radius:6px;font-size:12px;font-family:inherit;resize:none;height:50px;outline:none;background:#fff" placeholder="e.g. Old Rev 0 used, correct drawing is Rev 2..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><i class="ti ti-list-check" style="font-size:13px"></i> Step 3 — Items &amp; checklist</div>
+      <div style="padding:0 14px 4px">
+        <div style="font-size:10px;font-weight:500;color:#666;text-transform:uppercase;letter-spacing:0.5px;padding:6px 0 4px;border-bottom:0.5px solid #eee;margin-bottom:4px">Items being released</div>
+        <div id="itemList"></div>
+        <button class="add-btn" onclick="addItem()"><i class="ti ti-plus"></i> Add item</button>
+      </div>
+      <div style="padding:0 14px 10px;margin-top:4px">
+        <div style="font-size:10px;font-weight:500;color:#666;text-transform:uppercase;letter-spacing:0.5px;padding:8px 0 6px;border-top:0.5px solid #eee;border-bottom:0.5px solid #eee;margin-bottom:8px">Inspection checklist — from request</div>
+        <div id="quickCheckList"><div style="font-size:12px;color:#aaa;padding:4px 0">No checklist from request — use stage checklist below</div></div>
+        <div style="margin-top:10px">
+          <div style="font-size:10px;font-weight:500;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Full stage checklist</div>
+          <div id="stageList"></div>
+          <div class="ssum" id="stageSummary"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px 4px">
+        <div style="font-size:12px;font-weight:500;color:#333"><i class="ti ti-ruler" style="font-size:13px"></i> Dimensions <span style="font-size:10px;font-weight:400;color:#888">(if applicable)</span></div>
+        <button onclick="toggleDims()" id="dimsToggleBtn" style="font-size:11px;padding:3px 10px;background:#f0f0f0;border:none;border-radius:6px;cursor:pointer;color:#666">+ Show</button>
+      </div>
+      <div id="dimsSection" style="display:none;padding:4px 14px 10px">
         <table class="dt"><thead><tr><th style="width:24px">Dim</th><th>Drawing</th><th>Measured</th><th style="width:36px"></th></tr></thead>
         <tbody id="fabBody"></tbody></table>
         <button class="add-dim" onclick="addFab()"><i class="ti ti-plus" style="font-size:11px"></i> Add row</button>
@@ -290,30 +290,49 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
     </div>
 
     <div class="card">
-      <div class="ct"><i class="ti ti-note" style="font-size:13px"></i> Inspection notes</div>
-      <textarea style="width:100%;padding:10px 14px;background:transparent;border:none;resize:vertical;min-height:68px;font-size:13px;color:#1a1a1a;font-family:inherit;outline:none" id="notes" placeholder="Record findings, observations, deviations..."></textarea>
-    </div>
-
-    <div class="card">
-      <div class="ct"><i class="ti ti-lock" style="font-size:13px"></i> Sign-off &mdash; codes required</div>
-      <div class="signoff-block">
-        <div class="so-role"><i class="ti ti-hard-hat" style="font-size:14px;color:#1a3a5c"></i> Supervisor <span style="font-size:10px;color:#E24B4A;font-weight:400">* Required</span></div>
-        <div class="so-sub">Enter SUP code to authorise release</div>
-        <input class="code-in" id="supCode" placeholder="SUP-000" maxlength="7" oninput="validateCode('sup')">
-        <div class="code-status" id="supStatus"></div>
+      <div class="ct"><i class="ti ti-lock" style="font-size:13px"></i> Step 4 — Notes &amp; sign-off</div>
+      <div style="padding:0 14px 10px">
+        <div style="font-size:10px;color:#666;margin-bottom:4px;font-weight:500">Inspection notes</div>
+        <textarea style="width:100%;padding:8px 10px;background:#f9f9f7;border:0.5px solid #ddd;border-radius:6px;resize:none;min-height:60px;font-size:13px;color:#1a1a1a;font-family:inherit;outline:none" id="notes" placeholder="Record findings, observations, deviations..."></textarea>
       </div>
-      <div class="signoff-block">
-        <div class="so-role"><i class="ti ti-eye-check" style="font-size:14px;color:#185FA5"></i> Quality (QC) <span style="font-size:10px;color:#E24B4A;font-weight:400">* Required</span></div>
-        <div class="so-sub">Enter QC code to authorise release</div>
-        <input class="code-in" id="qcCode" placeholder="QC-000" maxlength="6" oninput="validateCode('qc')">
-        <div class="code-status" id="qcStatus"></div>
+      <div style="padding:0 14px 10px">
+        <div style="font-size:10px;color:#666;margin-bottom:6px;font-weight:500">Overall result</div>
+        <div style="display:flex;gap:8px">
+          <button class="rb acc" id="btnAcc" onclick="setRes('accept')" style="flex:1;padding:10px;font-size:13px"><i class="ti ti-check"></i> Accept / Release</button>
+          <button class="rb rej" id="btnRej" onclick="setRes('reject')" style="flex:1;padding:10px;font-size:13px"><i class="ti ti-x"></i> Reject</button>
+        </div>
+        <div id="rejectionPanel" style="display:none;margin-top:8px;padding:12px;background:#FCEBEB;border:1px solid #E24B4A;border-radius:8px">
+          <div style="font-size:11px;font-weight:500;color:#A32D2D;margin-bottom:8px"><i class="ti ti-alert-circle" style="font-size:14px"></i> Rejection details required</div>
+          <div style="margin-bottom:8px">
+            <div style="font-size:10px;font-weight:500;color:#A32D2D;margin-bottom:4px">Rejection reason <span style="color:#E24B4A">*</span></div>
+            <textarea id="rejectionReason" style="width:100%;padding:8px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:60px;background:#fff;outline:none" placeholder="Describe what was found..."></textarea>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:500;color:#A32D2D;margin-bottom:4px">Action required <span style="color:#E24B4A">*</span></div>
+            <textarea id="rejectionAction" style="width:100%;padding:8px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:60px;background:#fff;outline:none" placeholder="What must be done before re-inspection..."></textarea>
+          </div>
+        </div>
       </div>
-      <div class="signoff-block">
-        <div class="so-role"><i class="ti ti-building" style="font-size:14px;color:#888"></i> Client <span class="optional-tag">If applicable</span></div>
-        <div class="so-sub">Print report for wet signature if required</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
-          <div><div style="font-size:10px;color:#666;margin-bottom:3px">Client name</div><input class="fi" id="clientName" placeholder="Full name"></div>
-          <div><div style="font-size:10px;color:#666;margin-bottom:3px">Company</div><input class="fi" id="clientCo" placeholder="Company"></div>
+      <div style="padding:0 14px 12px">
+        <div style="font-size:10px;color:#666;margin-bottom:8px;font-weight:500">Sign-off codes</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <div style="font-size:10px;color:#666;margin-bottom:3px"><i class="ti ti-eye-check" style="font-size:12px;color:#185FA5"></i> QC inspector <span style="color:#E24B4A">*</span></div>
+            <input class="code-in" id="qcCode" placeholder="QC-000" maxlength="6" oninput="validateCode('qc')" style="width:100%">
+            <div class="code-status" id="qcStatus"></div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:#666;margin-bottom:3px"><i class="ti ti-hard-hat" style="font-size:12px;color:#1a3a5c"></i> Supervisor <span style="color:#E24B4A">*</span></div>
+            <input class="code-in" id="supCode" placeholder="SUP-000" maxlength="7" oninput="validateCode('sup')" style="width:100%">
+            <div class="code-status" id="supStatus"></div>
+          </div>
+        </div>
+        <div style="margin-top:10px">
+          <div style="font-size:10px;color:#888;margin-bottom:4px"><i class="ti ti-building" style="font-size:12px"></i> Client sign-off (if applicable)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <input class="fi" id="clientName" placeholder="Client name">
+            <input class="fi" id="clientCo" placeholder="Company">
+          </div>
         </div>
       </div>
     </div>
@@ -328,7 +347,7 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
     <div style="height:16px"></div>
   </div>
 
-  <div id="v-request" class="view">
+    <div id="v-request" class="view">
     <div class="hdr">
       <div class="hdr-top">
         <div class="hdr-left">
@@ -375,8 +394,9 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
     </div>
 
     <div class="card">
-      <div class="ct"><i class="ti ti-note" style="font-size:13px"></i> Special instructions</div>
-      <textarea style="width:100%;padding:10px 14px;background:transparent;border:none;resize:vertical;min-height:80px;font-size:13px;color:#1a1a1a;font-family:inherit;outline:none" id="reqInstructions" placeholder="e.g. Access doors to be fitted after initial weld. Inspect prior to closing..."></textarea>
+      <div class="ct"><i class="ti ti-note" style="font-size:13px"></i> What must the inspector check?</div>
+      <textarea style="width:100%;padding:10px 14px;background:transparent;border:none;resize:vertical;min-height:80px;font-size:13px;color:#1a1a1a;font-family:inherit;outline:none" id="reqInstructions" placeholder="e.g. Check level, square, dimensional correct, dog tags attached, PCD correct on N°1, N°2 &amp; N°3 before welding..."></textarea>
+      <div style="padding:0 14px 8px;font-size:10px;color:#888">Type each check on a new line or separated by commas — these become the inspector's checklist</div>
     </div>
 
     <div class="card">
@@ -715,6 +735,54 @@ var reqSupName='';
 var reqItemCnt=2;
 var REQ_INSP_TYPES=['Prior to welding (pre-stage)','S1: After tack welding','S2: After welding','S3: Trial assembly','S4: Match-marking','S5: Cleaning and NDT','S6: After primer','S7: Final paint','Final release / despatch'];
 
+function setDrawing(state){
+  var okBtn=document.getElementById('drawOkBtn');
+  var flagBtn=document.getElementById('drawFlagBtn');
+  var flagNote=document.getElementById('drawFlagNote');
+  if(state==='ok'){
+    okBtn.style.background='#EAF3DE';okBtn.style.borderColor='#1D9E75';okBtn.style.color='#27500A';
+    flagBtn.style.background='#fff';flagBtn.style.borderColor='#ccc';flagBtn.style.color='#666';
+    if(flagNote)flagNote.style.display='none';
+  } else {
+    flagBtn.style.background='#FAEEDA';flagBtn.style.borderColor='#BA7517';flagBtn.style.color='#633806';
+    okBtn.style.background='#fff';okBtn.style.borderColor='#ccc';okBtn.style.color='#666';
+    if(flagNote)flagNote.style.display='block';
+  }
+}
+function toggleDims(){
+  var sec=document.getElementById('dimsSection');
+  var btn=document.getElementById('dimsToggleBtn');
+  if(sec.style.display==='none'){sec.style.display='block';btn.textContent='− Hide';}
+  else{sec.style.display='none';btn.textContent='+ Show';}
+}
+function renderQuickChecklist(instructionText){
+  var el=document.getElementById('quickCheckList');
+  if(!el)return;
+  if(!instructionText||!instructionText.trim()){
+    el.innerHTML='<div style="font-size:12px;color:#aaa;padding:4px 0">No checklist from request — use stage checklist below</div>';
+    return;
+  }
+  var items=instructionText.split(/[,\n]+/).map(function(s){return s.trim();}).filter(function(s){return s.length>2;});
+  if(!items.length){el.innerHTML='<div style="font-size:12px;color:#aaa;padding:4px 0">'+instructionText+'</div>';return;}
+  var html='';
+  items.forEach(function(item,i){
+    html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:0.5px solid #eee" id="qc-row-'+i+'">';
+    html+='<div onclick="toggleCheck('+i+')" id="qc-box-'+i+'" style="width:22px;height:22px;border-radius:5px;border:2px solid #ccc;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:14px;color:#fff;background:#fff"></div>';
+    html+='<div style="font-size:13px;color:#333;flex:1">'+item+'</div>';
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
+function toggleCheck(i){
+  var box=document.getElementById('qc-box-'+i);
+  if(!box)return;
+  var checked=box.dataset.checked==='1';
+  if(checked){
+    box.dataset.checked='0';box.style.background='#fff';box.style.borderColor='#ccc';box.textContent='';
+  } else {
+    box.dataset.checked='1';box.style.background='#1D9E75';box.style.borderColor='#1D9E75';box.textContent='✓';
+  }
+}
 function toggleReqSubmit(){
   var cb=document.getElementById('reqAckCheck');
   var btn=document.getElementById('reqSubmitBtn');
@@ -1443,7 +1511,7 @@ function renderPendingReqs(){
     if(isRework){
       html+='<button data-fid="'+r.firebaseId+'" data-reqno="'+(r.reqNo||'')+'" data-attempt="'+(attempt+1)+'" onclick="resubmitRequest(this)" style="font-size:11px;padding:6px 12px;background:#854F0B;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600"><i class="ti ti-refresh"></i> Re-submit</button>';
     } else {
-      html+='<button data-fid="'+r.firebaseId+'" data-reqno="'+(r.reqNo||'')+'" data-job="'+(r.job||'').replace(/"/g,'&quot;')+'" data-client="'+(r.client||'').replace(/"/g,'&quot;')+'" data-items="'+(itemList).replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:12px;padding:8px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600"><i class="ti ti-file-check"></i> Complete IRN</button>';
+      html+='<button data-fid="'+r.firebaseId+'" data-reqno="'+(r.reqNo||'')+'" data-job="'+(r.job||'').replace(/"/g,'&quot;')+'" data-client="'+(r.client||'').replace(/"/g,'&quot;')+'" data-items="'+(itemList).replace(/"/g,'&quot;')+'" data-instructions="'+(r.instructions||'').replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:12px;padding:8px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600"><i class="ti ti-file-check"></i> Complete IRN</button>';
     }
     html+='</div></div>';
   });
@@ -1479,6 +1547,8 @@ function completeRequest(btn){
   setTimeout(function(){
     var joEl=document.getElementById('job');if(joEl)joEl.value=job;
     var prEl=document.getElementById('project');if(prEl)prEl.value=client;
+    // Show inherited banner
+    var banner=document.getElementById('inheritedBanner');if(banner)banner.style.display='block';
     // Pre-fill items
     if(itemsStr){
       var newItems=itemsStr.split(' | ').filter(Boolean).map(function(s,i){
@@ -1487,6 +1557,9 @@ function completeRequest(btn){
       });
       if(newItems.length){items=newItems;renderItems();}
     }
+    // Populate quick checklist from request instructions
+    var instrEl=btn.dataset.instructions||'';
+    renderQuickChecklist(instrEl);
     toast('Complete IRN for IRQ-'+reqNo+' — '+job,'ok');
   },100);
   if(window.markRequestComplete)window.markRequestComplete(firebaseId);
