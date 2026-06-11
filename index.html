@@ -941,8 +941,8 @@ async function submitRequest(){
   msg+='*Items for inspection:*\n'+itemList+'\n';
   msg+='*Inspection type:* '+d.inspTypes+'\n';
   if(d.instructions)msg+='*Special instructions:* '+d.instructions+'\n';
+  if(d.instructions)msg+='*What to check:* '+d.instructions+'\n';
   msg+='================================\n';
-  msg+='Raised by: '+d.supervisor+' ('+d.supCode+')\n';
   if(d.photos>0)msg+='Photos: '+d.photos+' attached (see form)\n';
   msg+='\n*QC - please attend and complete IRN on release*\n';
   msg+='================================\n';
@@ -952,7 +952,8 @@ async function submitRequest(){
     +'&client='+encodeURIComponent(d.client||'')
     +'&items='+encodeURIComponent(itemSummary)
     +'&type='+encodeURIComponent(d.inspTypes)
-    +'&by='+encodeURIComponent(d.supervisor);
+    +'&by='+encodeURIComponent(d.supervisor)
+    +'&checks='+encodeURIComponent(d.instructions||'');
   var liveLink='https://eric0103360.github.io/fse-irn-system?'+linkData;
   msg+='*Open IRN System to respond:*\n'+liveLink;
   window.open('https://wa.me/?text='+encodeURIComponent(msg));
@@ -1707,6 +1708,7 @@ var _urlReq=_irqParam?{
   items:_urlP.get('items')||'',
   inspTypes:_urlP.get('type')||'',
   supervisor:_urlP.get('by')||'',
+  instructions:_urlP.get('checks')||'',
   status:'pending',
   firebaseId:''
 }:null;
