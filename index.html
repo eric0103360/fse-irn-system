@@ -555,15 +555,32 @@ var fabDims=['A','B','C','D','E','F','G','H','I','J','K','L','M'].map(function(l
 var lastIRNs={};
 
 var STAGES=[
+  {id:'s0',num:0,label:'Prior to welding',gate:'Pre-weld inspection - 100% visual and dimensional',criteria:['Level','Square','Dimensional correct','PCD correct','Stiffeners fitted','Dog tags attached']},
   {id:'s1',num:1,label:'After tack welding',gate:'Inspection after tack welding - 100% visual and dimensional',criteria:['Level','Square','Dimensional','PCD correct','Stiffeners fitted','Dog tags attached']},
   {id:'s2',num:2,label:'After welding',gate:'Inspection after welding - 100% visual and dimensional',criteria:['Weld size correct','Weld profile ok','No mis-welds','Smalls fitted','No overgrinding','Stop starts ok','No pinholes']},
   {id:'s3',num:3,label:'Trial assembly',isCritical:true,gate:'Trial assembly performed - all holes bolt-verified and match marked',criteria:['All holes drilled per drawing','Every hole bolt-verified (not 2nd/3rd)','No misaligned holes','Match marks applied','Marks correspond to mating part','Support feet drilled and verified','Assembly fits without forcing']},
   {id:'s4',num:4,label:'Match-marking',gate:'Match-marking completed after trial assembly',criteria:['Sequential numbering correct','Colour coded where applicable','Marks clearly visible','Marks on mating faces only']},
   {id:'s5',num:5,label:'Cleaning and NDT',gate:'Inspection after cleaning and NDT - 100% visual',criteria:['Spatter removed','Holes de-burred','No pinholes','No porosity','No structural defects']},
   {id:'s6',num:6,label:'After primer',gate:'Inspection after primer - 100% visual',criteria:['Coverage uniform','No bare metal','DFT within spec','Surface prep confirmed']},
-  {id:'s7',num:7,label:'Final paint',gate:'Final inspection after paint - 100% visual',criteria:['Smooth and uniform finish','DFT correct','No pinholes','Colour correct','Touch-up checked']}
+  {id:'s7',num:7,label:'Final paint',gate:'Final inspection after paint - 100% visual',criteria:['Smooth and uniform finish','DFT correct','No pinholes','Colour correct','Touch-up checked']},
+  {id:'s8',num:8,label:'Final release / despatch',gate:'Final release inspection complete',criteria:['All stages complete','Documentation in order','Client sign-off obtained']}
 ];
-STAGES.forEach(function(s){ss[s.id]={gate:false,na:false,crit:new Array(s.criteria.length).fill(false),tdims:[],result:null,rejectReason:'',rejectAction:'',photos:[]};});
+
+// Maps inspection type labels to stage IDs
+var INSP_TYPE_STAGE_MAP={
+  'Prior to welding (pre-stage)':['s0'],
+  'S1: After tack welding':['s1'],
+  'S2: After welding':['s2'],
+  'S3: Trial assembly':['s3'],
+  'S4: Match-marking':['s4'],
+  'S5: Cleaning and NDT':['s5'],
+  'S6: After primer':['s6'],
+  'S7: Final paint':['s7'],
+  'Final release / despatch':['s8']
+};
+
+var activeStageFilter=null; // null = show all
+STAGES.forEach(function(s){if(!ss[s.id])ss[s.id]={gate:false,na:false,crit:new Array(s.criteria.length).fill(false),tdims:[],result:null,rejectReason:'',rejectAction:'',photos:[]};});
 
 function toast(msg,type){
   if(!type)type='info';
@@ -582,6 +599,7 @@ function showV(v,btn){
       else{renderReg();}
     } else{renderReg();}
   }
+  if(v==='form'&&!completeRequest._fromReq){activeStageFilter=null;renderStages();}
   if(v==='request'){document.getElementById('reqLogo').src=getLogoSrc();if(window.peekNextIRQ){window.peekNextIRQ().then(function(n){var el=document.getElementById('reqNo');if(el&&!el.value){el.value=n;el.style.color='rgba(255,255,255,0.6)';}});}renderPendingReqs();}
   if(v==='register'){document.getElementById('regLogo').src=getLogoSrc();}
   if(v==='admin'){document.getElementById('admLogo').src=getLogoSrc();}
@@ -1049,7 +1067,11 @@ function stSt(sid){
 }
 function renderStages(){
   var html='';
-  STAGES.forEach(function(s){
+  var stagesToShow=activeStageFilter?STAGES.filter(function(s){return activeStageFilter.indexOf(s.id)!==-1;}):STAGES;
+  if(activeStageFilter&&stagesToShow.length>0){
+    html+='<div style="padding:6px 14px;font-size:11px;color:#185FA5;background:#E6F1FB;border-bottom:0.5px solid #B5D4F4"><i class="ti ti-filter" style="font-size:12px"></i> Showing stage relevant to this request — <a href="javascript:void(0)" onclick="activeStageFilter=null;renderStages()" style="color:#185FA5;font-weight:500">show all</a></div>';
+  }
+  stagesToShow.forEach(function(s){
     var st=ss[s.id],open=openS===s.id;
     var cd=st.crit.filter(Boolean).length,status=stSt(s.id);
     var ic='si',ico=''+s.num;
@@ -1511,7 +1533,7 @@ function renderPendingReqs(){
     if(isRework){
       html+='<button data-fid="'+r.firebaseId+'" data-reqno="'+(r.reqNo||'')+'" data-attempt="'+(attempt+1)+'" onclick="resubmitRequest(this)" style="font-size:11px;padding:6px 12px;background:#854F0B;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600"><i class="ti ti-refresh"></i> Re-submit</button>';
     } else {
-      html+='<button data-fid="'+r.firebaseId+'" data-reqno="'+(r.reqNo||'')+'" data-job="'+(r.job||'').replace(/"/g,'&quot;')+'" data-client="'+(r.client||'').replace(/"/g,'&quot;')+'" data-items="'+(itemList).replace(/"/g,'&quot;')+'" data-instructions="'+(r.instructions||'').replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:12px;padding:8px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600"><i class="ti ti-file-check"></i> Complete IRN</button>';
+      html+='<button data-fid="'+r.firebaseId+'" data-reqno="'+(r.reqNo||'')+'" data-job="'+(r.job||'').replace(/"/g,'&quot;')+'" data-client="'+(r.client||'').replace(/"/g,'&quot;')+'" data-items="'+(itemList).replace(/"/g,'&quot;')+'" data-instructions="'+(r.instructions||'').replace(/"/g,'&quot;')+'" data-insptype="'+(r.inspTypes||'').replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:12px;padding:8px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600"><i class="ti ti-file-check"></i> Complete IRN</button>';
     }
     html+='</div></div>';
   });
@@ -1540,6 +1562,9 @@ function completeRequest(btn){
   var job=btn.dataset.job;
   var client=btn.dataset.client;
   var itemsStr=btn.dataset.items||'';
+  var inspType=btn.dataset.insptype||'';
+  // Set stage filter based on inspection type from request
+  activeStageFilter=INSP_TYPE_STAGE_MAP[inspType]||null;
   // Switch to New IRN tab first
   var newIrnBtn=document.querySelectorAll('.nb')[0];
   showV('form',newIrnBtn);
@@ -1560,6 +1585,8 @@ function completeRequest(btn){
     // Populate quick checklist from request instructions
     var instrEl=btn.dataset.instructions||'';
     renderQuickChecklist(instrEl);
+    // Re-render stages with filter applied
+    renderStages();
     toast('Complete IRN for IRQ-'+reqNo+' — '+job,'ok');
   },100);
   if(window.markRequestComplete)window.markRequestComplete(firebaseId);
