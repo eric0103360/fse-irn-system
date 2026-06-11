@@ -1472,20 +1472,23 @@ function completeRequest(btn){
   var job=btn.dataset.job;
   var client=btn.dataset.client;
   var itemsStr=btn.dataset.items||'';
-  // Pre-fill job fields
-  var joEl=document.getElementById('job');if(joEl)joEl.value=job;
-  var prEl=document.getElementById('project');if(prEl)prEl.value=client;
-  // Pre-fill items
-  if(itemsStr){
-    var newItems=itemsStr.split(' | ').filter(Boolean).map(function(s,i){
-      var p=s.match(/^(.+?)(?:\s+x(\S+))?$/);
-      return{id:'i'+(i+1),desc:p?p[1].trim():s,qty:p&&p[2]?p[2]:'1'};
-    });
-    if(newItems.length){items=newItems;renderItems();}
-  }
+  // Switch to New IRN tab first
   var newIrnBtn=document.querySelectorAll('.nb')[0];
   showV('form',newIrnBtn);
-  toast('Complete IRN for IRQ-'+reqNo+' — '+job,'ok');
+  // Set values AFTER tab switch so renderItems doesn't wipe them
+  setTimeout(function(){
+    var joEl=document.getElementById('job');if(joEl)joEl.value=job;
+    var prEl=document.getElementById('project');if(prEl)prEl.value=client;
+    // Pre-fill items
+    if(itemsStr){
+      var newItems=itemsStr.split(' | ').filter(Boolean).map(function(s,i){
+        var p=s.match(/^(.+?)(?:\s+x(\S+))?$/);
+        return{id:'i'+(i+1),desc:p?p[1].trim():s,qty:p&&p[2]?p[2]:'1'};
+      });
+      if(newItems.length){items=newItems;renderItems();}
+    }
+    toast('Complete IRN for IRQ-'+reqNo+' — '+job,'ok');
+  },100);
   if(window.markRequestComplete)window.markRequestComplete(firebaseId);
 }
 function printRec(book,no){
