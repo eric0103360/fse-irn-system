@@ -127,7 +127,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .ra{font-size:11px;padding:5px 10px;border-radius:6px;border:0.5px solid #ddd;background:#fff;cursor:pointer;color:#666;display:flex;align-items:center;gap:4px}
 .ra.bl{border-color:#185FA5;color:#185FA5}
 .ra.wa{border-color:#25D366;color:#25D366}
-.sg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.sg{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px}
 .sc2{background:#f4f4f0;border-radius:8px;padding:8px 10px;text-align:center}
 .filt-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
 .filt-btn{font-size:11px;padding:4px 10px;border-radius:10px;border:0.5px solid #ddd;background:#fff;color:#666;cursor:pointer}
@@ -165,9 +165,11 @@ window.peekNextIRQ=async function(){try{const r=doc(db,'counters','irq');const d
 window.getNextIRQ=async function(){try{const r=doc(db,'counters','irq');const n=await runTransaction(db,async(t)=>{const d=await t.get(r);const c=d.exists()?d.data().count:0;const x=c+1;t.set(r,{count:x});return x;});return String(n).padStart(4,'0');}catch(e){return String(Date.now()).slice(-4);}};
 window.getNextIRN=async function(){try{const r=doc(db,'counters','irn');const n=await runTransaction(db,async(t)=>{const d=await t.get(r);const c=d.exists()?d.data().count:0;const x=c+1;t.set(r,{count:x});return x;});return String(n).padStart(4,'0');}catch(e){return String(Date.now()).slice(-4);}};
 window.saveIRNToFirebase=async function(data){try{var s=Object.assign({},data);if(s.stageStates){var cs={};Object.keys(s.stageStates).forEach(function(k){var st=Object.assign({},s.stageStates[k]);st.photos=st.photos?st.photos.length+' photo(s)':'0';cs[k]=st;});s.stageStates=cs;}s.timestamp=new Date().toISOString();await addDoc(collection(db,'irns'),s);return true;}catch(e){return false;}};
-window.saveRequestToFirebase=async function(data){try{var s=Object.assign({},data);s.timestamp=new Date().toISOString();s.status='pending';await addDoc(collection(db,'requests'),s);return true;}catch(e){return false;}};
+window.saveRequestToFirebase=async function(data){try{var s=Object.assign({},data);s.timestamp=new Date().toISOString();s.status='pending';s.attempt=data.attempt||1;await addDoc(collection(db,'requests'),s);return true;}catch(e){return false;}};
+window.resubmitRequest=async function(firebaseId,attempt){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'pending',attempt:attempt,resubmittedAt:new Date().toISOString()});return true;}catch(e){return false;}};
 window.loadRequestsFromFirebase=function(cb){try{var q=query(collection(db,'requests'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);});}catch(e){cb([]);}};
 window.markRequestComplete=async function(firebaseId){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'complete'});return true;}catch(e){return false;}};
+window.markRequestRework=async function(firebaseId){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'rework'});return true;}catch(e){return false;}};
 window.loadIRNsFromFirebase=function(cb){try{var q=query(collection(db,'irns'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);});}catch(e){cb([]);}};
 window.addEventListener('DOMContentLoaded',async function(){var n=await window.peekNextIRN();window._nextIRNNum=n;var el=document.getElementById('reportNo');if(el&&!el.value){el.value=n;el.style.color='rgba(255,255,255,0.6)';}});
 </script>
@@ -406,8 +408,22 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
       </div>
     </div>
 
+    <div style="margin-top:10px;background:#FCEBEB;border:1.5px solid #E24B4A;border-radius:10px;padding:12px 14px">
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
+        <i class="ti ti-alert-triangle" style="font-size:18px;color:#E24B4A;flex-shrink:0;margin-top:1px"></i>
+        <div>
+          <div style="font-size:12px;font-weight:600;color:#A32D2D;margin-bottom:4px">Pre-submission declaration — required</div>
+          <div style="font-size:12px;color:#A32D2D;line-height:1.5">I confirm that the item(s) listed have been physically verified by myself and the artisan prior to this inspection request being raised. All previous stage requirements have been met and the work is ready for QC inspection and release.</div>
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="reqAckCheck" onchange="toggleReqSubmit()" style="width:16px;height:16px;accent-color:#E24B4A;cursor:pointer">
+        <span style="font-size:12px;font-weight:600;color:#A32D2D">I acknowledge the above declaration</span>
+      </label>
+    </div>
+
     <div style="margin-top:10px">
-      <button class="ab sub" id="reqSubmitBtn" onclick="submitRequest()" style="width:100%;padding:12px;border-radius:8px"><i class="ti ti-send"></i> Submit request &amp; notify QC group</button>
+      <button class="ab sub" id="reqSubmitBtn" onclick="submitRequest()" disabled style="width:100%;padding:12px;border-radius:8px;opacity:0.5;cursor:not-allowed"><i class="ti ti-send"></i> Submit request &amp; notify QC group</button>
     </div>
 
     <div style="margin-top:8px">
@@ -435,7 +451,9 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
       <div class="sc2"><div style="font-size:22px;font-weight:500" id="statT">0</div><div style="font-size:10px;color:#666">Total</div></div>
       <div style="background:#EAF3DE;border-radius:8px;padding:8px 10px;text-align:center"><div style="font-size:22px;font-weight:500;color:#27500A" id="statP">0</div><div style="font-size:10px;color:#3B6D11">Passed</div></div>
       <div style="background:#FCEBEB;border-radius:8px;padding:8px 10px;text-align:center"><div style="font-size:22px;font-weight:500;color:#A32D2D" id="statF">0</div><div style="font-size:10px;color:#A32D2D">Failed</div></div>
+      <div style="background:#E6F1FB;border-radius:8px;padding:8px 10px;text-align:center"><div style="font-size:22px;font-weight:500;color:#0C447C" id="statFTP">0%</div><div style="font-size:10px;color:#185FA5">1st pass</div></div>
     </div>
+    <div id="stageChart" style="display:none;background:#fff;border:0.5px solid #eee;border-radius:10px;padding:12px;margin-bottom:8px"></div>
     <div class="filt-row">
       <button class="filt-btn on" onclick="setFilt('all',this)">All</button>
       <button class="filt-btn" onclick="setFilt('pass',this)">Passed</button>
@@ -697,6 +715,11 @@ var reqSupName='';
 var reqItemCnt=2;
 var REQ_INSP_TYPES=['Prior to welding (pre-stage)','S1: After tack welding','S2: After welding','S3: Trial assembly','S4: Match-marking','S5: Cleaning and NDT','S6: After primer','S7: Final paint','Final release / despatch'];
 
+function toggleReqSubmit(){
+  var cb=document.getElementById('reqAckCheck');
+  var btn=document.getElementById('reqSubmitBtn');
+  if(cb&&btn){btn.disabled=!cb.checked;btn.style.opacity=cb.checked?'1':'0.5';btn.style.cursor=cb.checked?'pointer':'not-allowed';}
+}
 function initRequest(){
   document.getElementById('reqDate').value=new Date().toISOString().split('T')[0];
   document.getElementById('reqLogo').src=getLogoSrc();
@@ -848,6 +871,9 @@ async function submitRequest(){
   window.open('https://wa.me/?text='+encodeURIComponent(msg));
   if(window.saveRequestToFirebase)window.saveRequestToFirebase(d);
   toast('Request submitted to QC group','ok');
+  // Reset form
+  var cb=document.getElementById('reqAckCheck');if(cb)cb.checked=false;
+  toggleReqSubmit();
 }
 function printRequest(){
   var d=getRequestData();
@@ -1194,6 +1220,11 @@ async function submitIRN(){
     if(ex>=0)reg[ex]=d;else reg.unshift(d);
     lastIRNs[d.bookRef]=(lastIRNs[d.bookRef]||0)+1;
     if(window.saveIRNToFirebase)window.saveIRNToFirebase(d);
+    // If rejected, mark the linked request as rework
+    if(d.result==='reject'&&_irqParam){
+      var linkedReq=reqs.find(function(x){return x.reqNo===_irqParam;});
+      if(linkedReq&&linkedReq.firebaseId&&window.markRequestRework)window.markRequestRework(linkedReq.firebaseId);
+    }
     toast(d.reportNo+' submitted and saved','ok');
     setTimeout(function(){
       var msg=buildWAMessage(d);
@@ -1221,9 +1252,66 @@ function stStFromSaved(st,s){
   if(st.gate||cd>0)return'partial';return'empty';
 }
 function renderReg(){
-  document.getElementById('statT').textContent=reg.length;
-  document.getElementById('statP').textContent=reg.filter(function(r){return r.result==='accept';}).length;
-  document.getElementById('statF').textContent=reg.filter(function(r){return r.result==='reject';}).length;
+  var total=reg.length;
+  var passed=reg.filter(function(r){return r.result==='accept';}).length;
+  var failed=reg.filter(function(r){return r.result==='reject';}).length;
+  // 1st time pass = passed IRNs where attempt === 1 or no attempt field
+  var ftp=reg.filter(function(r){return r.result==='accept'&&(!r.attempt||r.attempt===1);}).length;
+  var ftpPct=total>0?Math.round(ftp/total*100):0;
+  document.getElementById('statT').textContent=total;
+  document.getElementById('statP').textContent=passed;
+  document.getElementById('statF').textContent=failed;
+  document.getElementById('statFTP').textContent=ftpPct+'%';
+
+  // Stage pass rate chart
+  var chartEl=document.getElementById('stageChart');
+  if(total>0&&chartEl){
+    chartEl.style.display='block';
+    var chartHtml='<div style="font-size:10px;font-weight:600;color:#1a3a5c;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Pass rate per stage</div>';
+    STAGES.forEach(function(s){
+      var stagePass=0,stageTotal=0;
+      reg.forEach(function(r){
+        if(r.stageStates&&r.stageStates[s.id]){
+          var st=r.stageStates[s.id];
+          if(!st.na){stageTotal++;if(st.gate)stagePass++;}
+        }
+      });
+      if(stageTotal===0)return;
+      var pct=Math.round(stagePass/stageTotal*100);
+      var failPct=100-pct;
+      chartHtml+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+      chartHtml+='<div style="width:110px;font-size:11px;color:#666;text-align:right;flex-shrink:0">'+s.label+'</div>';
+      chartHtml+='<div style="flex:1;background:#f0f0f0;border-radius:4px;height:16px;overflow:hidden;display:flex">';
+      chartHtml+='<div style="width:'+pct+'%;background:#1D9E75;height:100%;display:flex;align-items:center;justify-content:flex-end;padding-right:3px">';
+      if(pct>15)chartHtml+='<span style="font-size:10px;color:#fff;font-weight:600">'+pct+'%</span>';
+      chartHtml+='</div>';
+      chartHtml+='<div style="width:'+failPct+'%;background:#E24B4A;height:100%;display:flex;align-items:center;padding-left:3px">';
+      if(failPct>15)chartHtml+='<span style="font-size:10px;color:#fff;font-weight:600">'+failPct+'%</span>';
+      chartHtml+='</div></div>';
+      chartHtml+='<div style="width:40px;font-size:10px;color:#888;flex-shrink:0">'+stagePass+'/'+stageTotal+'</div>';
+      chartHtml+='</div>';
+    });
+    // Mini bar chart - last 10 jobs
+    var last10=reg.slice(0,10).reverse();
+    if(last10.length>1){
+      chartHtml+='<div style="font-size:10px;font-weight:600;color:#1a3a5c;text-transform:uppercase;letter-spacing:1px;margin:12px 0 8px">Pass vs fail — recent jobs</div>';
+      chartHtml+='<div style="display:flex;gap:3px;align-items:flex-end;height:50px">';
+      last10.forEach(function(r){
+        var isPass=r.result==='accept';
+        chartHtml+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px">';
+        chartHtml+='<div style="width:100%;background:'+(isPass?'#1D9E75':'#E24B4A')+';height:'+(isPass?'45px':'45px')+';border-radius:3px 3px 0 0"></div>';
+        chartHtml+='<div style="font-size:9px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;text-align:center">'+(r.reportNo||'').slice(-4)+'</div>';
+        chartHtml+='</div>';
+      });
+      chartHtml+='</div>';
+      chartHtml+='<div style="display:flex;gap:12px;margin-top:6px;font-size:10px">';
+      chartHtml+='<div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;background:#1D9E75;border-radius:2px"></div><span style="color:#666">Pass</span></div>';
+      chartHtml+='<div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;background:#E24B4A;border-radius:2px"></div><span style="color:#666">Fail</span></div>';
+      chartHtml+='</div>';
+    }
+    chartEl.innerHTML=chartHtml;
+  } else if(chartEl){chartEl.style.display='none';}
+
   document.getElementById('regList').innerHTML='';
   var filtered=reg;
   if(regFilt==='pass')filtered=reg.filter(function(r){return r.result==='accept';});
@@ -1327,19 +1415,22 @@ function renderPendingReqs(){
   var html='';
   pending.forEach(function(r){
     var isTarget=_irqParam&&r.reqNo===_irqParam;
+    var isRework=r.status==='rework';
     var itemList='--';
     if(r.items&&Array.isArray(r.items)){
-      var filtered=r.items.filter(function(i){return i.desc&&i.desc.trim();});
-      if(filtered.length)itemList=filtered.map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', ');
-    }
-    var border=isTarget?'border:2.5px solid #E24B4A;box-shadow:0 0 0 3px rgba(226,75,74,0.2)':'border:1.5px solid #f5a623';
-    html+='<div style="background:#fff8f0;'+border+';border-radius:10px;margin-bottom:10px;overflow:hidden">';
-    if(isTarget){
-      html+='<div style="background:#E24B4A;color:#fff;font-size:11px;font-weight:600;text-align:center;padding:4px">⚡ ACTION REQUIRED — Complete the IRN for this request</div>';
-    }
-    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:'+(isTarget?'#c0392b':'#f5a623')+'">';
-    html+='<div style="font-size:13px;font-weight:700;color:#fff">IRQ-'+(r.reqNo||'----')+'</div>';
-    html+='<span style="font-size:10px;background:rgba(255,255,255,0.3);color:#fff;padding:2px 8px;border-radius:10px;font-weight:600">AWAITING IRN</span>';
+      var filtered2=r.items.filter(function(i){return i.desc&&i.desc.trim();});
+      if(filtered2.length)itemList=filtered2.map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', ');
+    } else if(typeof r.items==='string'&&r.items){itemList=r.items;}
+    var attempt=r.attempt||1;
+    var headerBg=isTarget?'#c0392b':isRework?'#854F0B':'#f5a623';
+    var cardBg=isRework?'#FAEEDA':'#fff8f0';
+    var border=isTarget?'border:2.5px solid #E24B4A;box-shadow:0 0 0 3px rgba(226,75,74,0.2)':isRework?'border:2px solid #854F0B':'border:1.5px solid #f5a623';
+    html+='<div style="background:'+cardBg+';'+border+';border-radius:10px;margin-bottom:10px;overflow:hidden">';
+    if(isTarget)html+='<div style="background:#E24B4A;color:#fff;font-size:11px;font-weight:600;text-align:center;padding:4px">⚡ ACTION REQUIRED — Complete the IRN for this request</div>';
+    if(isRework)html+='<div style="background:#633806;color:#fff;font-size:11px;font-weight:600;text-align:center;padding:4px">🔧 REWORK REQUIRED — Fix the item then re-submit for inspection</div>';
+    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:'+headerBg+'">';
+    html+='<div style="font-size:13px;font-weight:700;color:#fff">IRQ-'+(r.reqNo||'----')+(attempt>1?' <span style="font-size:10px;background:rgba(255,255,255,0.3);padding:1px 6px;border-radius:8px">Attempt '+attempt+'</span>':'')+'</div>';
+    html+='<span style="font-size:10px;background:rgba(255,255,255,0.3);color:#fff;padding:2px 8px;border-radius:10px;font-weight:600">'+(isRework?'REWORK':'AWAITING IRN')+'</span>';
     html+='</div>';
     html+='<div style="display:grid;grid-template-columns:1fr 1fr;padding:8px 12px;border-bottom:0.5px solid #f5a623">';
     html+='<div><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:2px">Job/Order</div><div style="font-size:13px;font-weight:700">'+(r.job||'--')+'</div></div>';
@@ -1347,9 +1438,13 @@ function renderPendingReqs(){
     html+='</div>';
     html+='<div style="padding:6px 12px;border-bottom:0.5px solid #f5a623"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:2px">Items</div><div style="font-size:12px">'+itemList+'</div></div>';
     html+='<div style="padding:6px 12px;border-bottom:0.5px solid #f5a623"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:2px">Inspection type</div><div style="font-size:12px">'+(r.inspTypes||'--')+'</div></div>';
-    html+='<div style="padding:8px 12px;display:flex;justify-content:space-between;align-items:center">';
+    html+='<div style="padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:6px">';
     html+='<div style="font-size:11px;color:#888">By: <strong>'+(r.supervisor||'--')+'</strong> &middot; '+(r.date||'')+'</div>';
-    html+='<button data-fid="'+r.firebaseId+'" data-reqno="'+(r.reqNo||'')+'" data-job="'+(r.job||'').replace(/"/g,'&quot;')+'" data-client="'+(r.client||'').replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:12px;padding:8px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600"><i class="ti ti-file-check"></i> Complete IRN</button>';
+    if(isRework){
+      html+='<button data-fid="'+r.firebaseId+'" data-reqno="'+(r.reqNo||'')+'" data-attempt="'+(attempt+1)+'" onclick="resubmitRequest(this)" style="font-size:11px;padding:6px 12px;background:#854F0B;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600"><i class="ti ti-refresh"></i> Re-submit</button>';
+    } else {
+      html+='<button data-fid="'+r.firebaseId+'" data-reqno="'+(r.reqNo||'')+'" data-job="'+(r.job||'').replace(/"/g,'&quot;')+'" data-client="'+(r.client||'').replace(/"/g,'&quot;')+'" data-items="'+(itemList).replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:12px;padding:8px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600"><i class="ti ti-file-check"></i> Complete IRN</button>';
+    }
     html+='</div></div>';
   });
   el.innerHTML=html;
@@ -1362,20 +1457,35 @@ function renderPendingReqs(){
   }
 }
 
+function resubmitRequest(btn){
+  var firebaseId=btn.dataset.fid;
+  var reqNo=btn.dataset.reqno;
+  var attempt=parseInt(btn.dataset.attempt)||2;
+  if(confirm('Re-submit IRQ-'+reqNo+' for inspection?\nThis will be Attempt '+attempt+'.')){
+    if(window.resubmitRequest)window.resubmitRequest(firebaseId,attempt);
+    toast('IRQ-'+reqNo+' re-submitted (Attempt '+attempt+')','ok');
+  }
+}
 function completeRequest(btn){
   var firebaseId=btn.dataset.fid;
   var reqNo=btn.dataset.reqno;
   var job=btn.dataset.job;
   var client=btn.dataset.client;
-  // Pre-fill New IRN form
-  var joEl=document.getElementById('jobNo');if(joEl)joEl.value=job;
-  var poEl=document.getElementById('poNo');if(poEl)poEl.value='';
-  var prEl=document.getElementById('projectDesc');if(prEl)prEl.value=client;
-  // Switch to New IRN tab
+  var itemsStr=btn.dataset.items||'';
+  // Pre-fill job fields
+  var joEl=document.getElementById('job');if(joEl)joEl.value=job;
+  var prEl=document.getElementById('project');if(prEl)prEl.value=client;
+  // Pre-fill items
+  if(itemsStr){
+    var newItems=itemsStr.split(' | ').filter(Boolean).map(function(s,i){
+      var p=s.match(/^(.+?)(?:\s+x(\S+))?$/);
+      return{id:'i'+(i+1),desc:p?p[1].trim():s,qty:p&&p[2]?p[2]:'1'};
+    });
+    if(newItems.length){items=newItems;renderItems();}
+  }
   var newIrnBtn=document.querySelectorAll('.nb')[0];
   showV('form',newIrnBtn);
   toast('Complete IRN for IRQ-'+reqNo+' — '+job,'ok');
-  // Mark request complete in Firebase
   if(window.markRequestComplete)window.markRequestComplete(firebaseId);
 }
 function printRec(book,no){
