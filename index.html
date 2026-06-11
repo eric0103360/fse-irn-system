@@ -599,7 +599,8 @@ function showV(v,btn){
       else{renderReg();}
     } else{renderReg();}
   }
-  if(v==='form'&&!completeRequest._fromReq){activeStageFilter=null;renderStages();}
+  if(v==='form'&&!window._keepStageFilter){activeStageFilter=null;renderStages();}
+  window._keepStageFilter=false;
   if(v==='request'){document.getElementById('reqLogo').src=getLogoSrc();if(window.peekNextIRQ){window.peekNextIRQ().then(function(n){var el=document.getElementById('reqNo');if(el&&!el.value){el.value=n;el.style.color='rgba(255,255,255,0.6)';}});}renderPendingReqs();}
   if(v==='register'){document.getElementById('regLogo').src=getLogoSrc();}
   if(v==='admin'){document.getElementById('admLogo').src=getLogoSrc();}
@@ -1176,13 +1177,18 @@ function renderStages(){
     html+='</div>';
   });
   document.getElementById('stageList').innerHTML=html;
-  var map={complete:'Complete',partial:'Partial',empty:'Not started',na:'N/A'};
-  var sumHtml='';
-  STAGES.forEach(function(s){
-    var st=stSt(s.id);
-    sumHtml+='<div class="ssc"><span style="font-size:11px">'+s.label+'</span><span class="pill '+st+'">'+map[st]+'</span></div>';
-  });
-  document.getElementById('stageSummary').innerHTML=sumHtml;
+  var sumEl=document.getElementById('stageSummary');
+  if(activeStageFilter){
+    sumEl.innerHTML='';
+  } else {
+    var map={complete:'Complete',partial:'Partial',empty:'Not started',na:'N/A'};
+    var sumHtml='';
+    STAGES.forEach(function(s){
+      var st=stSt(s.id);
+      sumHtml+='<div class="ssc"><span style="font-size:11px">'+s.label+'</span><span class="pill '+st+'">'+map[st]+'</span></div>';
+    });
+    sumEl.innerHTML=sumHtml;
+  }
 }
 function addFab(){fabDims.push({label:String.fromCharCode(65+fabDims.length),draw:'',meas:''});renderFab();}
 function upFab(i,f,v){fabDims[i][f]=v;}
@@ -1565,6 +1571,7 @@ function completeRequest(btn){
   var inspType=btn.dataset.insptype||'';
   // Set stage filter based on inspection type from request
   activeStageFilter=INSP_TYPE_STAGE_MAP[inspType]||null;
+  window._keepStageFilter=true;
   // Switch to New IRN tab first
   var newIrnBtn=document.querySelectorAll('.nb')[0];
   showV('form',newIrnBtn);
