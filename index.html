@@ -254,6 +254,7 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
     <div class="card">
       <div class="ct"><i class="ti ti-list-check" style="font-size:13px"></i> Step 3 — Items &amp; checklist</div>
       <div style="padding:0 14px 4px">
+        <div id="irqRefBanner" style="display:none;background:#E6F1FB;border-radius:6px;padding:6px 10px;margin:0 0 8px;font-size:11px;color:#0C447C"><i class="ti ti-link" style="font-size:13px"></i> <span id="irqRefText"></span></div>
         <div style="font-size:10px;font-weight:500;color:#666;text-transform:uppercase;letter-spacing:0.5px;padding:6px 0 4px;border-bottom:0.5px solid #eee;margin-bottom:4px">Items being released</div>
         <div id="itemList"></div>
         <button class="add-btn" onclick="addItem()"><i class="ti ti-plus"></i> Add item</button>
@@ -266,6 +267,16 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
           <div id="stageList"></div>
           <div class="ssum" id="stageSummary"></div>
         </div>
+      </div>
+      <!-- Inspector photos -->
+      <div style="padding:0 14px 12px;border-top:0.5px solid #eee;margin-top:4px">
+        <div style="font-size:10px;font-weight:500;color:#666;text-transform:uppercase;letter-spacing:0.5px;padding:8px 0 6px">Inspector photos</div>
+        <div id="inspPhotos" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px"></div>
+        <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;border:1.5px dashed #185FA5;background:#f0f6ff;color:#185FA5;font-size:12px;font-weight:500;cursor:pointer">
+          <i class="ti ti-camera" style="font-size:18px"></i> Take / add inspection photo
+          <input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="addInspPhotos(this)">
+        </label>
+        <div style="font-size:10px;color:#aaa;margin-top:4px">Photos will appear in the printed report</div>
       </div>
     </div>
 
@@ -324,12 +335,9 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
       </div>
     </div>
 
-    <div class="ag no-print">
-      <button class="ab pr" onclick="printIRN()"><i class="ti ti-printer"></i> Print IRN</button>
-      <button class="ab wa" onclick="sendWA()"><i class="ti ti-brand-whatsapp"></i> WhatsApp</button>
-    </div>
     <div class="ag no-print" style="margin-top:8px">
-      <button class="ab sub" id="submitBtn" onclick="submitIRN()" style="grid-column:1/-1;padding:12px"><i class="ti ti-cloud-upload"></i> Submit &amp; notify FSE QC Releases</button>
+      <button class="ab pr" onclick="printIRN()" style="padding:11px"><i class="ti ti-printer"></i> Print IRN</button>
+      <button class="ab sub" id="submitBtn" onclick="submitIRN()" style="padding:11px;background:#1D9E75;border-color:#1D9E75"><i class="ti ti-send"></i> Release &amp; Notify</button>
     </div>
     <div style="height:16px"></div>
   </div>
@@ -569,6 +577,7 @@ var codes={
 var supValidated=false,qcValidated=false,supName='',qcName='';
 var iRes=null,openS=null,iCnt=3,tdCnt=0,reg=[],reqs=[],regFilt='all';
 var items=[{id:'i1',desc:'',qty:''},{id:'i2',desc:'',qty:''}];
+var inspPhotosArr=[];
 var ss={};
 var fabDims=['A','B','C','D','E','F','G','H','I','J','K','L','M'].map(function(l){return{label:l,draw:'',meas:''};});
 var lastIRNs={};
@@ -836,6 +845,34 @@ function toggleCheck(i){
   } else {
     box.dataset.checked='1';box.style.background='#1D9E75';box.style.borderColor='#1D9E75';box.textContent='✓';
   }
+}
+function addInspPhotos(input){
+  if(!input.files)return;
+  Array.from(input.files).forEach(function(file){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      inspPhotosArr.push(e.target.result);
+      renderInspPhotos();
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value='';
+}
+function renderInspPhotos(){
+  var el=document.getElementById('inspPhotos');
+  if(!el)return;
+  var html='';
+  inspPhotosArr.forEach(function(src,i){
+    html+='<div style="position:relative;width:80px;height:80px">';
+    html+='<img src="'+src+'" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:0.5px solid #ddd">';
+    html+='<button onclick="removeInspPhoto('+i+')" style="position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.6);border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">&times;</button>';
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
+function removeInspPhoto(i){
+  inspPhotosArr.splice(i,1);
+  renderInspPhotos();
 }
 function toggleReqSubmit(){
   var cb=document.getElementById('reqAckCheck');
@@ -1324,28 +1361,29 @@ async function submitIRN(){
       if(linkedReq&&linkedReq.firebaseId&&window.markRequestRework)window.markRequestRework(linkedReq.firebaseId);
     }
     toast(d.reportNo+' submitted','ok');
-    // Send WhatsApp back to supervisor with result
+    // Auto-send WhatsApp notification
     setTimeout(function(){
       var isPass=d.result==='accept';
+      var stageName=activeStageFilter&&STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;})?STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;}).label:'';
       var irqRef=_irqParam?'IRQ-'+_irqParam:'';
-      var resultLine=isPass?'PASSED - Released':'FAILED - Rework required';
-      var resultIcon=isPass?'[PASS]':'[FAIL]';
-      var msg='*FSE INSPECTION RESULT*\n';
+      var msg='*FSE INSPECTION RELEASE NOTE*\n';
       msg+='================================\n';
-      msg+='*'+resultIcon+' '+resultLine+'*\n';
+      msg+=(isPass?'✅ *PASSED — Released*':'❌ *REJECTED — Rework required*')+'\n';
       msg+='================================\n';
       msg+='IRN: *INS-C '+d.reportNo+'*'+(irqRef?' ('+irqRef+')':'')+'\n';
       msg+='Job: *'+d.job+'*\n';
       msg+='Client: '+(d.project||'--')+'\n';
+      if(stageName)msg+='Stage: '+stageName+'\n';
+      msg+='Drawing: '+(d.drawing||'--')+'\n';
       msg+='Date: '+d.date+'\n';
-      msg+='QC Inspector: '+d.qc+' ('+d.qcCode+')\n';
+      msg+='QC: '+d.qc+' ('+d.qcCode+')\n';
       msg+='================================\n';
       if(!isPass){
-        msg+='*Reason:* '+(document.getElementById('rejectionReason').value||'--')+'\n';
-        msg+='*Action required:* '+(document.getElementById('rejectionAction').value||'--')+'\n';
+        msg+='*Reason:* '+(gv('rejectionReason')||'--')+'\n';
+        msg+='*Action required:* '+(gv('rejectionAction')||'--')+'\n';
         msg+='================================\n';
       }
-      msg+='View register: https://eric0103360.github.io/fse-irn-system';
+      msg+='Register: https://eric0103360.github.io/fse-irn-system';
       window.open('https://wa.me/?text='+encodeURIComponent(msg));
     },800);
     renderReg();
@@ -1561,7 +1599,7 @@ function renderPendingReqs(){
     if(isRework){
       html+='<button data-fid="'+r.firebaseId+'" data-reqno="'+(r.reqNo||'')+'" data-attempt="'+(attempt+1)+'" onclick="resubmitRequest(this)" style="font-size:11px;padding:6px 12px;background:#854F0B;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600"><i class="ti ti-refresh"></i> Re-submit</button>';
     } else {
-      html+='<button data-fid="'+r.firebaseId+'" data-reqno="'+(r.reqNo||'')+'" data-job="'+(r.job||'').replace(/"/g,'&quot;')+'" data-client="'+(r.client||'').replace(/"/g,'&quot;')+'" data-items="'+(itemList).replace(/"/g,'&quot;')+'" data-instructions="'+(r.instructions||'').replace(/"/g,'&quot;')+'" data-insptype="'+(r.inspTypes||'').replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:12px;padding:8px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600"><i class="ti ti-file-check"></i> Complete IRN</button>';
+      html+='<button data-fid="'+r.firebaseId+'" data-reqno="'+(r.reqNo||'')+'" data-job="'+(r.job||'').replace(/"/g,'&quot;')+'" data-client="'+(r.client||'').replace(/"/g,'&quot;')+'" data-items="'+(itemList).replace(/"/g,'&quot;')+'" data-instructions="'+(r.instructions||'').replace(/"/g,'&quot;')+'" data-insptype="'+(r.inspTypes||'').replace(/"/g,'&quot;')+'" data-by="'+(r.supervisor||'').replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:12px;padding:8px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600"><i class="ti ti-file-check"></i> Complete IRN</button>';
     }
     html+='</div></div>';
   });
@@ -1603,6 +1641,14 @@ function completeRequest(btn){
     var prEl=document.getElementById('project');if(prEl)prEl.value=client;
     // Show inherited banner
     var banner=document.getElementById('inheritedBanner');if(banner)banner.style.display='block';
+    // Show IRQ reference banner
+    if(reqNo){
+      var irqBanner=document.getElementById('irqRefBanner');
+      var irqText=document.getElementById('irqRefText');
+      if(irqBanner&&irqText){irqBanner.style.display='block';irqText.textContent='In response to IRQ-'+reqNo+' raised by '+btn.dataset.by;}
+    }
+    // Reset inspector photos
+    inspPhotosArr=[];renderInspPhotos();
     // Pre-fill items
     if(itemsStr){
       var newItems=itemsStr.split(' | ').filter(Boolean).map(function(s,i){
@@ -1730,8 +1776,13 @@ function printIRN(){
   if(stageName){
     win.document.write('<table><thead><tr><th colspan="2">Inspection checklist — '+stageName+'</th></tr></thead><tbody>'+criteriaRows+'</tbody></table>');
   }
-  if(d.notes){win.document.write('<div style="margin-bottom:12px"><div style="font-size:10px;color:#888;text-transform:uppercase;margin-bottom:4px">Inspection notes</div><div style="padding:8px;background:#f9f9f9;border-radius:4px;font-size:12px">'+d.notes+'</div></div>');}
-  if(!isPass&&d.rejectionReason){win.document.write('<div style="padding:10px;background:#FCEBEB;border:1px solid #E24B4A;border-radius:6px;margin-bottom:12px"><div style="font-weight:600;color:#A32D2D;margin-bottom:4px">Rejection details</div><div style="font-size:11px;color:#A32D2D"><strong>Reason:</strong> '+d.rejectionReason+'</div><div style="font-size:11px;color:#A32D2D;margin-top:4px"><strong>Action required:</strong> '+d.rejectionAction+'</div></div>');}
+  if(inspPhotosArr.length>0){
+    win.document.write('<div style="margin-bottom:12px"><div style="font-size:10px;color:#888;text-transform:uppercase;margin-bottom:6px">Inspection photos</div><div style="display:flex;flex-wrap:wrap;gap:8px">');
+    inspPhotosArr.forEach(function(src){
+      win.document.write('<img src="'+src+'" style="width:120px;height:120px;object-fit:cover;border-radius:6px;border:0.5px solid #ddd">');
+    });
+    win.document.write('</div></div>');
+  }  if(!isPass&&d.rejectionReason){win.document.write('<div style="padding:10px;background:#FCEBEB;border:1px solid #E24B4A;border-radius:6px;margin-bottom:12px"><div style="font-weight:600;color:#A32D2D;margin-bottom:4px">Rejection details</div><div style="font-size:11px;color:#A32D2D"><strong>Reason:</strong> '+d.rejectionReason+'</div><div style="font-size:11px;color:#A32D2D;margin-top:4px"><strong>Action required:</strong> '+d.rejectionAction+'</div></div>');}
   win.document.write('<div class="sign-grid"><div class="sign-box"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:4px">QC Inspector</div><div style="font-size:12px;font-weight:600">'+d.qc+'</div><div style="font-size:11px;color:#185FA5">'+d.qcCode+'</div><div style="margin-top:20px;border-top:0.5px solid #ddd;font-size:9px;color:#aaa;padding-top:4px">Signature</div></div><div class="sign-box"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:4px">Supervisor</div><div style="font-size:12px"> </div><div style="margin-top:20px;border-top:0.5px solid #ddd;font-size:9px;color:#aaa;padding-top:4px">Signature</div></div><div class="sign-box"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:4px">Client</div><div style="font-size:12px">'+(d.client||' ')+'</div><div style="margin-top:20px;border-top:0.5px solid #ddd;font-size:9px;color:#aaa;padding-top:4px">Signature</div></div></div>');
   win.document.write('<div class="footer">FSE-QR-IRN.038 Rev 02 · This document is the property of FSE · If printed, verify against the authorised version on the server</div>');
   win.document.write('</body></html>');
