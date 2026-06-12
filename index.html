@@ -574,8 +574,8 @@ var fabDims=['A','B','C','D','E','F','G','H','I','J','K','L','M'].map(function(l
 var lastIRNs={};
 
 var STAGES=[
-  {id:'s0',num:0,label:'Prior to welding',gate:'Pre-weld inspection - 100% visual and dimensional',criteria:['Level','Square','Dimensional correct','PCD correct','Stiffeners fitted','Dog tags attached']},
-  {id:'s1',num:1,label:'After tack welding',gate:'Inspection after tack welding - 100% visual and dimensional',criteria:['Level','Square','Dimensional','PCD correct','Stiffeners fitted','Dog tags attached']},
+  {id:'s0',num:0,label:'Prior to welding',gate:'Pre-weld inspection - 100% visual and dimensional',criteria:['Level','Square','Dimensional correct','PCD correct','Stiffeners fitted']},
+  {id:'s1',num:1,label:'After tack welding',gate:'Inspection after tack welding - 100% visual and dimensional',criteria:['Level','Square','Dimensional','PCD correct','Stiffeners fitted']},
   {id:'s2',num:2,label:'After welding',gate:'Inspection after welding - 100% visual and dimensional',criteria:['Weld size correct','Weld profile ok','No mis-welds','Smalls fitted','No overgrinding','Stop starts ok','No pinholes']},
   {id:'s3',num:3,label:'Trial assembly',isCritical:true,gate:'Trial assembly performed - all holes bolt-verified and match marked',criteria:['All holes drilled per drawing','Every hole bolt-verified (not 2nd/3rd)','No misaligned holes','Match marks applied','Marks correspond to mating part','Support feet drilled and verified','Assembly fits without forcing']},
   {id:'s4',num:4,label:'Match-marking',gate:'Match-marking completed after trial assembly',criteria:['Sequential numbering correct','Colour coded where applicable','Marks clearly visible','Marks on mating faces only']},
@@ -1204,25 +1204,26 @@ function getSnags(){
   });
   return s.join(' | ')||'None';
 }
+function gv(id){var el=document.getElementById(id);return el?el.value:'';}
 function getFormBasic(){
   return{
-    reportNo:document.getElementById('reportNo').value||'--',
-    bookRef:document.getElementById('bookRef').value.toUpperCase(),
-    inspector:document.getElementById('inspector').value,
-    po:document.getElementById('po').value,
-    job:document.getElementById('job').value,
-    project:document.getElementById('project').value,
-    drawing:document.getElementById('drawing').value,
-    artisan:document.getElementById('artisan').value,
-    date:document.getElementById('irnDate').value||new Date().toLocaleDateString('en-ZA'),
+    reportNo:gv('reportNo')||'--',
+    bookRef:'',
+    inspector:qcName||'',
+    po:gv('po'),
+    job:gv('job'),
+    project:gv('project'),
+    drawing:gv('drawing'),
+    artisan:gv('artisan'),
+    date:gv('irnDate')||new Date().toLocaleDateString('en-ZA'),
     result:iRes||'not set',
-    rejectionReason:iRes==='reject'?document.getElementById('rejectionReason').value:'',
-    rejectionAction:iRes==='reject'?document.getElementById('rejectionAction').value:'',
-    notes:document.getElementById('notes').value,
-    supervisor:supName,supCode:document.getElementById('supCode').value.toUpperCase(),
-    qc:qcName,qcCode:document.getElementById('qcCode').value.toUpperCase(),
-    client:document.getElementById('clientName').value,
-    clientCo:document.getElementById('clientCo').value
+    rejectionReason:iRes==='reject'?gv('rejectionReason'):'',
+    rejectionAction:iRes==='reject'?gv('rejectionAction'):'',
+    notes:gv('notes'),
+    supervisor:supName,supCode:'',
+    qc:qcName,qcCode:gv('qcCode').toUpperCase(),
+    client:gv('clientName'),
+    clientCo:gv('clientCo')
   };
 }
 function getForm(){
@@ -1277,7 +1278,26 @@ function buildWAMessage(d){
 }
 function sendWA(){
   var d=getFormBasic();
-  var msg='FSE IRN: '+d.bookRef+'/'+d.reportNo+'\nJob: '+d.job+' | PO: '+d.po+'\nResult: '+d.result.toUpperCase()+'\nDate: '+d.date;
+  var isPass=d.result==='accept';
+  var stageName=activeStageFilter&&STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;})?STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;}).label:'';
+  var msg='*FSE INSPECTION RELEASE NOTE*\n';
+  msg+='================================\n';
+  msg+=(isPass?'✅ *PASSED — Released*':'❌ *REJECTED — Rework required*')+'\n';
+  msg+='================================\n';
+  msg+='IRN: *INS-C '+d.reportNo+'*\n';
+  msg+='Job: *'+d.job+'*\n';
+  msg+='Client: '+(d.project||'--')+'\n';
+  if(stageName)msg+='Stage: '+stageName+'\n';
+  msg+='Drawing: '+(d.drawing||'--')+'\n';
+  msg+='Date: '+d.date+'\n';
+  msg+='QC: '+d.qc+' ('+d.qcCode+')\n';
+  if(!isPass&&d.rejectionReason){
+    msg+='================================\n';
+    msg+='*Reason:* '+d.rejectionReason+'\n';
+    msg+='*Action:* '+d.rejectionAction+'\n';
+  }
+  msg+='================================\n';
+  msg+='Register: https://eric0103360.github.io/fse-irn-system';
   window.open('https://wa.me/?text='+encodeURIComponent(msg));
 }
 async function submitIRN(){
@@ -1686,9 +1706,37 @@ var fabRows='';
 function printIRN(){
   var d=getForm();
   if(!d.reportNo||d.reportNo==='--'){toast('Enter a report number','err');return;}
-  var ex=reg.findIndex(function(r){return r.reportNo===d.reportNo&&r.bookRef===d.bookRef;});
-  if(ex<0)reg.unshift(d);
-  printRec(d.bookRef,d.reportNo);
+  var logoSrc=getLogoSrc();
+  var stageName='';
+  var criteriaRows='';
+  var stagesToPrint=activeStageFilter?STAGES.filter(function(s){return activeStageFilter.indexOf(s.id)!==-1;}):STAGES.filter(function(s){return stSt(s.id)!=='empty'&&!ss[s.id].na;});
+  stagesToPrint.forEach(function(s){
+    var st=ss[s.id];
+    if(!stageName)stageName=s.label;
+    criteriaRows+=s.criteria.map(function(c,ci){
+      return '<tr><td style="padding:4px 8px;border:0.5px solid #ddd">'+c+'</td><td style="padding:4px 8px;border:0.5px solid #ddd;text-align:center;color:'+(st.crit[ci]?'#1D9E75':'#E24B4A')+'">'+(st.crit[ci]?'&#10003; Pass':'&#10007; Fail')+'</td></tr>';
+    }).join('');
+  });
+  var itemRows=items.filter(function(i){return i.desc;}).map(function(i,idx){
+    return '<tr><td style="padding:4px 8px;border:0.5px solid #ddd">'+(idx+1)+'</td><td style="padding:4px 8px;border:0.5px solid #ddd">'+i.desc+'</td><td style="padding:4px 8px;border:0.5px solid #ddd;text-align:center">'+(i.qty||1)+'</td></tr>';
+  }).join('');
+  var isPass=d.result==='accept';
+  var win=window.open('','_blank');
+  win.document.write('<!DOCTYPE html><html><head><title>IRN INS-C '+d.reportNo+'</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#1a1a1a}h1{font-size:16px;margin:0}h2{font-size:13px;margin:4px 0}table{width:100%;border-collapse:collapse;margin-bottom:12px}th{background:#1a3a5c;color:#fff;padding:5px 8px;text-align:left;font-size:11px}td{font-size:11px}.hdr{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:8px;margin-bottom:12px}.logo{height:50px}.result-pass{background:#EAF3DE;border:1.5px solid #1D9E75;padding:8px 12px;border-radius:6px;font-weight:600;color:#27500A;font-size:13px;margin-bottom:12px}.result-fail{background:#FCEBEB;border:1.5px solid #E24B4A;padding:8px 12px;border-radius:6px;font-weight:600;color:#A32D2D;font-size:13px;margin-bottom:12px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}.cell{background:#f9f9f9;padding:6px 8px;border-radius:4px}.cell-label{font-size:9px;color:#888;text-transform:uppercase}.cell-val{font-size:12px;font-weight:500}.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}.sign-box{border:0.5px solid #ddd;padding:8px;border-radius:4px;min-height:50px}.footer{font-size:9px;color:#aaa;text-align:center;margin-top:16px;border-top:0.5px solid #eee;padding-top:8px}@media print{body{margin:10mm}}</style></head><body>');
+  win.document.write('<div class="hdr"><div><img src="'+logoSrc+'" class="logo"><div style="margin-top:4px"><h1>Inspection Release Note</h1><h2>FSE-QR-IRN.038 · Rev 02 · ISO9001 / ISO3834-2</h2></div></div><div style="text-align:right"><div style="font-size:10px;color:#888">REPORT NO</div><div style="font-size:22px;font-weight:700;color:#1a3a5c">INS-C '+d.reportNo+'</div></div></div>');
+  win.document.write('<div class="'+(isPass?'result-pass':'result-fail')+'">'+(isPass?'✓ ACCEPTED — Released for next stage':'✗ REJECTED — Rework required')+'</div>');
+  win.document.write('<div class="grid"><div class="cell"><div class="cell-label">Job / Order</div><div class="cell-val">'+d.job+'</div></div><div class="cell"><div class="cell-label">Client</div><div class="cell-val">'+(d.project||'--')+'</div></div><div class="cell"><div class="cell-label">PO Number</div><div class="cell-val">'+(d.po||'--')+'</div></div><div class="cell"><div class="cell-label">Artisan</div><div class="cell-val">'+(d.artisan||'--')+'</div></div><div class="cell"><div class="cell-label">Drawing / Rev</div><div class="cell-val">'+(d.drawing||'--')+'</div></div><div class="cell"><div class="cell-label">Date</div><div class="cell-val">'+d.date+'</div></div></div>');
+  if(itemRows){win.document.write('<table><thead><tr><th>#</th><th>Item description</th><th>Qty</th></tr></thead><tbody>'+itemRows+'</tbody></table>');}
+  if(stageName){
+    win.document.write('<table><thead><tr><th colspan="2">Inspection checklist — '+stageName+'</th></tr></thead><tbody>'+criteriaRows+'</tbody></table>');
+  }
+  if(d.notes){win.document.write('<div style="margin-bottom:12px"><div style="font-size:10px;color:#888;text-transform:uppercase;margin-bottom:4px">Inspection notes</div><div style="padding:8px;background:#f9f9f9;border-radius:4px;font-size:12px">'+d.notes+'</div></div>');}
+  if(!isPass&&d.rejectionReason){win.document.write('<div style="padding:10px;background:#FCEBEB;border:1px solid #E24B4A;border-radius:6px;margin-bottom:12px"><div style="font-weight:600;color:#A32D2D;margin-bottom:4px">Rejection details</div><div style="font-size:11px;color:#A32D2D"><strong>Reason:</strong> '+d.rejectionReason+'</div><div style="font-size:11px;color:#A32D2D;margin-top:4px"><strong>Action required:</strong> '+d.rejectionAction+'</div></div>');}
+  win.document.write('<div class="sign-grid"><div class="sign-box"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:4px">QC Inspector</div><div style="font-size:12px;font-weight:600">'+d.qc+'</div><div style="font-size:11px;color:#185FA5">'+d.qcCode+'</div><div style="margin-top:20px;border-top:0.5px solid #ddd;font-size:9px;color:#aaa;padding-top:4px">Signature</div></div><div class="sign-box"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:4px">Supervisor</div><div style="font-size:12px"> </div><div style="margin-top:20px;border-top:0.5px solid #ddd;font-size:9px;color:#aaa;padding-top:4px">Signature</div></div><div class="sign-box"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:4px">Client</div><div style="font-size:12px">'+(d.client||' ')+'</div><div style="margin-top:20px;border-top:0.5px solid #ddd;font-size:9px;color:#aaa;padding-top:4px">Signature</div></div></div>');
+  win.document.write('<div class="footer">FSE-QR-IRN.038 Rev 02 · This document is the property of FSE · If printed, verify against the authorised version on the server</div>');
+  win.document.write('</body></html>');
+  win.document.close();
+  setTimeout(function(){win.print();},400);
 }
 
 
