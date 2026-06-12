@@ -221,6 +221,28 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
       </div>
     </div>
 
+    <!-- Waiting screen — shown when no IRQ link -->
+    <div id="waitingScreen" style="display:none;text-align:center;padding:48px 24px">
+      <div style="width:72px;height:72px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+        <i class="ti ti-clock" style="font-size:32px;color:#185FA5"></i>
+      </div>
+      <div style="font-size:16px;font-weight:600;color:#1a3a5c;margin-bottom:8px">Waiting for inspection request</div>
+      <div style="font-size:13px;color:#888;margin-bottom:24px;line-height:1.5">When a supervisor raises an inspection request you will receive a WhatsApp notification with a direct link to the job.</div>
+      <div style="background:#f9f9f7;border-radius:10px;padding:16px;text-align:left;max-width:300px;margin:0 auto">
+        <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">How it works</div>
+        <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px"><div style="width:20px;height:20px;border-radius:50%;background:#1a3a5c;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</div><div style="font-size:12px;color:#444">Supervisor raises request on Inspect Req tab</div></div>
+        <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px"><div style="width:20px;height:20px;border-radius:50%;background:#1a3a5c;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</div><div style="font-size:12px;color:#444">You receive a WhatsApp with the job details and link</div></div>
+        <div style="display:flex;align-items:flex-start;gap:8px"><div style="width:20px;height:20px;border-radius:50%;background:#1a3a5c;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</div><div style="font-size:12px;color:#444">Tap the link — form pre-filled and ready to complete</div></div>
+      </div>
+    </div>
+
+    <!-- IRQ notification banner — colour coded by urgency -->
+    <div id="irqNotifBanner" style="display:none;margin-bottom:8px;border-radius:10px;overflow:hidden">
+    </div>
+
+    <!-- Main form — hidden until IRQ received -->
+    <div id="mainFormContent" style="display:none">
+
     <div class="card">
       <div class="ct"><i class="ti ti-briefcase" style="font-size:13px"></i> Step 1 — Job details</div>
       <div id="inheritedBanner" style="display:none;background:#E6F1FB;border-radius:6px;padding:6px 10px;margin:0 14px 8px;font-size:11px;color:#0C447C"><i class="ti ti-link" style="font-size:13px"></i> Pre-filled from inspection request</div>
@@ -335,9 +357,13 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
       </div>
     </div>
 
+    </div> <!-- end mainFormContent -->
+
+    <div id="formActions" style="display:none">
     <div class="ag no-print" style="margin-top:8px">
       <button class="ab pr" onclick="printIRN()" style="padding:11px"><i class="ti ti-printer"></i> Print IRN</button>
       <button class="ab sub" id="submitBtn" onclick="submitIRN()" style="padding:11px;background:#1D9E75;border-color:#1D9E75"><i class="ti ti-send"></i> Release &amp; Notify</button>
+    </div>
     </div>
     <div style="height:16px"></div>
   </div>
@@ -642,6 +668,7 @@ function showV(v,btn){
     } else{renderReg();}
   }
   if(v==='form'&&!window._keepStageFilter){activeStageFilter=null;renderStages();}
+  if(v==='form')showFormOrWaiting();
   window._keepStageFilter=false;
   if(v==='request'){document.getElementById('reqLogo').src=getLogoSrc();if(window.peekNextIRQ){window.peekNextIRQ().then(function(n){var el=document.getElementById('reqNo');if(el&&!el.value){el.value=n;el.style.color='rgba(255,255,255,0.6)';}});}renderPendingReqs();}
   if(v==='register'){document.getElementById('regLogo').src=getLogoSrc();}
@@ -873,6 +900,37 @@ function renderInspPhotos(){
 function removeInspPhoto(i){
   inspPhotosArr.splice(i,1);
   renderInspPhotos();
+}
+function showFormOrWaiting(){
+  var hasReq=!!_irqParam;
+  var waiting=document.getElementById('waitingScreen');
+  var form=document.getElementById('mainFormContent');
+  var actions=document.getElementById('formActions');
+  if(waiting)waiting.style.display=hasReq?'none':'block';
+  if(form)form.style.display=hasReq?'block':'none';
+  if(actions)actions.style.display=hasReq?'block':'none';
+  if(hasReq)renderIrqBanner();
+}
+function renderIrqBanner(){
+  var el=document.getElementById('irqNotifBanner');
+  if(!el||!_urlReq)return;
+  var isUrgent=(_urlReq.inspTypes||'').toLowerCase().includes('urgent');
+  var bg=isUrgent?'#E24B4A':'#1a3a5c';
+  var html='<div style="background:'+bg+';padding:10px 14px;display:flex;align-items:center;justify-content:space-between">';
+  html+='<div style="font-size:13px;font-weight:600;color:#fff">'+(isUrgent?'⚡ URGENT — ':'')+'IRQ-'+(_urlReq.reqNo||'----')+'</div>';
+  html+='<span style="font-size:10px;background:rgba(255,255,255,0.2);color:#fff;padding:2px 8px;border-radius:10px">'+(_urlReq.inspTypes||'')+'</span>';
+  html+='</div>';
+  html+='<div style="background:#fff8f0;border:1.5px solid '+bg+';border-top:none;border-radius:0 0 10px 10px;padding:10px 14px">';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px">';
+  html+='<div><div style="font-size:9px;color:#888;text-transform:uppercase">Job</div><div style="font-size:13px;font-weight:700">'+(_urlReq.job||'--')+'</div></div>';
+  html+='<div><div style="font-size:9px;color:#888;text-transform:uppercase">Client</div><div style="font-size:12px">'+(_urlReq.client||'--')+'</div></div>';
+  html+='</div>';
+  if(_urlReq.items)html+='<div style="font-size:11px;color:#555;margin-bottom:4px"><strong>Items:</strong> '+_urlReq.items+'</div>';
+  if(_urlReq.instructions)html+='<div style="font-size:11px;color:#555"><strong>Check:</strong> '+_urlReq.instructions+'</div>';
+  html+='<div style="font-size:11px;color:#888;margin-top:4px">Raised by: <strong>'+(_urlReq.supervisor||'--')+'</strong></div>';
+  html+='</div>';
+  el.innerHTML=html;
+  el.style.display='block';
 }
 function toggleReqSubmit(){
   var cb=document.getElementById('reqAckCheck');
@@ -1639,6 +1697,8 @@ function completeRequest(btn){
   setTimeout(function(){
     var joEl=document.getElementById('job');if(joEl)joEl.value=job;
     var prEl=document.getElementById('project');if(prEl)prEl.value=client;
+    // Show form (was waiting screen)
+    showFormOrWaiting();
     // Show inherited banner
     var banner=document.getElementById('inheritedBanner');if(banner)banner.style.display='block';
     // Show IRQ reference banner
@@ -1849,6 +1909,7 @@ setTimeout(function(){
 },600);
 
 renderItems();renderStages();renderFab();
+showFormOrWaiting();
 if(window.loadCodesFromFirebase)window.loadCodesFromFirebase();
 document.getElementById('irnDate').value=new Date().toISOString().split('T')[0];
 initRequest();
