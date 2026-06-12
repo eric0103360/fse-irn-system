@@ -1083,7 +1083,8 @@ async function submitRequest(){
     +'&items='+encodeURIComponent(itemSummary)
     +'&type='+encodeURIComponent(d.inspTypes)
     +'&by='+encodeURIComponent(d.supervisor)
-    +'&checks='+encodeURIComponent(d.instructions||'');
+    +'&checks='+encodeURIComponent(d.instructions||'')
+    +'&reqdate='+encodeURIComponent(d.date||'');
   var liveLink='https://eric0103360.github.io/fse-irn-system?'+linkData;
   msg+='*Open IRN System to respond:*\n'+liveLink;
   window.open('https://wa.me/?text='+encodeURIComponent(msg));
@@ -1820,34 +1821,106 @@ function printIRN(){
     var st=ss[s.id];
     if(!stageName)stageName=s.label;
     criteriaRows+=s.criteria.map(function(c,ci){
-      return '<tr><td style="padding:4px 8px;border:0.5px solid #ddd">'+c+'</td><td style="padding:4px 8px;border:0.5px solid #ddd;text-align:center;color:'+(st.crit[ci]?'#1D9E75':'#E24B4A')+'">'+(st.crit[ci]?'&#10003; Pass':'&#10007; Fail')+'</td></tr>';
+      return '<tr><td style="padding:5px 8px;border:0.5px solid #ddd">'+c+'</td><td style="padding:5px 8px;border:0.5px solid #ddd;text-align:center;color:'+(st.crit[ci]?'#1D9E75':'#E24B4A')+';font-weight:600">'+(st.crit[ci]?'✓ Pass':'✗ Fail')+'</td></tr>';
     }).join('');
   });
   var itemRows=items.filter(function(i){return i.desc;}).map(function(i,idx){
-    return '<tr><td style="padding:4px 8px;border:0.5px solid #ddd">'+(idx+1)+'</td><td style="padding:4px 8px;border:0.5px solid #ddd">'+i.desc+'</td><td style="padding:4px 8px;border:0.5px solid #ddd;text-align:center">'+(i.qty||1)+'</td></tr>';
+    return '<tr><td style="padding:5px 8px;border:0.5px solid #ddd;text-align:center">'+(idx+1)+'</td><td style="padding:5px 8px;border:0.5px solid #ddd">'+i.desc+'</td><td style="padding:5px 8px;border:0.5px solid #ddd;text-align:center">'+(i.qty||1)+'</td></tr>';
   }).join('');
   var isPass=d.result==='accept';
+  var irqRef=_irqParam?'IRQ-'+_irqParam:'';
+  var supName=_urlReq?(_urlReq.supervisor||''):'';
+  var reqDate=_urlReq?(_urlReq.date||''):'';
   var win=window.open('','_blank');
-  win.document.write('<!DOCTYPE html><html><head><title>IRN INS-C '+d.reportNo+'</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#1a1a1a}h1{font-size:16px;margin:0}h2{font-size:13px;margin:4px 0}table{width:100%;border-collapse:collapse;margin-bottom:12px}th{background:#1a3a5c;color:#fff;padding:5px 8px;text-align:left;font-size:11px}td{font-size:11px}.hdr{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:8px;margin-bottom:12px}.logo{height:50px}.result-pass{background:#EAF3DE;border:1.5px solid #1D9E75;padding:8px 12px;border-radius:6px;font-weight:600;color:#27500A;font-size:13px;margin-bottom:12px}.result-fail{background:#FCEBEB;border:1.5px solid #E24B4A;padding:8px 12px;border-radius:6px;font-weight:600;color:#A32D2D;font-size:13px;margin-bottom:12px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}.cell{background:#f9f9f9;padding:6px 8px;border-radius:4px}.cell-label{font-size:9px;color:#888;text-transform:uppercase}.cell-val{font-size:12px;font-weight:500}.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}.sign-box{border:0.5px solid #ddd;padding:8px;border-radius:4px;min-height:50px}.footer{font-size:9px;color:#aaa;text-align:center;margin-top:16px;border-top:0.5px solid #eee;padding-top:8px}@media print{body{margin:10mm}}</style></head><body>');
-  win.document.write('<div class="hdr"><div><img src="'+logoSrc+'" class="logo"><div style="margin-top:4px"><h1>Inspection Release Note</h1><h2>FSE-QR-IRN.038 · Rev 02 · ISO9001 / ISO3834-2</h2></div></div><div style="text-align:right"><div style="font-size:10px;color:#888">REPORT NO</div><div style="font-size:22px;font-weight:700;color:#1a3a5c">INS-C '+d.reportNo+'</div></div></div>');
+  win.document.write('<!DOCTYPE html><html><head><title>IRN INS-C '+d.reportNo+(irqRef?' | '+irqRef:'')+'</title>');
+  win.document.write('<style>');
+  win.document.write('*{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#1a1a1a}');
+  win.document.write('h1{font-size:16px;margin:0}h2{font-size:12px;margin:0;color:#555}');
+  win.document.write('table{width:100%;border-collapse:collapse;margin-bottom:12px}');
+  win.document.write('th{background:#1a3a5c;color:#fff;padding:6px 8px;text-align:left;font-size:11px}');
+  win.document.write('.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:10px;margin-bottom:14px}');
+  win.document.write('.logo{height:52px}.irn-no{text-align:right}.irn-label{font-size:9px;color:#888;text-transform:uppercase}.irn-val{font-size:24px;font-weight:700;color:#1a3a5c;line-height:1}');
+  win.document.write('.irq-ref{font-size:11px;color:#185FA5;margin-top:2px}');
+  win.document.write('.result-pass{background:#EAF3DE;border:1.5px solid #1D9E75;padding:8px 12px;border-radius:6px;font-weight:700;color:#27500A;font-size:13px;margin-bottom:12px}');
+  win.document.write('.result-fail{background:#FCEBEB;border:1.5px solid #E24B4A;padding:8px 12px;border-radius:6px;font-weight:700;color:#A32D2D;font-size:13px;margin-bottom:12px}');
+  win.document.write('.grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}');
+  win.document.write('.cell{background:#f9f9f9;padding:6px 8px;border-radius:4px;border:0.5px solid #eee}');
+  win.document.write('.cell-label{font-size:9px;color:#888;text-transform:uppercase;margin-bottom:2px}.cell-val{font-size:12px;font-weight:500}');
+  win.document.write('.req-banner{background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:6px;padding:8px 12px;margin-bottom:12px;display:flex;gap:16px}');
+  win.document.write('.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}');
+  win.document.write('.sign-box{border:0.5px solid #ddd;padding:8px 10px;border-radius:4px;min-height:60px}');
+  win.document.write('.sign-label{font-size:9px;color:#888;text-transform:uppercase;margin-bottom:3px}.sign-name{font-size:12px;font-weight:600}.sign-code{font-size:11px;color:#185FA5}.sign-line{margin-top:18px;border-top:0.5px solid #ddd;font-size:9px;color:#aaa;padding-top:3px}');
+  win.document.write('.footer{font-size:9px;color:#aaa;text-align:center;margin-top:16px;border-top:0.5px solid #eee;padding-top:8px}');
+  win.document.write('.no-print{text-align:center;margin:16px 0}');
+  win.document.write('@media print{.no-print{display:none}body{margin:10mm}}');
+  win.document.write('</style></head><body>');
+
+  // Back button
+  win.document.write('<div class="no-print" style="text-align:left;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back to form</button></div>');
+
+  // Header
+  win.document.write('<div class="hdr"><div><img src="'+logoSrc+'" class="logo"><div style="margin-top:5px"><h1>Inspection Release Note</h1><h2>FSE-QR-IRN.038 · Rev 02 · ISO9001 / ISO3834-2</h2></div></div>');
+  win.document.write('<div class="irn-no"><div class="irn-label">Report No</div><div class="irn-val">INS-C '+d.reportNo+'</div>'+(irqRef?'<div class="irq-ref">'+irqRef+'</div>':'')+'</div></div>');
+
+  // Result
   win.document.write('<div class="'+(isPass?'result-pass':'result-fail')+'">'+(isPass?'✓ ACCEPTED — Released for next stage':'✗ REJECTED — Rework required')+'</div>');
-  win.document.write('<div class="grid"><div class="cell"><div class="cell-label">Job / Order</div><div class="cell-val">'+d.job+'</div></div><div class="cell"><div class="cell-label">Client</div><div class="cell-val">'+(d.project||'--')+'</div></div><div class="cell"><div class="cell-label">PO Number</div><div class="cell-val">'+(d.po||'--')+'</div></div><div class="cell"><div class="cell-label">Artisan</div><div class="cell-val">'+(d.artisan||'--')+'</div></div><div class="cell"><div class="cell-label">Drawing / Rev</div><div class="cell-val">'+(d.drawing||'--')+'</div></div><div class="cell"><div class="cell-label">Date</div><div class="cell-val">'+d.date+'</div></div></div>');
-  if(itemRows){win.document.write('<table><thead><tr><th>#</th><th>Item description</th><th>Qty</th></tr></thead><tbody>'+itemRows+'</tbody></table>');}
-  if(stageName){
-    win.document.write('<table><thead><tr><th colspan="2">Inspection checklist — '+stageName+'</th></tr></thead><tbody>'+criteriaRows+'</tbody></table>');
+
+  // Request reference banner
+  if(irqRef||supName){
+    win.document.write('<div class="req-banner">');
+    if(irqRef)win.document.write('<div><div class="cell-label">Inspection request</div><div style="font-size:12px;font-weight:600;color:#185FA5">'+irqRef+'</div></div>');
+    if(supName)win.document.write('<div><div class="cell-label">Requested by</div><div style="font-size:12px;font-weight:500">'+supName+'</div></div>');
+    if(reqDate)win.document.write('<div><div class="cell-label">Request date</div><div style="font-size:12px">'+reqDate+'</div></div>');
+    win.document.write('</div>');
   }
+
+  // Job details grid
+  win.document.write('<div class="grid">');
+  win.document.write('<div class="cell"><div class="cell-label">Job / Order</div><div class="cell-val">'+d.job+'</div></div>');
+  win.document.write('<div class="cell"><div class="cell-label">Client</div><div class="cell-val">'+(d.project||'--')+'</div></div>');
+  win.document.write('<div class="cell"><div class="cell-label">PO Number</div><div class="cell-val">'+(d.po||'--')+'</div></div>');
+  win.document.write('<div class="cell"><div class="cell-label">Artisan</div><div class="cell-val">'+(d.artisan||'--')+'</div></div>');
+  win.document.write('<div class="cell"><div class="cell-label">Drawing / Rev</div><div class="cell-val">'+(d.drawing||'--')+'</div></div>');
+  win.document.write('<div class="cell"><div class="cell-label">Inspection date</div><div class="cell-val">'+d.date+'</div></div>');
+  win.document.write('</div>');
+
+  // Items
+  if(itemRows){win.document.write('<table><thead><tr><th style="width:30px">#</th><th>Item description</th><th style="width:50px;text-align:center">Qty</th></tr></thead><tbody>'+itemRows+'</tbody></table>');}
+
+  // Checklist
+  if(stageName&&criteriaRows){win.document.write('<table><thead><tr><th colspan="2">Inspection checklist — '+stageName+'</th></tr></thead><tbody>'+criteriaRows+'</tbody></table>');}
+
+  // Notes
+  if(d.notes){win.document.write('<div style="margin-bottom:12px;padding:8px;background:#f9f9f9;border-radius:4px;border:0.5px solid #eee"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:3px">Inspection notes</div><div style="font-size:12px">'+d.notes+'</div></div>');}
+
+  // Rejection details
+  if(!isPass&&d.rejectionReason){win.document.write('<div style="padding:10px;background:#FCEBEB;border:1px solid #E24B4A;border-radius:6px;margin-bottom:12px"><div style="font-weight:600;color:#A32D2D;margin-bottom:4px;font-size:12px">Rejection details</div><div style="font-size:11px;color:#A32D2D;margin-bottom:3px"><strong>Reason:</strong> '+d.rejectionReason+'</div><div style="font-size:11px;color:#A32D2D"><strong>Action required:</strong> '+d.rejectionAction+'</div></div>');}
+
+  // Photos
   if(inspPhotosArr.length>0){
-    win.document.write('<div style="margin-bottom:12px"><div style="font-size:10px;color:#888;text-transform:uppercase;margin-bottom:6px">Inspection photos</div><div style="display:flex;flex-wrap:wrap;gap:8px">');
-    inspPhotosArr.forEach(function(src){
-      win.document.write('<img src="'+src+'" style="width:120px;height:120px;object-fit:cover;border-radius:6px;border:0.5px solid #ddd">');
-    });
+    win.document.write('<div style="margin-bottom:12px"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:6px">Inspection photos</div><div style="display:flex;flex-wrap:wrap;gap:8px">');
+    inspPhotosArr.forEach(function(src){win.document.write('<img src="'+src+'" style="width:130px;height:130px;object-fit:cover;border-radius:6px;border:0.5px solid #ddd">');});
     win.document.write('</div></div>');
-  }  if(!isPass&&d.rejectionReason){win.document.write('<div style="padding:10px;background:#FCEBEB;border:1px solid #E24B4A;border-radius:6px;margin-bottom:12px"><div style="font-weight:600;color:#A32D2D;margin-bottom:4px">Rejection details</div><div style="font-size:11px;color:#A32D2D"><strong>Reason:</strong> '+d.rejectionReason+'</div><div style="font-size:11px;color:#A32D2D;margin-top:4px"><strong>Action required:</strong> '+d.rejectionAction+'</div></div>');}
-  win.document.write('<div class="sign-grid"><div class="sign-box"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:4px">QC Inspector</div><div style="font-size:12px;font-weight:600">'+d.qc+'</div><div style="font-size:11px;color:#185FA5">'+d.qcCode+'</div><div style="margin-top:20px;border-top:0.5px solid #ddd;font-size:9px;color:#aaa;padding-top:4px">Signature</div></div><div class="sign-box"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:4px">Supervisor</div><div style="font-size:12px"> </div><div style="margin-top:20px;border-top:0.5px solid #ddd;font-size:9px;color:#aaa;padding-top:4px">Signature</div></div><div class="sign-box"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:4px">Client</div><div style="font-size:12px">'+(d.client||' ')+'</div><div style="margin-top:20px;border-top:0.5px solid #ddd;font-size:9px;color:#aaa;padding-top:4px">Signature</div></div></div>');
+  }
+
+  // Sign-off
+  win.document.write('<div class="sign-grid">');
+  win.document.write('<div class="sign-box"><div class="sign-label">QC Inspector</div><div class="sign-name">'+d.qc+'</div><div class="sign-code">'+d.qcCode+'</div><div class="sign-line">Signature</div></div>');
+  win.document.write('<div class="sign-box"><div class="sign-label">Supervisor</div><div class="sign-name">'+(supName||'&nbsp;')+'</div><div class="sign-code">&nbsp;</div><div class="sign-line">Signature</div></div>');
+  win.document.write('<div class="sign-box"><div class="sign-label">Client <span style="font-weight:400;color:#aaa">(optional)</span></div><div class="sign-name">'+(d.client||'&nbsp;')+'</div><div class="sign-code">&nbsp;</div><div class="sign-line">Signature</div></div>');
+  win.document.write('</div>');
+
+  // Footer
   win.document.write('<div class="footer">FSE-QR-IRN.038 Rev 02 · This document is the property of FSE · If printed, verify against the authorised version on the server</div>');
+
+  // Print button
+  win.document.write('<div class="no-print" style="margin-top:16px;display:flex;gap:8px;justify-content:center">');
+  win.document.write('<button onclick="window.print()" style="padding:10px 28px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer">🖨 Print / Save as PDF</button>');
+  win.document.write('<button onclick="window.close()" style="padding:10px 20px;background:#f0f0f0;border:none;border-radius:8px;font-size:13px;cursor:pointer">✕ Close</button>');
+  win.document.write('</div>');
+
   win.document.write('</body></html>');
   win.document.close();
-  setTimeout(function(){win.print();},400);
 }
 
 
@@ -1869,6 +1942,7 @@ var _urlReq=_irqParam?{
   inspTypes:_urlP.get('type')||'',
   supervisor:_urlP.get('by')||'',
   instructions:_urlP.get('checks')||'',
+  date:_urlP.get('reqdate')||'',
   status:'pending',
   firebaseId:''
 }:null;
