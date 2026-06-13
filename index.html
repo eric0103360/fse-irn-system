@@ -701,9 +701,15 @@ function showV(v,btn){
     },150);
   }
   if(v==='register'){
+    document.getElementById('regLogo').src=getLogoSrc();
+    // Always reload both collections fresh
+    var regLoaded={irns:false,reqs:false};
+    function checkRegReady(){if(regLoaded.irns&&regLoaded.reqs)renderReg();}
+    if(window.loadIRNsFromFirebase){window.loadIRNsFromFirebase(function(r){reg=r;regLoaded.irns=true;checkRegReady();});}
+    else{regLoaded.irns=true;}
+    if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){reqs=r;regLoaded.reqs=true;checkRegReady();});}
+    else{regLoaded.reqs=true;}
     renderReg();
-    if(window.loadIRNsFromFirebase){window.loadIRNsFromFirebase(function(r){reg=r;renderReg();});}
-    if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){reqs=r;renderReg();});}
   }
   if(v==='form'){
     if(!window._keepStageFilter){activeStageFilter=null;}
@@ -717,7 +723,7 @@ function showV(v,btn){
     if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){reqs=r;renderPendingReqs();});}
     else{renderPendingReqs();}
   }
-  if(v==='register'){document.getElementById('regLogo').src=getLogoSrc();}
+
   if(v==='admin'){document.getElementById('admLogo').src=getLogoSrc();}
 }
 function capturePhoto(input,sid){
