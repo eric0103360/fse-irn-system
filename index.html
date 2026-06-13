@@ -1627,7 +1627,7 @@ function stStFromSaved(st,s){
   if(st.gate||cd>0)return'partial';return'empty';
 }
 function renderReg(){
-  // Merge requests and IRNs by IRQ
+  // Merge ALL requests and IRNs by IRQ
   var irqMap={};
   reqs.forEach(function(r){
     var key=r.reqNo||('req_'+r.firebaseId);
@@ -1649,7 +1649,7 @@ function renderReg(){
   // Stats
   var total=entries.length;
   var released=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept';}).length;
-  var pending=entries.filter(function(e){return !e.irns.length||(e.req&&e.req.status==='pending');}).length;
+  var pending=entries.filter(function(e){var l=e.irns[e.irns.length-1];return !l;}).length;
   var ftp=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&(!l.attempt||l.attempt===1);}).length;
   var ftpPct=released>0?Math.round(ftp/released*100):0;
   document.getElementById('statT').textContent=total;
@@ -1661,48 +1661,48 @@ function renderReg(){
   var chartEl=document.getElementById('stageChart');
   if(reg.length>0&&chartEl){
     chartEl.style.display='block';
-    var ch='<div style="font-size:10px;font-weight:600;color:#1a3a5c;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Pass rate per stage</div>';
+    var ch='<div style="font-size:11px;font-weight:600;color:#1a3a5c;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Pass rate per stage</div>';
     STAGES.forEach(function(s){
       var sp=0,st2=0;
       reg.forEach(function(r){if(r.stageStates&&r.stageStates[s.id]){var x=r.stageStates[s.id];if(!x.na){st2++;if(x.gate)sp++;}}});
       if(st2===0)return;
       var pct=Math.round(sp/st2*100);var fp=100-pct;
-      ch+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px"><div style="width:90px;font-size:10px;color:#666;text-align:right;flex-shrink:0">'+s.label+'</div><div style="flex:1;background:#f0f0f0;border-radius:3px;height:14px;overflow:hidden;display:flex"><div style="width:'+pct+'%;background:#1D9E75;height:100%;display:flex;align-items:center;justify-content:flex-end;padding-right:2px">'+(pct>20?'<span style="font-size:9px;color:#fff;font-weight:600">'+pct+'%</span>':'')+'</div><div style="width:'+fp+'%;background:#E24B4A;height:100%"></div></div><div style="width:36px;font-size:10px;color:#888">'+sp+'/'+st2+'</div></div>';
+      ch+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><div style="width:100px;font-size:11px;color:#666;text-align:right;flex-shrink:0">'+s.label+'</div><div style="flex:1;background:#f0f0f0;border-radius:4px;height:18px;overflow:hidden;display:flex"><div style="width:'+pct+'%;background:#1D9E75;height:100%;display:flex;align-items:center;justify-content:flex-end;padding-right:4px">'+(pct>15?'<span style="font-size:10px;color:#fff;font-weight:600">'+pct+'%</span>':'')+'</div><div style="width:'+fp+'%;background:#E24B4A;height:100%"></div></div><div style="width:40px;font-size:11px;color:#888;text-align:right">'+sp+'/'+st2+'</div></div>';
     });
     chartEl.innerHTML=ch;
   } else if(chartEl){chartEl.style.display='none';}
 
   // Filter
   var filtered=entries;
-  if(_regFilt==='pending')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return !l||(e.req&&e.req.status==='pending');});
+  if(_regFilt==='pending')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return !l;});
   else if(_regFilt==='released')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept';});
   else if(_regFilt==='rework')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='reject';});
 
   if(!filtered.length){
-    document.getElementById('regList').innerHTML='<div style="text-align:center;padding:32px 16px;color:#888;font-size:13px"><i class="ti ti-clipboard-list" style="font-size:32px;display:block;margin-bottom:8px"></i>No records found.</div>';
+    document.getElementById('regList').innerHTML='<div style="text-align:center;padding:32px 16px;color:#888;font-size:14px"><i class="ti ti-clipboard-list" style="font-size:40px;display:block;margin-bottom:8px"></i>No records found.</div>';
     return;
   }
 
-  // Build table
-  var html='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
+  // Build table — BIG and readable
+  var html='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">';
   html+='<thead><tr style="background:#1a3a5c;color:#fff">';
-  html+='<th style="padding:10px 12px;text-align:left;white-space:nowrap">IRQ</th>';
-  html+='<th style="padding:10px 12px;text-align:left;white-space:nowrap">Job</th>';
-  html+='<th style="padding:10px 12px;text-align:left;white-space:nowrap">Client</th>';
-  html+='<th style="padding:10px 12px;text-align:left;white-space:nowrap">Items</th>';
-  html+='<th style="padding:10px 8px;text-align:center;white-space:nowrap;font-size:10px">Pre<br>weld</th>';
-  html+='<th style="padding:10px 8px;text-align:center;white-space:nowrap;font-size:10px">S1<br>Tack</th>';
-  html+='<th style="padding:10px 8px;text-align:center;white-space:nowrap;font-size:10px">S2<br>Weld</th>';
-  html+='<th style="padding:10px 8px;text-align:center;white-space:nowrap;font-size:10px">S3<br>Trial</th>';
-  html+='<th style="padding:10px 8px;text-align:center;white-space:nowrap;font-size:10px">S4<br>Mark</th>';
-  html+='<th style="padding:10px 8px;text-align:center;white-space:nowrap;font-size:10px">S5<br>NDT</th>';
-  html+='<th style="padding:10px 8px;text-align:center;white-space:nowrap;font-size:10px">S6<br>Primer</th>';
-  html+='<th style="padding:10px 8px;text-align:center;white-space:nowrap;font-size:10px">S7<br>Paint</th>';
-  html+='<th style="padding:10px 8px;text-align:center;white-space:nowrap;font-size:10px">Final</th>';
-  html+='<th style="padding:10px 12px;text-align:left;white-space:nowrap">Supervisor</th>';
-  html+='<th style="padding:10px 12px;text-align:left;white-space:nowrap">QC</th>';
-  html+='<th style="padding:10px 12px;text-align:center;white-space:nowrap">Status</th>';
-  html+='<th style="padding:10px 12px;text-align:center;white-space:nowrap">Action</th>';
+  html+='<th style="padding:12px 14px;text-align:left;white-space:nowrap;min-width:60px">IRQ</th>';
+  html+='<th style="padding:12px 14px;text-align:left;white-space:nowrap;min-width:80px">Job</th>';
+  html+='<th style="padding:12px 14px;text-align:left;white-space:nowrap;min-width:80px">Client</th>';
+  html+='<th style="padding:12px 14px;text-align:left;white-space:nowrap;min-width:100px">Items</th>';
+  html+='<th style="padding:12px 8px;text-align:center;white-space:nowrap;font-size:11px;min-width:44px">Pre<br>weld</th>';
+  html+='<th style="padding:12px 8px;text-align:center;white-space:nowrap;font-size:11px;min-width:44px">S1<br>Tack</th>';
+  html+='<th style="padding:12px 8px;text-align:center;white-space:nowrap;font-size:11px;min-width:44px">S2<br>Weld</th>';
+  html+='<th style="padding:12px 8px;text-align:center;white-space:nowrap;font-size:11px;min-width:44px">S3<br>Trial</th>';
+  html+='<th style="padding:12px 8px;text-align:center;white-space:nowrap;font-size:11px;min-width:44px">S4<br>Mark</th>';
+  html+='<th style="padding:12px 8px;text-align:center;white-space:nowrap;font-size:11px;min-width:44px">S5<br>NDT</th>';
+  html+='<th style="padding:12px 8px;text-align:center;white-space:nowrap;font-size:11px;min-width:44px">S6<br>Primer</th>';
+  html+='<th style="padding:12px 8px;text-align:center;white-space:nowrap;font-size:11px;min-width:44px">S7<br>Paint</th>';
+  html+='<th style="padding:12px 8px;text-align:center;white-space:nowrap;font-size:11px;min-width:44px">Final</th>';
+  html+='<th style="padding:12px 14px;text-align:left;white-space:nowrap;min-width:90px">Supervisor</th>';
+  html+='<th style="padding:12px 14px;text-align:left;white-space:nowrap;min-width:90px">QC</th>';
+  html+='<th style="padding:12px 14px;text-align:center;white-space:nowrap;min-width:80px">Status</th>';
+  html+='<th style="padding:12px 14px;text-align:center;white-space:nowrap;min-width:110px">Action</th>';
   html+='</tr></thead><tbody>';
 
   var stageIds=['s0','s1','s2','s3','s4','s5','s6','s7','s8'];
@@ -1717,58 +1717,59 @@ function renderReg(){
     var job=(req&&req.job)||(latestIrn&&latestIrn.job)||'--';
     var client=(req&&req.client)||(latestIrn&&latestIrn.project)||'--';
     var items_str='--';
-    if(req&&req.items&&req.items.filter){items_str=req.items.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', ');}
-    else if(latestIrn&&latestIrn.items&&latestIrn.items.filter){items_str=latestIrn.items.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', ');}
+    if(req&&req.items&&Array.isArray(req.items)){items_str=req.items.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', ');}
+    else if(latestIrn&&latestIrn.items&&Array.isArray(latestIrn.items)){items_str=latestIrn.items.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', ');}
     var supName=(req&&req.supervisor)||(latestIrn&&latestIrn.reqSupervisor)||'--';
-    var qcName2=latestIrn?(latestIrn.qc+' · '+latestIrn.qcCode):'--';
+    var qcDisplay=latestIrn?(latestIrn.qc+' \xb7 '+latestIrn.qcCode):'--';
     var irqNo=entry.reqNo||'--';
     var sBg=status==='released'?'#EAF3DE':status==='rework'?'#FAEEDA':'#FCEBEB';
     var sCol=status==='released'?'#27500A':status==='rework'?'#633806':'#A32D2D';
     var sLbl=status==='released'?'Released':status==='rework'?'Rework':'Pending';
+    var isHighlighted=_irqParam&&String(irqNo)===String(_irqParam);
+    var rowBg=isHighlighted?'#FFF3CD':'#fff';
 
-    var rowBg=status==='released'?'#fff':status==='rework'?'#fff':'#fff';
-    var highlight=(_irqParam&&String(irqNo)===String(_irqParam))?'background:#FFF8E6;':'';
-    var highlightBanner=(_irqParam&&String(irqNo)===String(_irqParam))?'<td colspan="17" style="padding:4px 10px;background:#E24B4A;color:#fff;font-size:11px;font-weight:600;text-align:center">⚡ ACTION REQUIRED — Complete the IRN for this request</td>':'';
-    if(highlightBanner){
-      html+='<tr>'+highlightBanner+'</tr>';
+    if(isHighlighted){
+      html+='<tr><td colspan="17" style="padding:5px 14px;background:#E24B4A;color:#fff;font-size:12px;font-weight:600;text-align:center">';
+      html+='&#9889; ACTION REQUIRED — Complete the IRN for IRQ-'+irqNo+'</td></tr>';
     }
-    html+='<tr id="reg-row-'+irqNo+'" style="border-left:3px solid '+borderColor+';'+highlight+'" onmouseover="this.style.background=\'#f9f9f9\'" onmouseout="this.style.background=\''+(highlight?'#FFF8E6':'#fff')+'\'">';
-    html+='<td style="padding:10px 12px;font-weight:600;color:#1a3a5c">'+irqNo+'</td>';
-    html+='<td style="padding:10px 12px;font-weight:500">'+job+'</td>';
-    html+='<td style="padding:10px 12px;color:#555">'+client+'</td>';
-    html+='<td style="padding:10px 12px;color:#555;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+items_str+'">'+items_str+'</td>';
 
-    // Stage columns
+    html+='<tr id="reg-row-'+irqNo+'" style="border-left:4px solid '+borderColor+';background:'+rowBg+'" onmouseover="this.style.background=\'#f5f5f5\'" onmouseout="this.style.background=\''+rowBg+'\'">';
+    html+='<td style="padding:12px 14px;font-weight:700;color:#1a3a5c;font-size:14px">'+irqNo+'</td>';
+    html+='<td style="padding:12px 14px;font-weight:600;font-size:13px">'+job+'</td>';
+    html+='<td style="padding:12px 14px;color:#555">'+client+'</td>';
+    html+='<td style="padding:12px 14px;color:#555;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+items_str+'">'+items_str+'</td>';
+
     stageIds.forEach(function(sid){
       var stageData=latestIrn&&latestIrn.stageStates?latestIrn.stageStates[sid]:null;
       if(!stageData){
-        html+='<td style="padding:7px 10px;text-align:center;color:#ccc">·</td>';
+        html+='<td style="padding:12px 8px;text-align:center;color:#ccc;font-size:16px">\xb7</td>';
       } else if(stageData.na){
-        html+='<td style="padding:7px 10px;text-align:center"><span style="font-size:9px;color:#888;background:#f0f0f0;padding:1px 4px;border-radius:3px">N/A</span></td>';
+        html+='<td style="padding:12px 8px;text-align:center"><span style="font-size:10px;color:#888;background:#f0f0f0;padding:2px 5px;border-radius:3px">N/A</span></td>';
       } else if(stageData.gate){
-        html+='<td style="padding:7px 10px;text-align:center"><div style="width:20px;height:20px;border-radius:4px;background:#EAF3DE;display:inline-flex;align-items:center;justify-content:center"><i class="ti ti-check" style="font-size:11px;color:#27500A"></i></div></td>';
+        html+='<td style="padding:12px 8px;text-align:center"><div style="width:24px;height:24px;border-radius:5px;background:#EAF3DE;display:inline-flex;align-items:center;justify-content:center"><i class="ti ti-check" style="font-size:13px;color:#27500A"></i></div></td>';
       } else if(stageData.crit&&stageData.crit.some(Boolean)){
-        html+='<td style="padding:7px 10px;text-align:center"><div style="width:20px;height:20px;border-radius:4px;background:#FCEBEB;display:inline-flex;align-items:center;justify-content:center"><i class="ti ti-x" style="font-size:11px;color:#A32D2D"></i></div></td>';
+        html+='<td style="padding:12px 8px;text-align:center"><div style="width:24px;height:24px;border-radius:5px;background:#FCEBEB;display:inline-flex;align-items:center;justify-content:center"><i class="ti ti-x" style="font-size:13px;color:#A32D2D"></i></div></td>';
       } else {
-        html+='<td style="padding:7px 10px;text-align:center;color:#ccc">·</td>';
+        html+='<td style="padding:12px 8px;text-align:center;color:#ccc;font-size:16px">\xb7</td>';
       }
     });
 
-    html+='<td style="padding:7px 10px;color:#555;white-space:nowrap">'+supName+'</td>';
-    html+='<td style="padding:7px 10px;color:#555;white-space:nowrap">'+qcName2+'</td>';
-    html+='<td style="padding:7px 10px;text-align:center"><span style="font-size:10px;padding:3px 8px;border-radius:10px;font-weight:500;background:'+sBg+';color:'+sCol+'">'+sLbl+'</span></td>';
-    html+='<td style="padding:7px 10px;text-align:center;white-space:nowrap">';
+    html+='<td style="padding:12px 14px;color:#444">'+supName+'</td>';
+    html+='<td style="padding:12px 14px;color:#444">'+qcDisplay+'</td>';
+    html+='<td style="padding:12px 14px;text-align:center"><span style="font-size:11px;padding:4px 10px;border-radius:10px;font-weight:600;background:'+sBg+';color:'+sCol+'">'+sLbl+'</span></td>';
+    html+='<td style="padding:12px 14px;text-align:center">';
     if(status==='pending'){
-      html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-reqno="'+irqNo+'" data-job="'+job.replace(/"/g,"&quot;")+'" data-client="'+client.replace(/"/g,"&quot;")+'" data-items="'+items_str.replace(/"/g,"&quot;")+'" data-insptype="'+(req&&req.inspTypes||'').replace(/"/g,"&quot;")+'" data-by="'+supName.replace(/"/g,"&quot;")+'" onclick="completeRequest(this)" style="font-size:11px;padding:4px 10px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:500">Complete IRN</button>';
+      var inspType=(req&&req.inspTypes)||'';
+      var instructions=(req&&req.instructions)||'';
+      html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-reqno="'+irqNo+'" data-job="'+job.replace(/"/g,'&quot;')+'" data-client="'+client.replace(/"/g,'&quot;')+'" data-items="'+items_str.replace(/"/g,'&quot;')+'" data-insptype="'+inspType.replace(/"/g,'&quot;')+'" data-instructions="'+instructions.replace(/"/g,'&quot;')+'" data-by="'+supName.replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:12px;padding:7px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:7px;cursor:pointer;font-weight:600;white-space:nowrap">Complete IRN</button>';
     } else if(latestIrn){
-      html+='<button data-irn="'+latestIrn.reportNo+'" data-irq="'+irqNo+'" onclick="printFromReg(this)" style="font-size:11px;padding:4px 10px;background:#fff;border:0.5px solid #1a3a5c;color:#1a3a5c;border-radius:6px;cursor:pointer;font-weight:500"><i class="ti ti-printer" style="font-size:12px"></i> Print</button>';
+      html+='<button data-irn="'+latestIrn.reportNo+'" data-irq="'+irqNo+'" onclick="printFromReg(this)" style="font-size:12px;padding:7px 14px;background:#fff;border:1.5px solid #1a3a5c;color:#1a3a5c;border-radius:7px;cursor:pointer;font-weight:600"><i class="ti ti-printer" style="font-size:13px"></i> Print</button>';
     }
     html+='</td></tr>';
   });
 
   html+='</tbody></table></div>';
   document.getElementById('regList').innerHTML=html;
-  // Scroll to highlighted row if opened via WhatsApp link
   if(_irqParam){
     setTimeout(function(){
       var row=document.getElementById('reg-row-'+_irqParam);
