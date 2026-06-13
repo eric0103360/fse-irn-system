@@ -1726,7 +1726,13 @@ function renderReg(){
     var sCol=status==='released'?'#27500A':status==='rework'?'#633806':'#A32D2D';
     var sLbl=status==='released'?'Released':status==='rework'?'Rework':'Pending';
 
-    html+='<tr style="border-left:3px solid '+borderColor+';background:#fff" onmouseover="this.style.background=\'#f9f9f9\'" onmouseout="this.style.background=\'#fff\'">';
+    var rowBg=status==='released'?'#fff':status==='rework'?'#fff':'#fff';
+    var highlight=(_irqParam&&String(irqNo)===String(_irqParam))?'background:#FFF8E6;':'';
+    var highlightBanner=(_irqParam&&String(irqNo)===String(_irqParam))?'<td colspan="17" style="padding:4px 10px;background:#E24B4A;color:#fff;font-size:11px;font-weight:600;text-align:center">⚡ ACTION REQUIRED — Complete the IRN for this request</td>':'';
+    if(highlightBanner){
+      html+='<tr>'+highlightBanner+'</tr>';
+    }
+    html+='<tr id="reg-row-'+irqNo+'" style="border-left:3px solid '+borderColor+';'+highlight+'" onmouseover="this.style.background=\'#f9f9f9\'" onmouseout="this.style.background=\''+(highlight?'#FFF8E6':'#fff')+'\'">';
     html+='<td style="padding:7px 10px;font-weight:600;color:#1a3a5c">'+irqNo+'</td>';
     html+='<td style="padding:7px 10px;font-weight:500">'+job+'</td>';
     html+='<td style="padding:7px 10px;color:#555">'+client+'</td>';
@@ -1762,6 +1768,13 @@ function renderReg(){
 
   html+='</tbody></table></div>';
   document.getElementById('regList').innerHTML=html;
+  // Scroll to highlighted row if opened via WhatsApp link
+  if(_irqParam){
+    setTimeout(function(){
+      var row=document.getElementById('reg-row-'+_irqParam);
+      if(row)row.scrollIntoView({behavior:'smooth',block:'center'});
+    },300);
+  }
 }
 
 function toggleRegRow(id){
@@ -2106,19 +2119,13 @@ if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){
 setTimeout(function(){
   enterApp();
   if(_irqParam){
-    var reqBtn=document.querySelectorAll('.nb')[1];
-    if(reqBtn){
-      // Directly show the tab without triggering Firebase reload
-      document.querySelectorAll('.view').forEach(function(x){x.classList.remove('on');});
-      document.querySelectorAll('.nb').forEach(function(x){x.classList.remove('on');});
-      document.getElementById('v-request').classList.add('on');
-      reqBtn.classList.add('on');
-      document.getElementById('reqLogo').src=getLogoSrc();
-      renderPendingReqs();
-    }
+    // Inspector opened WhatsApp link — go straight to Register
+    var regBtn=document.querySelectorAll('.nb')[2];
+    if(regBtn)showV('register',regBtn);
   } else {
-    var formBtn=document.querySelectorAll('.nb')[0];
-    if(formBtn)showV('form',formBtn);
+    // Normal open — go to Inspect Req
+    var reqBtn=document.querySelectorAll('.nb')[0];
+    if(reqBtn)showV('request',reqBtn);
   }
 },2500);
 
