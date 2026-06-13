@@ -181,9 +181,37 @@ window.clearAllData=async function(){
 };
 window.saveCodesToFirebase=async function(){try{await setDoc(doc(db,'settings','codes'),{qc:codes.qc,sup:codes.sup});return true;}catch(e){return false;}};
 window.loadCodesFromFirebase=async function(){try{var d=await getDoc(doc(db,'settings','codes'));if(d.exists()){var data=d.data();if(data.qc){codes.qc=data.qc.map(function(c){return Object.assign({pin:''},c);});}if(data.sup){codes.sup=data.sup.map(function(c){return Object.assign({pin:''},c);});}}}catch(e){console.log('Codes load error:',e);}};
-window.saveRequestToFirebase=async function(data){try{var s=Object.assign({},data);s.timestamp=new Date().toISOString();s.status='pending';s.attempt=data.attempt||1;await addDoc(collection(db,'requests'),s);return true;}catch(e){return false;}};
+window.saveRequestToFirebase=async function(data){
+  try{
+    var s=Object.assign({},data);
+    s.timestamp=new Date().toISOString();
+    s.status='pending';
+    s.attempt=data.attempt||1;
+    // Remove photo data from Firebase save if too large
+    if(s.reqPhotoData&&s.reqPhotoData.length>0){
+      var totalSize=s.reqPhotoData.join('').length;
+      if(totalSize>500000){s.reqPhotoData=[];} // Skip photos if over 500KB
+    }
+    var ref=await addDoc(collection(db,'requests'),s);
+    console.log('Request saved to Firebase:',ref.id,'IRQ:',data.reqNo);
+    return true;
+  }catch(e){
+    console.error('Firebase save error:',e);
+    return false;
+  }
+};
 window.resubmitRequest=async function(firebaseId,attempt){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'pending',attempt:attempt,resubmittedAt:new Date().toISOString()});return true;}catch(e){return false;}};
-window.loadRequestsFromFirebase=function(cb){try{var q=query(collection(db,'requests'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);});}catch(e){cb([]);}};
+window.loadRequestsFromFirebase=function(cb){
+  try{
+    var q=query(collection(db,'requests'),orderBy('timestamp','desc'));
+    return onSnapshot(q,function(snap){
+      var r=[];
+      snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});
+      console.log('Loaded',r.length,'requests from Firebase. Pending:',r.filter(function(x){return x.status==='pending';}).length);
+      cb(r);
+    });
+  }catch(e){console.error('Load requests error:',e);cb([]);}
+};
 window.markRequestComplete=async function(firebaseId){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'complete'});return true;}catch(e){return false;}};
 window.markRequestRework=async function(firebaseId){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'rework'});return true;}catch(e){return false;}};
 window.loadIRNsFromFirebase=function(cb){try{var q=query(collection(db,'irns'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);});}catch(e){cb([]);}};
