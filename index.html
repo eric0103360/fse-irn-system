@@ -1818,60 +1818,7 @@ function waRec(book,no){
   window.open('https://wa.me/?text='+encodeURIComponent(msg));
 }
 function renderPendingReqs(){
-  var el=document.getElementById('pendingReqsList');
-  if(!el)return;
-  var pending=reqs.filter(function(r){return r.status==='pending';});
-  if(!pending.length){
-    el.innerHTML='<div style="text-align:center;padding:20px;color:#888;font-size:13px;background:#f9f9f7;border-radius:8px">No pending requests.</div>';
-    return;
-  }
-  // Sort — if URL has ?irq=, put that one first
-  if(_irqParam){
-    pending.sort(function(a,b){return a.reqNo===_irqParam?-1:b.reqNo===_irqParam?1:0;});
-  }
-  var html='';
-  pending.forEach(function(r){
-    var isTarget=_irqParam&&r.reqNo===_irqParam;
-    var isRework=r.status==='rework';
-    var itemList='--';
-    if(r.items&&Array.isArray(r.items)){
-      var filtered2=r.items.filter(function(i){return i.desc&&i.desc.trim();});
-      if(filtered2.length)itemList=filtered2.map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', ');
-    } else if(typeof r.items==='string'&&r.items){itemList=r.items;}
-    var attempt=r.attempt||1;
-    var headerBg=isTarget?'#c0392b':isRework?'#854F0B':'#f5a623';
-    var cardBg=isRework?'#FAEEDA':'#fff8f0';
-    var border=isTarget?'border:2.5px solid #E24B4A;box-shadow:0 0 0 3px rgba(226,75,74,0.2)':isRework?'border:2px solid #854F0B':'border:1.5px solid #f5a623';
-    html+='<div style="background:'+cardBg+';'+border+';border-radius:10px;margin-bottom:10px;overflow:hidden">';
-    if(isTarget)html+='<div style="background:#E24B4A;color:#fff;font-size:11px;font-weight:600;text-align:center;padding:4px">⚡ ACTION REQUIRED — Complete the IRN for this request</div>';
-    if(isRework)html+='<div style="background:#633806;color:#fff;font-size:11px;font-weight:600;text-align:center;padding:4px">🔧 REWORK REQUIRED — Fix the item then re-submit for inspection</div>';
-    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:'+headerBg+'">';
-    html+='<div style="font-size:13px;font-weight:700;color:#fff">IRQ-'+(r.reqNo||'----')+(attempt>1?' <span style="font-size:10px;background:rgba(255,255,255,0.3);padding:1px 6px;border-radius:8px">Attempt '+attempt+'</span>':'')+'</div>';
-    html+='<span style="font-size:10px;background:rgba(255,255,255,0.3);color:#fff;padding:2px 8px;border-radius:10px;font-weight:600">'+(isRework?'REWORK':'AWAITING IRN')+'</span>';
-    html+='</div>';
-    html+='<div style="display:grid;grid-template-columns:1fr 1fr;padding:8px 12px;border-bottom:0.5px solid #f5a623">';
-    html+='<div><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:2px">Job/Order</div><div style="font-size:13px;font-weight:700">'+(r.job||'--')+'</div></div>';
-    html+='<div><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:2px">Client</div><div style="font-size:12px">'+(r.client||'--')+'</div></div>';
-    html+='</div>';
-    html+='<div style="padding:6px 12px;border-bottom:0.5px solid #f5a623"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:2px">Items</div><div style="font-size:12px">'+itemList+'</div></div>';
-    html+='<div style="padding:6px 12px;border-bottom:0.5px solid #f5a623"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:2px">Inspection type</div><div style="font-size:12px">'+(r.inspTypes||'--')+'</div></div>';
-    html+='<div style="padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:6px">';
-    html+='<div style="font-size:11px;color:#888">By: <strong>'+(r.supervisor||'--')+'</strong> &middot; '+(r.date||'')+'</div>';
-    if(isRework){
-      html+='<button data-fid="'+r.firebaseId+'" data-reqno="'+(r.reqNo||'')+'" data-attempt="'+(attempt+1)+'" onclick="resubmitRequest(this)" style="font-size:11px;padding:6px 12px;background:#854F0B;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600"><i class="ti ti-refresh"></i> Re-submit</button>';
-    } else {
-      html+='<button data-fid="'+r.firebaseId+'" data-reqno="'+(r.reqNo||'')+'" data-job="'+(r.job||'').replace(/"/g,'&quot;')+'" data-client="'+(r.client||'').replace(/"/g,'&quot;')+'" data-items="'+(itemList).replace(/"/g,'&quot;')+'" data-instructions="'+(r.instructions||'').replace(/"/g,'&quot;')+'" data-insptype="'+(r.inspTypes||'').replace(/"/g,'&quot;')+'" data-by="'+(r.supervisor||'').replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:12px;padding:8px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600"><i class="ti ti-file-check"></i> Complete IRN</button>';
-    }
-    html+='</div></div>';
-  });
-  el.innerHTML=html;
-  // Auto-scroll to highlighted card when opened via link
-  if(_irqParam){
-    setTimeout(function(){
-      var el2=document.getElementById('pendingReqsList');
-      if(el2)el2.scrollIntoView({behavior:'smooth',block:'start'});
-    },300);
-  }
+  // Cards removed - pending requests shown in Register table
 }
 
 function resubmitRequest(btn){
