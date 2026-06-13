@@ -701,9 +701,9 @@ function showV(v,btn){
     },150);
   }
   if(v==='register'){
+    renderReg();
     if(window.loadIRNsFromFirebase){window.loadIRNsFromFirebase(function(r){reg=r;renderReg();});}
     if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){reqs=r;renderReg();});}
-    renderReg();
   }
   if(v==='form'){
     if(!window._keepStageFilter){activeStageFilter=null;}
@@ -1242,9 +1242,12 @@ async function submitRequest(){
   var itemSummary=reqItems.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(' | ');
   var liveLink='https://eric0103360.github.io/fse-irn-system?irq='+encodeURIComponent(d.reqNo);
   msg+='*Open IRN System to respond:*\n'+liveLink;
-  window.open('https://wa.me/?text='+encodeURIComponent(msg));
-  if(window.saveRequestToFirebase)window.saveRequestToFirebase(d);
+  // Save to Firebase FIRST before anything else
+  if(window.saveRequestToFirebase){
+    await window.saveRequestToFirebase(d);
+  }
   toast('Request submitted to QC group','ok');
+  window.open('https://wa.me/?text='+encodeURIComponent(msg));
   // Reset form
   var cb=document.getElementById('reqAckCheck');if(cb)cb.checked=false;
   // Reset IRQ number for next request
