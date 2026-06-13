@@ -2101,36 +2101,54 @@ function enterApp(){
   sp.style.opacity='0';
   setTimeout(function(){sp.style.display='none';},500);
 }
-// Read URL params immediately — no Firebase wait needed
+// Read URL params immediately
 var _urlP=new URLSearchParams(window.location.search);
 var _irqParam=_urlP.get('irq');
-var _urlReq=null; // Will be loaded from Firebase
 
-// If URL has request data, inject it into reqs immediately
-if(_urlReq)reqs=[_urlReq];
+// Create immediate placeholder from URL so inspector sees something right away
+var _urlReq=null;
+if(_irqParam){
+  _urlReq={
+    reqNo:_irqParam,
+    job:'Loading...',
+    client:'',
+    items:[],
+    inspTypes:'',
+    supervisor:'',
+    instructions:'',
+    status:'pending',
+    firebaseId:''
+  };
+  reqs=[_urlReq];
+}
 
-// Always load fresh — no caching flags
-if(window.loadIRNsFromFirebase){window._fbL=window.loadIRNsFromFirebase(function(r){reg=r;renderReg();});}
-if(window.loadRequestsFromFirebase){window._fbRL=window.loadRequestsFromFirebase(function(r){
+// Load from Firebase — updates the placeholder with real data
+if(window.loadIRNsFromFirebase){window.loadIRNsFromFirebase(function(r){reg=r;renderReg();});}
+if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){
   reqs=r;
   if(_irqParam){
     var found=reqs.find(function(x){return String(x.reqNo)===String(_irqParam)&&x.status==='pending';});
-    if(found){
-      _urlReq=found;
-      renderPendingReqs();
-      showFormOrWaiting();
-    }
+    if(found){_urlReq=found;}
+    else if(_urlReq){reqs=[_urlReq];}
   }
   renderPendingReqs();
+  showFormOrWaiting();
 });}
 
 // Splash auto-dismiss
 setTimeout(function(){
   enterApp();
   if(_irqParam){
-    // Go to Inspect Req tab — Firebase will populate it when loaded
     var reqBtn=document.querySelectorAll('.nb')[1];
-    if(reqBtn)showV('request',reqBtn);
+    if(reqBtn){
+      // Directly show the tab without triggering Firebase reload
+      document.querySelectorAll('.view').forEach(function(x){x.classList.remove('on');});
+      document.querySelectorAll('.nb').forEach(function(x){x.classList.remove('on');});
+      document.getElementById('v-request').classList.add('on');
+      reqBtn.classList.add('on');
+      document.getElementById('reqLogo').src=getLogoSrc();
+      renderPendingReqs();
+    }
   } else {
     var formBtn=document.querySelectorAll('.nb')[0];
     if(formBtn)showV('form',formBtn);
