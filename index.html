@@ -2081,22 +2081,28 @@ if(_urlReq)reqs=[_urlReq];
 if(window.loadIRNsFromFirebase&&!window._fbL){window._fbL=window.loadIRNsFromFirebase(function(r){reg=r;renderReg();});}
 if(window.loadRequestsFromFirebase&&!window._fbRL){window._fbRL=window.loadRequestsFromFirebase(function(r){
   reqs=r;
-  // Find matching request from Firebase using IRQ param
   if(_irqParam){
     var found=reqs.find(function(x){return x.reqNo===_irqParam&&x.status==='pending';});
-    if(found){_urlReq=found;}
-    showFormOrWaiting();
-    renderPendingReqs();
-  } else {
-    renderPendingReqs();
+    if(found){
+      _urlReq=found;
+      // Auto navigate to Inspect Req tab and show the request
+      var reqBtn=document.querySelectorAll('.nb')[1];
+      if(reqBtn&&document.getElementById('v-request').classList.contains('on')){
+        renderPendingReqs();
+        showFormOrWaiting();
+      } else if(reqBtn){
+        showV('request',reqBtn);
+      }
+    }
   }
+  renderPendingReqs();
 });}
 
 // Splash auto-dismiss
 setTimeout(function(){
   enterApp();
   if(_irqParam){
-    // Came from WhatsApp — go straight to Inspect Req showing the pending card
+    // Go to Inspect Req tab — Firebase will populate it when loaded
     var reqBtn=document.querySelectorAll('.nb')[1];
     if(reqBtn)showV('request',reqBtn);
   } else {
