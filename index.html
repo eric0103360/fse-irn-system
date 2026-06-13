@@ -705,15 +705,19 @@ function showV(v,btn){
     },150);
   }
   if(v==='register'){
-    window._fbL=null;window._fbRL=null;
-    if(window.loadIRNsFromFirebase){window._fbL=window.loadIRNsFromFirebase(function(r){reg=r;renderReg();});}
-    if(window.loadRequestsFromFirebase){window._fbRL=window.loadRequestsFromFirebase(function(r){reqs=r;renderReg();});}
+    if(window.loadIRNsFromFirebase){window.loadIRNsFromFirebase(function(r){reg=r;renderReg();});}
+    if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){reqs=r;renderReg();});}
     renderReg();
   }
   if(v==='form'&&!window._keepStageFilter){activeStageFilter=null;renderStages();}
   if(v==='form')showFormOrWaiting();
   window._keepStageFilter=false;
-  if(v==='request'){document.getElementById('reqLogo').src=getLogoSrc();if(window.peekNextIRQ){window.peekNextIRQ().then(function(n){var el=document.getElementById('reqNo');if(el&&!el.value){el.value=n;el.style.color='rgba(255,255,255,0.6)';}});}renderPendingReqs();}
+  if(v==='request'){
+    document.getElementById('reqLogo').src=getLogoSrc();
+    if(window.peekNextIRQ){window.peekNextIRQ().then(function(n){var el=document.getElementById('reqNo');if(el&&!el.value){el.value=n;el.style.color='rgba(255,255,255,0.6)';}});}
+    if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){reqs=r;renderPendingReqs();});}
+    else{renderPendingReqs();}
+  }
   if(v==='register'){document.getElementById('regLogo').src=getLogoSrc();}
   if(v==='admin'){document.getElementById('admLogo').src=getLogoSrc();}
 }
@@ -2105,22 +2109,16 @@ var _urlReq=null; // Will be loaded from Firebase
 // If URL has request data, inject it into reqs immediately
 if(_urlReq)reqs=[_urlReq];
 
-// Pre-load Firebase data in background
-if(window.loadIRNsFromFirebase&&!window._fbL){window._fbL=window.loadIRNsFromFirebase(function(r){reg=r;renderReg();});}
-if(window.loadRequestsFromFirebase&&!window._fbRL){window._fbRL=window.loadRequestsFromFirebase(function(r){
+// Always load fresh — no caching flags
+if(window.loadIRNsFromFirebase){window._fbL=window.loadIRNsFromFirebase(function(r){reg=r;renderReg();});}
+if(window.loadRequestsFromFirebase){window._fbRL=window.loadRequestsFromFirebase(function(r){
   reqs=r;
   if(_irqParam){
-    var found=reqs.find(function(x){return x.reqNo===_irqParam&&x.status==='pending';});
+    var found=reqs.find(function(x){return String(x.reqNo)===String(_irqParam)&&x.status==='pending';});
     if(found){
       _urlReq=found;
-      // Auto navigate to Inspect Req tab and show the request
-      var reqBtn=document.querySelectorAll('.nb')[1];
-      if(reqBtn&&document.getElementById('v-request').classList.contains('on')){
-        renderPendingReqs();
-        showFormOrWaiting();
-      } else if(reqBtn){
-        showV('request',reqBtn);
-      }
+      renderPendingReqs();
+      showFormOrWaiting();
     }
   }
   renderPendingReqs();
