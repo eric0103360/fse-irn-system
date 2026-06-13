@@ -180,7 +180,7 @@ window.clearAllData=async function(){
   }catch(e){console.error(e);return false;}
 };
 window.saveCodesToFirebase=async function(){try{await setDoc(doc(db,'settings','codes'),{qc:codes.qc,sup:codes.sup});return true;}catch(e){return false;}};
-window.loadCodesFromFirebase=async function(){try{var d=await getDoc(doc(db,'settings','codes'));if(d.exists()){var data=d.data();if(data.qc)codes.qc=data.qc;if(data.sup)codes.sup=data.sup;}}catch(e){}};
+window.loadCodesFromFirebase=async function(){try{var d=await getDoc(doc(db,'settings','codes'));if(d.exists()){var data=d.data();if(data.qc){codes.qc=data.qc.map(function(c){return Object.assign({pin:''},c);});}if(data.sup){codes.sup=data.sup.map(function(c){return Object.assign({pin:''},c);});}}}catch(e){console.log('Codes load error:',e);}};
 window.saveRequestToFirebase=async function(data){try{var s=Object.assign({},data);s.timestamp=new Date().toISOString();s.status='pending';s.attempt=data.attempt||1;await addDoc(collection(db,'requests'),s);return true;}catch(e){return false;}};
 window.resubmitRequest=async function(firebaseId,attempt){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'pending',attempt:attempt,resubmittedAt:new Date().toISOString()});return true;}catch(e){return false;}};
 window.loadRequestsFromFirebase=function(cb){try{var q=query(collection(db,'requests'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);});}catch(e){cb([]);}};
@@ -536,7 +536,7 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
         <i class="ti ti-lock" style="font-size:40px;color:#aaa;display:block;margin-bottom:12px"></i>
         <div style="font-size:14px;font-weight:500;margin-bottom:6px">Admin access required</div>
         <div style="font-size:12px;color:#888;margin-bottom:16px">Enter your admin code to manage codes</div>
-        <input class="admin-code-input" id="adminCodeIn" type="password" placeholder="Enter admin code" maxlength="20">
+        <input class="admin-code-input" id="adminCodeIn" type="password" placeholder="Enter admin code" maxlength="20" onkeydown="if(event.key==='Enter')unlockAdmin()">
         <button class="ab pri" style="width:100%;margin-top:8px" onclick="unlockAdmin()"><i class="ti ti-lock-open"></i> Unlock admin panel</button>
       </div>
     </div>
@@ -819,11 +819,16 @@ function checkPin(el,role,code){
   }
 }
 function unlockAdmin(){
-  if(document.getElementById('adminCodeIn').value===ADMIN_CODE){
+  var entered=document.getElementById('adminCodeIn').value;
+  if(entered===ADMIN_CODE){
     document.getElementById('adminLocked').style.display='none';
     document.getElementById('adminPanel').style.display='block';
     renderCodeTables();
-  }else{toast('Incorrect admin code','err');document.getElementById('adminCodeIn').value='';}
+  }else{
+    toast('Incorrect admin code','err');
+    document.getElementById('adminCodeIn').value='';
+    document.getElementById('adminCodeIn').focus();
+  }
 }
 function lockAdmin(){
   document.getElementById('adminLocked').style.display='block';
