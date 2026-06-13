@@ -1218,12 +1218,9 @@ async function submitRequest(){
   if(reqItems.filter(function(i){return i.desc;}).length===0){toast('Add at least one item','err');return;}
   if(selectedInspTypes.length===0){toast('Select at least one inspection type','err');return;}
   if(!reqSupValidated){toast('Supervisor code required','err');return;}
-  var reqNum=document.getElementById('reqNo').value;
-  if(!reqNum||reqNum==='----'||reqNum==='--'){
-    reqNum=await window.getNextIRQ();
-    document.getElementById('reqNo').value=reqNum;
-  }
-  d.reqNo=reqNum;
+  // Always get a fresh IRQ number — never reuse
+  d.reqNo=await window.getNextIRQ();
+  document.getElementById('reqNo').value=d.reqNo;
   var urgIcon=d.urgency==='urgent'?'URGENT - ':'';
   var itemList=reqItems.filter(function(i){return i.desc;}).map(function(i,idx){return '  '+(idx+1)+'. '+i.desc+(i.qty?' x'+i.qty:'');}).join('\n');
   var msg='*FSE INSPECTION REQUEST*\n';
@@ -1250,6 +1247,10 @@ async function submitRequest(){
   toast('Request submitted to QC group','ok');
   // Reset form
   var cb=document.getElementById('reqAckCheck');if(cb)cb.checked=false;
+  // Reset IRQ number for next request
+  var reqNoEl=document.getElementById('reqNo');
+  if(reqNoEl){reqNoEl.value='';reqNoEl.style.color='rgba(255,255,255,0.6)';}
+  if(window.peekNextIRQ){window.peekNextIRQ().then(function(n){var el=document.getElementById('reqNo');if(el){el.value=n;el.style.color='rgba(255,255,255,0.6)';}});}
   toggleReqSubmit();
 }
 function printRequest(){
