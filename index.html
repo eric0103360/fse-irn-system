@@ -1684,25 +1684,25 @@ function renderReg(){
   }
 
   // Build table
-  var html='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">';
+  var html='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
   html+='<thead><tr style="background:#1a3a5c;color:#fff">';
-  html+='<th style="padding:8px 10px;text-align:left;white-space:nowrap">IRQ</th>';
-  html+='<th style="padding:8px 10px;text-align:left;white-space:nowrap">Job</th>';
-  html+='<th style="padding:8px 10px;text-align:left;white-space:nowrap">Client</th>';
-  html+='<th style="padding:8px 10px;text-align:left;white-space:nowrap">Items</th>';
-  html+='<th style="padding:8px 10px;text-align:center;white-space:nowrap">Pre-weld</th>';
-  html+='<th style="padding:8px 10px;text-align:center;white-space:nowrap">S1 Tack</th>';
-  html+='<th style="padding:8px 10px;text-align:center;white-space:nowrap">S2 Weld</th>';
-  html+='<th style="padding:8px 10px;text-align:center;white-space:nowrap">S3 Trial</th>';
-  html+='<th style="padding:8px 10px;text-align:center;white-space:nowrap">S4 Mark</th>';
-  html+='<th style="padding:8px 10px;text-align:center;white-space:nowrap">S5 NDT</th>';
-  html+='<th style="padding:8px 10px;text-align:center;white-space:nowrap">S6 Primer</th>';
-  html+='<th style="padding:8px 10px;text-align:center;white-space:nowrap">S7 Paint</th>';
-  html+='<th style="padding:8px 10px;text-align:center;white-space:nowrap">Final</th>';
-  html+='<th style="padding:8px 10px;text-align:left;white-space:nowrap">Supervisor</th>';
-  html+='<th style="padding:8px 10px;text-align:left;white-space:nowrap">QC</th>';
-  html+='<th style="padding:8px 10px;text-align:center;white-space:nowrap">Status</th>';
-  html+='<th style="padding:8px 10px;text-align:center;white-space:nowrap">Action</th>';
+  html+='<th style="padding:10px 12px;text-align:left;white-space:nowrap">IRQ</th>';
+  html+='<th style="padding:10px 12px;text-align:left;white-space:nowrap">Job</th>';
+  html+='<th style="padding:10px 12px;text-align:left;white-space:nowrap">Client</th>';
+  html+='<th style="padding:10px 12px;text-align:left;white-space:nowrap">Items</th>';
+  html+='<th style="padding:10px 8px;text-align:center;white-space:nowrap;font-size:10px">Pre<br>weld</th>';
+  html+='<th style="padding:10px 8px;text-align:center;white-space:nowrap;font-size:10px">S1<br>Tack</th>';
+  html+='<th style="padding:10px 8px;text-align:center;white-space:nowrap;font-size:10px">S2<br>Weld</th>';
+  html+='<th style="padding:10px 8px;text-align:center;white-space:nowrap;font-size:10px">S3<br>Trial</th>';
+  html+='<th style="padding:10px 8px;text-align:center;white-space:nowrap;font-size:10px">S4<br>Mark</th>';
+  html+='<th style="padding:10px 8px;text-align:center;white-space:nowrap;font-size:10px">S5<br>NDT</th>';
+  html+='<th style="padding:10px 8px;text-align:center;white-space:nowrap;font-size:10px">S6<br>Primer</th>';
+  html+='<th style="padding:10px 8px;text-align:center;white-space:nowrap;font-size:10px">S7<br>Paint</th>';
+  html+='<th style="padding:10px 8px;text-align:center;white-space:nowrap;font-size:10px">Final</th>';
+  html+='<th style="padding:10px 12px;text-align:left;white-space:nowrap">Supervisor</th>';
+  html+='<th style="padding:10px 12px;text-align:left;white-space:nowrap">QC</th>';
+  html+='<th style="padding:10px 12px;text-align:center;white-space:nowrap">Status</th>';
+  html+='<th style="padding:10px 12px;text-align:center;white-space:nowrap">Action</th>';
   html+='</tr></thead><tbody>';
 
   var stageIds=['s0','s1','s2','s3','s4','s5','s6','s7','s8'];
@@ -1733,10 +1733,10 @@ function renderReg(){
       html+='<tr>'+highlightBanner+'</tr>';
     }
     html+='<tr id="reg-row-'+irqNo+'" style="border-left:3px solid '+borderColor+';'+highlight+'" onmouseover="this.style.background=\'#f9f9f9\'" onmouseout="this.style.background=\''+(highlight?'#FFF8E6':'#fff')+'\'">';
-    html+='<td style="padding:7px 10px;font-weight:600;color:#1a3a5c">'+irqNo+'</td>';
-    html+='<td style="padding:7px 10px;font-weight:500">'+job+'</td>';
-    html+='<td style="padding:7px 10px;color:#555">'+client+'</td>';
-    html+='<td style="padding:7px 10px;color:#555;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+items_str+'">'+items_str+'</td>';
+    html+='<td style="padding:10px 12px;font-weight:600;color:#1a3a5c">'+irqNo+'</td>';
+    html+='<td style="padding:10px 12px;font-weight:500">'+job+'</td>';
+    html+='<td style="padding:10px 12px;color:#555">'+client+'</td>';
+    html+='<td style="padding:10px 12px;color:#555;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+items_str+'">'+items_str+'</td>';
 
     // Stage columns
     stageIds.forEach(function(sid){
@@ -1850,13 +1850,16 @@ function completeRequest(btn){
   var client=btn.dataset.client;
   var itemsStr=btn.dataset.items||'';
   var inspType=btn.dataset.insptype||'';
-  // Set _irqParam so form shows instead of waiting screen
+  // Set _irqParam so form shows
   _irqParam=reqNo;
-  // Set stage filter based on inspection type from request
+  // Find full request from Firebase data to fix Loading...
+  var foundReq=reqs.find(function(x){return String(x.reqNo)===String(reqNo);});
+  if(foundReq)_urlReq=foundReq;
+  // Set stage filter from inspection type
   activeStageFilter=INSP_TYPE_STAGE_MAP[inspType]||null;
   window._keepStageFilter=true;
-  // Switch to New IRN tab
-  var newIrnBtn=document.querySelectorAll('.nb')[0];
+  // Switch to New IRN tab (index 1 — after Inspect Req)
+  var newIrnBtn=document.querySelectorAll('.nb')[1];
   showV('form',newIrnBtn);
   setTimeout(function(){
     var joEl=document.getElementById('job');if(joEl)joEl.value=job;
@@ -1873,8 +1876,9 @@ function completeRequest(btn){
     renderQuickChecklist(instrEl);
     renderStages();
     showFormOrWaiting();
+    renderIrqBanner();
     toast('Complete IRN for IRQ-'+reqNo+' — '+job,'ok');
-  },100);
+  },150);
   if(window.markRequestComplete)window.markRequestComplete(firebaseId);
 }
 function printRec(book,no){
