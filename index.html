@@ -1683,31 +1683,12 @@ function renderReg(){
     return;
   }
 
-  // Build table — BIG and readable
-  var html='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">';
-  html+='<thead><tr style="background:#1a3a5c;color:#fff">';
-  html+='<th style="padding:12px 14px;text-align:left;white-space:nowrap;min-width:60px">IRQ</th>';
-  html+='<th style="padding:12px 14px;text-align:left;white-space:nowrap;min-width:80px">Job</th>';
-  html+='<th style="padding:12px 14px;text-align:left;white-space:nowrap;min-width:80px">Client</th>';
-  html+='<th style="padding:12px 14px;text-align:left;white-space:nowrap;min-width:100px">Items</th>';
-  html+='<th style="padding:12px 8px;text-align:center;white-space:nowrap;font-size:11px;min-width:44px">Pre<br>weld</th>';
-  html+='<th style="padding:12px 8px;text-align:center;white-space:nowrap;font-size:11px;min-width:44px">S1<br>Tack</th>';
-  html+='<th style="padding:12px 8px;text-align:center;white-space:nowrap;font-size:11px;min-width:44px">S2<br>Weld</th>';
-  html+='<th style="padding:12px 8px;text-align:center;white-space:nowrap;font-size:11px;min-width:44px">S3<br>Trial</th>';
-  html+='<th style="padding:12px 8px;text-align:center;white-space:nowrap;font-size:11px;min-width:44px">S4<br>Mark</th>';
-  html+='<th style="padding:12px 8px;text-align:center;white-space:nowrap;font-size:11px;min-width:44px">S5<br>NDT</th>';
-  html+='<th style="padding:12px 8px;text-align:center;white-space:nowrap;font-size:11px;min-width:44px">S6<br>Primer</th>';
-  html+='<th style="padding:12px 8px;text-align:center;white-space:nowrap;font-size:11px;min-width:44px">S7<br>Paint</th>';
-  html+='<th style="padding:12px 8px;text-align:center;white-space:nowrap;font-size:11px;min-width:44px">Final</th>';
-  html+='<th style="padding:12px 14px;text-align:left;white-space:nowrap;min-width:90px">Supervisor</th>';
-  html+='<th style="padding:12px 14px;text-align:left;white-space:nowrap;min-width:90px">QC</th>';
-  html+='<th style="padding:12px 14px;text-align:center;white-space:nowrap;min-width:80px">Status</th>';
-  html+='<th style="padding:12px 14px;text-align:center;white-space:nowrap;min-width:110px">Action</th>';
-  html+='</tr></thead><tbody>';
-
+  // Build clean card list
   var stageIds=['s0','s1','s2','s3','s4','s5','s6','s7','s8'];
+  var stageShort=['Pre','S1','S2','S3','S4','S5','S6','S7','Fin'];
+  var html='';
 
-  filtered.forEach(function(entry,ei){
+  filtered.forEach(function(entry){
     var req=entry.req;
     var irns=entry.irns;
     var latestIrn=irns[irns.length-1];
@@ -1720,55 +1701,73 @@ function renderReg(){
     if(req&&req.items&&Array.isArray(req.items)){items_str=req.items.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', ');}
     else if(latestIrn&&latestIrn.items&&Array.isArray(latestIrn.items)){items_str=latestIrn.items.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', ');}
     var supName=(req&&req.supervisor)||(latestIrn&&latestIrn.reqSupervisor)||'--';
-    var qcDisplay=latestIrn?(latestIrn.qc+' \xb7 '+latestIrn.qcCode):'--';
+    var qcDisplay=latestIrn?latestIrn.qc+' ('+latestIrn.qcCode+')':'--';
     var irqNo=entry.reqNo||'--';
+    var stage=(req&&req.inspTypes)||(latestIrn&&latestIrn.stageName)||'--';
     var sBg=status==='released'?'#EAF3DE':status==='rework'?'#FAEEDA':'#FCEBEB';
     var sCol=status==='released'?'#27500A':status==='rework'?'#633806':'#A32D2D';
     var sLbl=status==='released'?'Released':status==='rework'?'Rework':'Pending';
     var isHighlighted=_irqParam&&String(irqNo)===String(_irqParam);
-    var rowBg=isHighlighted?'#FFF3CD':'#fff';
 
+    html+='<div id="reg-row-'+irqNo+'" style="background:#fff;border-left:5px solid '+borderColor+';border:0.5px solid #ddd;border-left:5px solid '+borderColor+';border-radius:10px;margin-bottom:10px;overflow:hidden'+(isHighlighted?';box-shadow:0 0 0 3px rgba(226,75,74,0.3)':'')+'">';
+
+    // Action required banner
     if(isHighlighted){
-      html+='<tr><td colspan="17" style="padding:5px 14px;background:#E24B4A;color:#fff;font-size:12px;font-weight:600;text-align:center">';
-      html+='&#9889; ACTION REQUIRED — Complete the IRN for IRQ-'+irqNo+'</td></tr>';
+      html+='<div style="background:#E24B4A;color:#fff;font-size:13px;font-weight:600;text-align:center;padding:7px">&#9889; ACTION REQUIRED — Complete the IRN for this request</div>';
     }
 
-    html+='<tr id="reg-row-'+irqNo+'" style="border-left:4px solid '+borderColor+';background:'+rowBg+'" onmouseover="this.style.background=\'#f5f5f5\'" onmouseout="this.style.background=\''+rowBg+'\'">';
-    html+='<td style="padding:12px 14px;font-weight:700;color:#1a3a5c;font-size:14px">'+irqNo+'</td>';
-    html+='<td style="padding:12px 14px;font-weight:600;font-size:13px">'+job+'</td>';
-    html+='<td style="padding:12px 14px;color:#555">'+client+'</td>';
-    html+='<td style="padding:12px 14px;color:#555;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+items_str+'">'+items_str+'</td>';
+    // Main row
+    html+='<div style="padding:14px 16px">';
+    html+='<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">';
+    html+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+    html+='<span style="font-size:18px;font-weight:700;color:#1a3a5c">IRQ-'+irqNo+'</span>';
+    html+='<span style="font-size:12px;color:#666;background:#f0f0f0;padding:3px 10px;border-radius:8px">'+stage+'</span>';
+    html+='</div>';
+    html+='<span style="font-size:12px;padding:4px 12px;border-radius:10px;font-weight:600;background:'+sBg+';color:'+sCol+'">'+sLbl+'</span>';
+    html+='</div>';
 
-    stageIds.forEach(function(sid){
-      var stageData=latestIrn&&latestIrn.stageStates?latestIrn.stageStates[sid]:null;
-      if(!stageData){
-        html+='<td style="padding:12px 8px;text-align:center;color:#ccc;font-size:16px">\xb7</td>';
-      } else if(stageData.na){
-        html+='<td style="padding:12px 8px;text-align:center"><span style="font-size:10px;color:#888;background:#f0f0f0;padding:2px 5px;border-radius:3px">N/A</span></td>';
-      } else if(stageData.gate){
-        html+='<td style="padding:12px 8px;text-align:center"><div style="width:24px;height:24px;border-radius:5px;background:#EAF3DE;display:inline-flex;align-items:center;justify-content:center"><i class="ti ti-check" style="font-size:13px;color:#27500A"></i></div></td>';
-      } else if(stageData.crit&&stageData.crit.some(Boolean)){
-        html+='<td style="padding:12px 8px;text-align:center"><div style="width:24px;height:24px;border-radius:5px;background:#FCEBEB;display:inline-flex;align-items:center;justify-content:center"><i class="ti ti-x" style="font-size:13px;color:#A32D2D"></i></div></td>';
-      } else {
-        html+='<td style="padding:12px 8px;text-align:center;color:#ccc;font-size:16px">\xb7</td>';
-      }
-    });
+    // Job details grid
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
+    html+='<div><div style="font-size:10px;color:#999;text-transform:uppercase;margin-bottom:2px">Job / Order</div><div style="font-size:15px;font-weight:600;color:#1a1a1a">'+job+'</div></div>';
+    html+='<div><div style="font-size:10px;color:#999;text-transform:uppercase;margin-bottom:2px">Client</div><div style="font-size:14px;color:#333">'+client+'</div></div>';
+    html+='<div><div style="font-size:10px;color:#999;text-transform:uppercase;margin-bottom:2px">Items</div><div style="font-size:13px;color:#333">'+items_str+'</div></div>';
+    html+='<div><div style="font-size:10px;color:#999;text-transform:uppercase;margin-bottom:2px">Date</div><div style="font-size:13px;color:#333">'+(req&&req.date||latestIrn&&latestIrn.date||'--')+'</div></div>';
+    html+='</div>';
 
-    html+='<td style="padding:12px 14px;color:#444">'+supName+'</td>';
-    html+='<td style="padding:12px 14px;color:#444">'+qcDisplay+'</td>';
-    html+='<td style="padding:12px 14px;text-align:center"><span style="font-size:11px;padding:4px 10px;border-radius:10px;font-weight:600;background:'+sBg+';color:'+sCol+'">'+sLbl+'</span></td>';
-    html+='<td style="padding:12px 14px;text-align:center">';
+    // Supervisor and QC
+    html+='<div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap">';
+    html+='<div><span style="font-size:11px;color:#999">Supervisor: </span><span style="font-size:13px;font-weight:500">'+supName+'</span></div>';
+    html+='<div><span style="font-size:11px;color:#999">QC: </span><span style="font-size:13px;font-weight:500">'+qcDisplay+'</span></div>';
+    html+='</div>';
+
+    // Stage dots
+    if(latestIrn&&latestIrn.stageStates){
+      html+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px">';
+      stageIds.forEach(function(sid,si){
+        var sd=latestIrn.stageStates[sid];
+        var dotColor=!sd?'#e0e0e0':sd.na?'#ccc':sd.gate?'#1D9E75':sd.crit&&sd.crit.some(Boolean)?'#E24B4A':'#e0e0e0';
+        var dotTitle=stageShort[si];
+        html+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
+        html+='<div style="width:20px;height:20px;border-radius:50%;background:'+dotColor+'"></div>';
+        html+='<div style="font-size:9px;color:#999">'+dotTitle+'</div>';
+        html+='</div>';
+      });
+      html+='</div>';
+    }
+
+    // Action button
+    html+='<div style="display:flex;justify-content:flex-end">';
     if(status==='pending'){
       var inspType=(req&&req.inspTypes)||'';
       var instructions=(req&&req.instructions)||'';
-      html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-reqno="'+irqNo+'" data-job="'+job.replace(/"/g,'&quot;')+'" data-client="'+client.replace(/"/g,'&quot;')+'" data-items="'+items_str.replace(/"/g,'&quot;')+'" data-insptype="'+inspType.replace(/"/g,'&quot;')+'" data-instructions="'+instructions.replace(/"/g,'&quot;')+'" data-by="'+supName.replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:12px;padding:7px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:7px;cursor:pointer;font-weight:600;white-space:nowrap">Complete IRN</button>';
+      html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-reqno="'+irqNo+'" data-job="'+job.replace(/"/g,'&quot;')+'" data-client="'+client.replace(/"/g,'&quot;')+'" data-items="'+items_str.replace(/"/g,'&quot;')+'" data-insptype="'+inspType.replace(/"/g,'&quot;')+'" data-instructions="'+instructions.replace(/"/g,'&quot;')+'" data-by="'+supName.replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:14px;padding:10px 20px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">Complete IRN</button>';
     } else if(latestIrn){
-      html+='<button data-irn="'+latestIrn.reportNo+'" data-irq="'+irqNo+'" onclick="printFromReg(this)" style="font-size:12px;padding:7px 14px;background:#fff;border:1.5px solid #1a3a5c;color:#1a3a5c;border-radius:7px;cursor:pointer;font-weight:600"><i class="ti ti-printer" style="font-size:13px"></i> Print</button>';
+      html+='<button data-irn="'+latestIrn.reportNo+'" data-irq="'+irqNo+'" onclick="printFromReg(this)" style="font-size:13px;padding:9px 18px;background:#fff;border:1.5px solid #1a3a5c;color:#1a3a5c;border-radius:8px;cursor:pointer;font-weight:600"><i class="ti ti-printer" style="font-size:14px"></i> View / Print</button>';
     }
-    html+='</td></tr>';
+    html+='</div>';
+    html+='</div></div>';
   });
 
-  html+='</tbody></table></div>';
   document.getElementById('regList').innerHTML=html;
   if(_irqParam){
     setTimeout(function(){
