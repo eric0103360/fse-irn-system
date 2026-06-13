@@ -2118,10 +2118,10 @@ if(window.loadIRNsFromFirebase){window.loadIRNsFromFirebase(function(r){reg=r;re
 if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){
   reqs=r;
   if(_irqParam){
-    var found=reqs.find(function(x){return String(x.reqNo)===String(_irqParam)&&x.status==='pending';});
+    var found=reqs.find(function(x){return String(x.reqNo)===String(_irqParam);});
     if(found){_urlReq=found;}
-    else if(_urlReq){reqs=[_urlReq];}
   }
+  renderReg();
   renderPendingReqs();
   showFormOrWaiting();
 });}
