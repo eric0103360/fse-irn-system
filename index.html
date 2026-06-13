@@ -157,7 +157,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 <link rel="manifest" href="manifest.json">
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
-import{getFirestore,doc,getDoc,addDoc,updateDoc,setDoc,collection,query,orderBy,onSnapshot,runTransaction}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
+import{getFirestore,doc,getDoc,getDocs,addDoc,updateDoc,setDoc,deleteDoc,collection,query,orderBy,onSnapshot,runTransaction}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
 const app=initializeApp({apiKey:"AIzaSyC3sKMm02GnikBdgXPd4RUm7RxnsR90A_I",authDomain:"fse-irn-system.firebaseapp.com",projectId:"fse-irn-system",storageBucket:"fse-irn-system.firebasestorage.app",messagingSenderId:"1097944808267",appId:"1:1097944808267:web:d8f1f3a52e2223253f86ce"});
 const db=getFirestore(app);
 window.peekNextIRN=async function(){try{const r=doc(db,'counters','irn');const d=await getDoc(r);const c=d.exists()?d.data().count:0;return String(c+1).padStart(4,'0');}catch(e){return'----';}};
@@ -165,6 +165,20 @@ window.peekNextIRQ=async function(){try{const r=doc(db,'counters','irq');const d
 window.getNextIRQ=async function(){try{const r=doc(db,'counters','irq');const n=await runTransaction(db,async(t)=>{const d=await t.get(r);const c=d.exists()?d.data().count:0;const x=c+1;t.set(r,{count:x});return x;});return String(n).padStart(4,'0');}catch(e){return String(Date.now()).slice(-4);}};
 window.getNextIRN=async function(){try{const r=doc(db,'counters','irn');const n=await runTransaction(db,async(t)=>{const d=await t.get(r);const c=d.exists()?d.data().count:0;const x=c+1;t.set(r,{count:x});return x;});return String(n).padStart(4,'0');}catch(e){return String(Date.now()).slice(-4);}};
 window.saveIRNToFirebase=async function(data){try{var s=Object.assign({},data);if(s.stageStates){var cs={};Object.keys(s.stageStates).forEach(function(k){var st=Object.assign({},s.stageStates[k]);st.photos=st.photos?st.photos.length+' photo(s)':'0';cs[k]=st;});s.stageStates=cs;}s.timestamp=new Date().toISOString();await addDoc(collection(db,'irns'),s);return true;}catch(e){return false;}};
+window.clearAllData=async function(){
+  try{
+    var isnap=await getDocs(collection(db,'irns'));
+    var rsnap=await getDocs(collection(db,'requests'));
+    var batch=[];
+    isnap.forEach(function(d){batch.push(deleteDoc(doc(db,'irns',d.id)));});
+    rsnap.forEach(function(d){batch.push(deleteDoc(doc(db,'requests',d.id)));});
+    await Promise.all(batch);
+    // Reset counters
+    await setDoc(doc(db,'counters','irn'),{count:0});
+    await setDoc(doc(db,'counters','irq'),{count:0});
+    return true;
+  }catch(e){console.error(e);return false;}
+};
 window.saveCodesToFirebase=async function(){try{await setDoc(doc(db,'settings','codes'),{qc:codes.qc,sup:codes.sup});return true;}catch(e){return false;}};
 window.loadCodesFromFirebase=async function(){try{var d=await getDoc(doc(db,'settings','codes'));if(d.exists()){var data=d.data();if(data.qc)codes.qc=data.qc;if(data.sup)codes.sup=data.sup;}}catch(e){}};
 window.saveRequestToFirebase=async function(data){try{var s=Object.assign({},data);s.timestamp=new Date().toISOString();s.status='pending';s.attempt=data.attempt||1;await addDoc(collection(db,'requests'),s);return true;}catch(e){return false;}};
@@ -542,7 +556,8 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
         <div style="padding:8px 14px"><button class="add-btn" onclick="addSlot('sup')"><i class="ti ti-plus"></i> Add SUP slot</button></div>
       </div>
       <div style="padding:8px 0 16px;font-size:11px;color:#888;text-align:center">Deactivated codes cannot sign off new IRNs.</div>
-      <button onclick="if(window.saveCodesToFirebase)window.saveCodesToFirebase().then(function(){toast('Codes saved','ok');})" style="width:100%;padding:10px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:12px"><i class="ti ti-device-floppy" style="font-size:14px"></i> Save all names &amp; codes</button>
+      <button onclick="if(window.saveCodesToFirebase)window.saveCodesToFirebase().then(function(){toast('Codes saved','ok');})" style="width:100%;padding:10px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:8px"><i class="ti ti-device-floppy" style="font-size:14px"></i> Save all names &amp; codes</button>
+      <button onclick="clearAllTestData()" style="width:100%;padding:10px;background:#FCEBEB;color:#A32D2D;border:1px solid #E24B4A;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:12px"><i class="ti ti-trash" style="font-size:14px"></i> Clear all test IRNs &amp; requests</button>
     </div>
   </div>
 </div>
@@ -567,37 +582,37 @@ window.addEventListener('DOMContentLoaded',function(){
 
 var codes={
   qc:[
-    {code:'QC-001',name:'Teboho Molete',active:true},
-    {code:'QC-002',name:'Bongani Sithole',active:true},
-    {code:'QC-003',name:'Peare Viljoen',active:true},
-    {code:'QC-004',name:'Collins Mokwana',active:true},
-    {code:'QC-005',name:'Quinton Jacobs',active:true},
-    {code:'QC-006',name:'Minney Roos',active:true},
-    {code:'QC-007',name:'Henning Oosthuyzen',active:true},
-    {code:'QC-008',name:'Sinead Viljoen',active:true},
-    {code:'QC-009',name:'',active:false},
-    {code:'QC-010',name:'',active:false},
-    {code:'QC-011',name:'',active:false},
-    {code:'QC-012',name:'',active:false}
+    {code:'QC-001',name:'Teboho Molete',active:true,pin:''},
+    {code:'QC-002',name:'Bongani Sithole',active:true,pin:''},
+    {code:'QC-003',name:'Peare Viljoen',active:true,pin:''},
+    {code:'QC-004',name:'Collins Mokwana',active:true,pin:''},
+    {code:'QC-005',name:'Quinton Jacobs',active:true,pin:''},
+    {code:'QC-006',name:'Minney Roos',active:true,pin:''},
+    {code:'QC-007',name:'Henning Oosthuyzen',active:true,pin:''},
+    {code:'QC-008',name:'Sinead Viljoen',active:true,pin:''},
+    {code:'QC-009',name:'',active:false,pin:''},
+    {code:'QC-010',name:'',active:false,pin:''},
+    {code:'QC-011',name:'',active:false,pin:''},
+    {code:'QC-012',name:'',active:false,pin:''}
   ],
   sup:[
-    {code:'SUP-001',name:'Shaun Engelbrecht',active:true},
-    {code:'SUP-002',name:'Jaun Pieré Muller',active:true},
-    {code:'SUP-003',name:'Shaw Chamunorwa',active:true},
-    {code:'SUP-004',name:'Sidney Klaassen',active:true},
-    {code:'SUP-005',name:'Khoabane Mokhesi',active:true},
-    {code:'SUP-006',name:'Paulus Muller',active:true},
-    {code:'SUP-007',name:'Guntter Nieuwenhuis',active:true},
-    {code:'SUP-008',name:'Richard Nolan',active:true},
-    {code:'SUP-009',name:'Elton Sithole',active:true},
-    {code:'SUP-010',name:'Juan-Pierre Van Heerden',active:true},
-    {code:'SUP-011',name:'Cornelius Watson',active:true},
-    {code:'SUP-012',name:'Godfrey Mshwamo',active:true},
-    {code:'SUP-013',name:'Andries Van Zyl',active:true},
-    {code:'SUP-014',name:'Khanya Kele',active:true},
-    {code:'SUP-015',name:'Matikane Mohlabayi',active:true},
-    {code:'SUP-016',name:'Nkosana Nonkonyane',active:true},
-    {code:'SUP-017',name:'Thamsanga Gwentshe',active:true}
+    {code:'SUP-001',name:'Shaun Engelbrecht',active:true,pin:''},
+    {code:'SUP-002',name:'Jaun Pieré Muller',active:true,pin:''},
+    {code:'SUP-003',name:'Shaw Chamunorwa',active:true,pin:''},
+    {code:'SUP-004',name:'Sidney Klaassen',active:true,pin:''},
+    {code:'SUP-005',name:'Khoabane Mokhesi',active:true,pin:''},
+    {code:'SUP-006',name:'Paulus Muller',active:true,pin:''},
+    {code:'SUP-007',name:'Guntter Nieuwenhuis',active:true,pin:''},
+    {code:'SUP-008',name:'Richard Nolan',active:true,pin:''},
+    {code:'SUP-009',name:'Elton Sithole',active:true,pin:''},
+    {code:'SUP-010',name:'Juan-Pierre Van Heerden',active:true,pin:''},
+    {code:'SUP-011',name:'Cornelius Watson',active:true,pin:''},
+    {code:'SUP-012',name:'Godfrey Mshwamo',active:true,pin:''},
+    {code:'SUP-013',name:'Andries Van Zyl',active:true,pin:''},
+    {code:'SUP-014',name:'Khanya Kele',active:true,pin:''},
+    {code:'SUP-015',name:'Matikane Mohlabayi',active:true,pin:''},
+    {code:'SUP-016',name:'Nkosana Nonkonyane',active:true,pin:''},
+    {code:'SUP-017',name:'Thamsanga Gwentshe',active:true,pin:''}
   ]
 };
 var supValidated=false,qcValidated=false,supName='',qcName='';
@@ -662,10 +677,10 @@ function showV(v,btn){
     },150);
   }
   if(v==='register'){
-    if(window.loadIRNsFromFirebase){
-      if(!window._fbL){window._fbL=window.loadIRNsFromFirebase(function(r){reg=r;renderReg();});}
-      else{renderReg();}
-    } else{renderReg();}
+    window._fbL=null;window._fbRL=null;
+    if(window.loadIRNsFromFirebase){window._fbL=window.loadIRNsFromFirebase(function(r){reg=r;renderReg();});}
+    if(window.loadRequestsFromFirebase){window._fbRL=window.loadRequestsFromFirebase(function(r){reqs=r;renderReg();});}
+    renderReg();
   }
   if(v==='form'&&!window._keepStageFilter){activeStageFilter=null;renderStages();}
   if(v==='form')showFormOrWaiting();
@@ -749,12 +764,57 @@ function validateCode(role){
     return;
   }
   if(match){
-    inp.className='code-in valid';
-    stat.innerHTML='<span style="color:#27500A">&#10003; Authorised - '+match.name+'</span>';
-    if(role==='sup'){supValidated=true;supName=match.name;}else{qcValidated=true;qcName=match.name;}
+    // Check if PIN is set for this code
+    if(match.pin&&match.pin.length===4){
+      // Show PIN entry field
+      inp.className='code-in valid';
+      var pinId=role+'PinEntry';
+      if(!document.getElementById(pinId)){
+        var pinWrap=document.createElement('div');
+        pinWrap.id=pinId;
+        pinWrap.style.cssText='margin-top:6px;display:flex;align-items:center;gap:8px';
+        pinWrap.innerHTML='<input type="password" maxlength="4" placeholder="Enter PIN" style="width:100px;padding:6px 10px;border:1.5px solid #ccc;border-radius:6px;font-size:14px;letter-spacing:4px;font-family:monospace;text-align:center;outline:none" oninput="checkPin(this,\''+role+'\',\''+match.code+'\')">'+'<span style="font-size:11px;color:#888">Enter your 4-digit PIN</span>';
+        stat.parentNode.insertBefore(pinWrap,stat);
+        pinWrap.querySelector('input').focus();
+      }
+      stat.innerHTML='<span style="color:#185FA5">✓ '+match.name+' — enter your PIN to confirm</span>';
+      if(role==='sup'){supValidated=false;supName='';}else{qcValidated=false;qcName='';}
+    } else {
+      // No PIN set — validate directly
+      inp.className='code-in valid';
+      stat.innerHTML='<span style="color:#27500A">✓ Authorised — '+match.name+'</span>';
+      if(role==='sup'){supValidated=true;supName=match.name;}else{qcValidated=true;qcName=match.name;}
+      removePinEntry(role);
+    }
   }else{
     inp.className='code-in invalid';
-    stat.innerHTML='<span style="color:#A32D2D">&#10007; Invalid or inactive code</span>';
+    stat.innerHTML='<span style="color:#A32D2D">✗ Invalid or inactive code</span>';
+    if(role==='sup'){supValidated=false;supName='';}else{qcValidated=false;qcName='';}
+    removePinEntry(role);
+  }
+}
+function removePinEntry(role){
+  var el=document.getElementById(role+'PinEntry');
+  if(el)el.parentNode.removeChild(el);
+}
+function checkPin(el,role,code){
+  var val=el.value.replace(/\D/g,'');
+  el.value=val;
+  if(val.length<4)return;
+  var list=role==='sup'?codes.sup:codes.qc;
+  var match=list.find(function(c){return c.code===code;});
+  var stat=document.getElementById(role+'Status');
+  if(match&&match.pin===val){
+    el.style.borderColor='#1D9E75';
+    stat.innerHTML='<span style="color:#27500A">✓ Authorised — '+match.name+'</span>';
+    if(role==='sup'){supValidated=true;supName=match.name;}else{qcValidated=true;qcName=match.name;}
+    // Persist for tab switching
+    if(role==='qc'){window._savedQC=document.getElementById('qcCode').value;window._savedQCv=true;window._savedQCn=match.name;}
+    else{window._savedSUP=document.getElementById('supCode').value;window._savedSUPv=true;window._savedSUPn=match.name;}
+  }else{
+    el.style.borderColor='#E24B4A';
+    stat.innerHTML='<span style="color:#A32D2D">✗ Incorrect PIN — try again</span>';
+    el.value='';
     if(role==='sup'){supValidated=false;supName='';}else{qcValidated=false;qcName='';}
   }
 }
@@ -773,21 +833,27 @@ function lockAdmin(){
 function renderCodeTables(){
   ['qc','sup'].forEach(function(role){
     var list=role==='qc'?codes.qc:codes.sup;
-    var rows='<tr><th>Code</th><th>Name assigned</th><th>Status</th><th>Action</th></tr>';
+    var rows='<tr><th>Code</th><th>Name assigned</th><th>PIN (4 digits)</th><th>Status</th><th>Action</th></tr>';
     list.forEach(function(c,i){
       rows+='<tr><td><span class="cbadge '+(c.active&&c.name?'active':'avail')+'">'+c.code+'</span></td>';
       rows+='<td><input class="name-in" value="'+c.name+'" placeholder="Assign name..." oninput="updateName(this,'+i+')"></td>';
+      rows+='<td><input class="name-in" type="password" value="'+(c.pin||'')+'" placeholder="PIN" maxlength="4" style="width:70px;letter-spacing:3px;font-family:monospace;text-align:center" oninput="updatePin(this,'+i+')"></td>';
       rows+='<td><span class="cbadge '+(c.active&&c.name?'active':c.name&&!c.active?'inactive':'avail')+'">'+(c.active&&c.name?'Active':c.name&&!c.active?'Inactive':'Available')+'</span></td>';
       rows+='<td><button class="toggle-btn" data-role="'+role+'" data-idx="'+i+'" onclick="toggleCode(this)">'+(c.active?'Deactivate':'Activate')+'</button></td></tr>';
     });
     document.getElementById(role+'Table').innerHTML=rows;
   });
 }
+function updatePin(el,i){
+  var val=el.value.replace(/\D/g,'').slice(0,4);
+  el.value=val;
+  var role=el.closest('table').id.replace('Table','');
+  if(role==='qc')codes.qc[i].pin=val;else codes.sup[i].pin=val;
+}
 function updateName(el,i){
   var val=el.value;
   var role=el.closest('table').id.replace('Table','');
   if(role==='qc')codes.qc[i].name=val;else codes.sup[i].name=val;
-  // Update badge status inline without re-rendering the whole table
   var row=el.closest('tr');
   var badge=row.querySelector('.cbadge');
   var statusBadge=row.querySelectorAll('.cbadge')[1];
@@ -797,6 +863,22 @@ function updateName(el,i){
   if(statusBadge){
     statusBadge.className='cbadge '+(c.active&&val?'active':val&&!c.active?'inactive':'avail');
     statusBadge.textContent=c.active&&val?'Active':val&&!c.active?'Inactive':'Available';
+  }
+}
+
+function clearAllTestData(){
+  if(!confirm('This will permanently delete ALL IRNs and requests from Firebase.\n\nAre you sure? This cannot be undone.')){return;}
+  if(!confirm('FINAL WARNING — Delete all test data and reset counters to zero?')){return;}
+  if(window.clearAllData){
+    window.clearAllData().then(function(ok){
+      if(ok){
+        reg=[];reqs=[];
+        renderReg();renderPendingReqs();
+        toast('All test data cleared — counters reset to zero','ok');
+      } else {
+        toast('Error clearing data — check console','err');
+      }
+    });
   }
 }
 function toggleCode(el){
@@ -1020,15 +1102,47 @@ function validateReqSup(){
   var val=inp.value.trim().toUpperCase();
   var match=null;
   for(var i=0;i<codes.sup.length;i++){if(codes.sup[i].code===val&&codes.sup[i].active&&codes.sup[i].name){match=codes.sup[i];break;}}
-  if(val.length<5){inp.className='code-in';stat.innerHTML='';reqSupValidated=false;reqSupName='';return;}
+  if(val.length<5){inp.className='code-in';stat.innerHTML='';reqSupValidated=false;reqSupName='';removePinEntry('reqSup');return;}
   if(match){
-    inp.className='code-in valid';
-    stat.innerHTML='<span style="color:#27500A">&#10003; Authorised &mdash; '+match.name+'</span>';
-    reqSupValidated=true;reqSupName=match.name;
+    if(match.pin&&match.pin.length===4){
+      inp.className='code-in valid';
+      if(!document.getElementById('reqSupPinEntry')){
+        var pinWrap=document.createElement('div');
+        pinWrap.id='reqSupPinEntry';
+        pinWrap.style.cssText='margin-top:6px;display:flex;align-items:center;gap:8px';
+        pinWrap.innerHTML='<input type="password" maxlength="4" placeholder="Enter PIN" style="width:100px;padding:6px 10px;border:1.5px solid #ccc;border-radius:6px;font-size:14px;letter-spacing:4px;font-family:monospace;text-align:center;outline:none" oninput="checkReqSupPin(this,\''+match.code+'\')">'+'<span style="font-size:11px;color:#888">Enter your 4-digit PIN</span>';
+        stat.parentNode.insertBefore(pinWrap,stat);
+        pinWrap.querySelector('input').focus();
+      }
+      stat.innerHTML='<span style="color:#185FA5">✓ '+match.name+' — enter your PIN</span>';
+      reqSupValidated=false;reqSupName='';
+    } else {
+      inp.className='code-in valid';
+      stat.innerHTML='<span style="color:#27500A">✓ Authorised — '+match.name+'</span>';
+      reqSupValidated=true;reqSupName=match.name;
+      removePinEntry('reqSup');
+    }
   }else{
     inp.className='code-in invalid';
-    stat.innerHTML='<span style="color:#A32D2D">&#10007; Invalid or inactive SUP code</span>';
+    stat.innerHTML='<span style="color:#A32D2D">✗ Invalid or inactive SUP code</span>';
     reqSupValidated=false;reqSupName='';
+    removePinEntry('reqSup');
+  }
+}
+function checkReqSupPin(el,code){
+  var val=el.value.replace(/\D/g,'');
+  el.value=val;
+  if(val.length<4)return;
+  var match=codes.sup.find(function(c){return c.code===code;});
+  var stat=document.getElementById('reqSupStatus');
+  if(match&&match.pin===val){
+    el.style.borderColor='#1D9E75';
+    stat.innerHTML='<span style="color:#27500A">✓ Authorised — '+match.name+'</span>';
+    reqSupValidated=true;reqSupName=match.name;
+  }else{
+    el.style.borderColor='#E24B4A';
+    stat.innerHTML='<span style="color:#A32D2D">✗ Incorrect PIN — try again</span>';
+    el.value='';reqSupValidated=false;reqSupName='';
   }
 }
 function getRequestData(){
@@ -1122,7 +1236,7 @@ function printRequest(){
   html+='<h2>QC sign-off</h2><table><tr><th>QC Inspector</th><th>Date attended</th><th>IRN number</th><th>Signature</th></tr>';
   html+='<tr><td style="padding:8px;border:1px solid #ccc;height:40px"></td><td style="padding:8px;border:1px solid #ccc"></td><td style="padding:8px;border:1px solid #ccc"></td><td style="padding:8px;border:1px solid #ccc;width:180px"></td></tr></table>';
   html+='<div style="margin-top:16px;font-size:9px;color:#999;border-top:1px solid #eee;padding-top:6px">FSE eIRN System &middot; '+new Date().toLocaleString('en-ZA')+'</div>';
-  html+='<div class="np" style="margin-top:16px;text-align:center"><button onclick="window.print()" style="padding:8px 24px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">Print / Save as PDF</button></div>';
+  html+='<div class="np" style="margin-top:16px;display:flex;gap:8px;justify-content:center"><button onclick="window.print()" style="padding:8px 24px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">Print / Save as PDF</button><button onclick="window.close()" style="padding:8px 20px;background:#f0f0f0;border:none;border-radius:6px;font-size:13px;cursor:pointer">Close</button></div>';
   html+='</body></html>';
   pw.document.write(html);pw.document.close();
 }
@@ -1535,7 +1649,7 @@ function renderReg(){
     var expandId='exp_'+ei;
 
     html+='<div style="background:#fff;border:0.5px solid '+sBor+';border-radius:12px;margin-bottom:10px;overflow:hidden">';
-    html+='<div data-eid=""+expandId+"\" onclick="toggleRegRow(this.dataset.eid)" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:0.5px solid #eee;cursor:pointer;background:'+sBg+'">';
+    html+='<div data-eid="'+expandId+'" onclick="toggleRegRow(this.dataset.eid)" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:0.5px solid #eee;cursor:pointer;background:'+sBg+'">';
     html+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:13px;font-weight:700;color:#1a3a5c">IRQ-'+irqNo+'</span><span style="font-size:11px;color:#666;background:#fff;padding:2px 8px;border-radius:6px">'+stage+'</span><span style="font-size:11px;color:#888">'+irnNo+'</span></div>';
     html+='<div style="display:flex;align-items:center;gap:8px"><span style="font-size:10px;padding:3px 10px;border-radius:10px;font-weight:600;background:'+sBg+';color:'+sCol+';border:0.5px solid '+sBor+'">'+sLbl+'</span><i class="ti ti-chevron-down" style="font-size:14px;color:#aaa" id="chev_'+expandId+'"></i></div>';
     html+='</div>';
@@ -1575,16 +1689,15 @@ function renderReg(){
     }
 
     if(latestIrn){
-      html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:10px 14px;border-top:0.5px solid #eee;background:#fff">';
+      html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 14px;border-top:0.5px solid #eee;background:#fff">';
       html+='<div style="border:0.5px solid #eee;border-radius:8px;padding:8px"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:3px">QC inspector</div><div style="font-size:12px;font-weight:600">'+latestIrn.qc+'</div><div style="font-size:11px;color:#185FA5">'+latestIrn.qcCode+'</div></div>';
-      html+='<div style="border:0.5px solid #eee;border-radius:8px;padding:8px"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:3px">Supervisor</div><div style="font-size:12px;font-weight:600">'+(latestIrn.reqSupervisor||supName||'--')+'</div></div>';
-      html+='<div style="border:0.5px solid #eee;border-radius:8px;padding:8px"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:3px">Client (optional)</div><div style="font-size:12px;color:#888">'+(latestIrn.client||'—')+'</div></div>';
+      html+='<div style="border:0.5px solid #eee;border-radius:8px;padding:8px"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:3px">Supervisor</div><div style="font-size:12px;font-weight:600">'+(latestIrn.reqSupervisor||supName||'--')+'</div><div style="font-size:11px;color:#555">'+(req&&req.supCode?req.supCode:latestIrn.supCode||'')+'</div></div>';
       html+='</div>';
     }
 
     html+='<div style="padding:10px 14px;display:flex;gap:8px;border-top:0.5px solid #eee;background:#fff">';
     if(latestIrn)html+='<button data-irn="'+latestIrn.reportNo+'" data-irq="'+irqNo+'" onclick="printFromReg(this)" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:none;font-size:12px;font-weight:500;cursor:pointer;background:#1a3a5c;color:#fff"><i class="ti ti-printer" style="font-size:14px"></i> Print report</button>';
-    html+='<button data-eid=""+expandId+"\" onclick="toggleRegRow(this.dataset.eid)" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:0.5px solid #ddd;font-size:12px;cursor:pointer;background:#fff;color:#666;margin-left:auto"><i class="ti ti-chevron-up" style="font-size:14px"></i> Collapse</button>';
+    html+='<button data-eid="'+expandId+'" onclick="toggleRegRow(this.dataset.eid)" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:0.5px solid #ddd;font-size:12px;cursor:pointer;background:#fff;color:#666;margin-left:auto"><i class="ti ti-chevron-up" style="font-size:14px"></i> Collapse</button>';
     html+='</div>';
     html+='</div></div>';
   });
