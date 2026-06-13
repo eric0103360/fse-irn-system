@@ -1858,29 +1858,18 @@ function completeRequest(btn){
   var client=btn.dataset.client;
   var itemsStr=btn.dataset.items||'';
   var inspType=btn.dataset.insptype||'';
+  // Set _irqParam so form shows instead of waiting screen
+  _irqParam=reqNo;
   // Set stage filter based on inspection type from request
   activeStageFilter=INSP_TYPE_STAGE_MAP[inspType]||null;
   window._keepStageFilter=true;
-  // Switch to New IRN tab first
+  // Switch to New IRN tab
   var newIrnBtn=document.querySelectorAll('.nb')[0];
   showV('form',newIrnBtn);
-  // Set values AFTER tab switch so renderItems doesn't wipe them
   setTimeout(function(){
     var joEl=document.getElementById('job');if(joEl)joEl.value=job;
     var prEl=document.getElementById('project');if(prEl)prEl.value=client;
-    // Show form (was waiting screen)
-    showFormOrWaiting();
-    // Show inherited banner
     var banner=document.getElementById('inheritedBanner');if(banner)banner.style.display='block';
-    // Show IRQ reference banner
-    if(reqNo){
-      var irqBanner=document.getElementById('irqRefBanner');
-      var irqText=document.getElementById('irqRefText');
-      if(irqBanner&&irqText){irqBanner.style.display='block';irqText.textContent='In response to IRQ-'+reqNo+' raised by '+btn.dataset.by;}
-    }
-    // Reset inspector photos
-    inspPhotosArr=[];renderInspPhotos();
-    // Pre-fill items
     if(itemsStr){
       var newItems=itemsStr.split(' | ').filter(Boolean).map(function(s,i){
         var p=s.match(/^(.+?)(?:\s+x(\S+))?$/);
@@ -1888,11 +1877,10 @@ function completeRequest(btn){
       });
       if(newItems.length){items=newItems;renderItems();}
     }
-    // Populate quick checklist from request instructions
     var instrEl=btn.dataset.instructions||'';
     renderQuickChecklist(instrEl);
-    // Re-render stages with filter applied
     renderStages();
+    showFormOrWaiting();
     toast('Complete IRN for IRQ-'+reqNo+' — '+job,'ok');
   },100);
   if(window.markRequestComplete)window.markRequestComplete(firebaseId);
