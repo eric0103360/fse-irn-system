@@ -1192,15 +1192,7 @@ async function submitRequest(){
   msg+='\n*QC - please attend and complete IRN on release*\n';
   msg+='================================\n';
   var itemSummary=reqItems.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(' | ');
-  var linkData='irq='+encodeURIComponent(d.reqNo)
-    +'&job='+encodeURIComponent(d.job)
-    +'&client='+encodeURIComponent(d.client||'')
-    +'&items='+encodeURIComponent(itemSummary)
-    +'&type='+encodeURIComponent(d.inspTypes)
-    +'&by='+encodeURIComponent(d.supervisor)
-    +'&checks='+encodeURIComponent(d.instructions||'')
-    +'&reqdate='+encodeURIComponent(d.date||'');
-  var liveLink='https://eric0103360.github.io/fse-irn-system?'+linkData;
+  var liveLink='https://eric0103360.github.io/fse-irn-system?irq='+encodeURIComponent(d.reqNo);
   msg+='*Open IRN System to respond:*\n'+liveLink;
   window.open('https://wa.me/?text='+encodeURIComponent(msg));
   if(window.saveRequestToFirebase)window.saveRequestToFirebase(d);
@@ -2075,18 +2067,7 @@ function enterApp(){
 // Read URL params immediately — no Firebase wait needed
 var _urlP=new URLSearchParams(window.location.search);
 var _irqParam=_urlP.get('irq');
-var _urlReq=_irqParam?{
-  reqNo:_irqParam,
-  job:_urlP.get('job')||'',
-  client:_urlP.get('client')||'',
-  items:_urlP.get('items')||'',
-  inspTypes:_urlP.get('type')||'',
-  supervisor:_urlP.get('by')||'',
-  instructions:_urlP.get('checks')||'',
-  date:_urlP.get('reqdate')||'',
-  status:'pending',
-  firebaseId:''
-}:null;
+var _urlReq=null; // Will be loaded from Firebase
 
 // If URL has request data, inject it into reqs immediately
 if(_urlReq)reqs=[_urlReq];
@@ -2094,15 +2075,16 @@ if(_urlReq)reqs=[_urlReq];
 // Pre-load Firebase data in background
 if(window.loadIRNsFromFirebase&&!window._fbL){window._fbL=window.loadIRNsFromFirebase(function(r){reg=r;renderReg();});}
 if(window.loadRequestsFromFirebase&&!window._fbRL){window._fbRL=window.loadRequestsFromFirebase(function(r){
-  // Merge Firebase requests with URL request (avoid duplicate)
-  if(_urlReq){
-    var found=r.find(function(x){return x.reqNo===_irqParam&&x.status==='pending';});
-    if(found){_urlReq.firebaseId=found.firebaseId;reqs=r;}
-    else{reqs=r.concat([_urlReq]);}
+  reqs=r;
+  // Find matching request from Firebase using IRQ param
+  if(_irqParam){
+    var found=reqs.find(function(x){return x.reqNo===_irqParam&&x.status==='pending';});
+    if(found){_urlReq=found;}
+    showFormOrWaiting();
+    renderPendingReqs();
   } else {
-    reqs=r;
+    renderPendingReqs();
   }
-  renderPendingReqs();
 });}
 
 // Splash auto-dismiss
