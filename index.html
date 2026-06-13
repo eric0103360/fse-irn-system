@@ -705,8 +705,11 @@ function showV(v,btn){
     if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){reqs=r;renderReg();});}
     renderReg();
   }
-  if(v==='form'&&!window._keepStageFilter){activeStageFilter=null;renderStages();}
-  if(v==='form')showFormOrWaiting();
+  if(v==='form'){
+    if(!window._keepStageFilter){activeStageFilter=null;}
+    showFormOrWaiting();
+    setTimeout(function(){renderStages();},50);
+  }
   window._keepStageFilter=false;
   if(v==='request'){
     document.getElementById('reqLogo').src=getLogoSrc();
@@ -1635,7 +1638,7 @@ function renderReg(){
     irqMap[key].req=r;
   });
   reg.forEach(function(r){
-    var key=r.irqRef||r.reportNo;
+    var key=r.irqRef||('irn_'+r.reportNo);
     if(!irqMap[key])irqMap[key]={req:null,irns:[],reqNo:r.irqRef||''};
     irqMap[key].irns.push(r);
   });
@@ -1857,9 +1860,9 @@ function completeRequest(btn){
   if(foundReq)_urlReq=foundReq;
   // Set stage filter from inspection type
   activeStageFilter=INSP_TYPE_STAGE_MAP[inspType]||null;
-  window._keepStageFilter=true;
   // Switch to New IRN tab (index 1 — after Inspect Req)
   var newIrnBtn=document.querySelectorAll('.nb')[1];
+  window._keepStageFilter=true;
   showV('form',newIrnBtn);
   setTimeout(function(){
     var joEl=document.getElementById('job');if(joEl)joEl.value=job;
