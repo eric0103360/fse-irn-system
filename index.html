@@ -1471,18 +1471,22 @@ function renderFab(){
     var drawVal=parseFloat(d.draw);
     var measVal=parseFloat(d.meas);
     var hasData=d.draw!==''&&d.meas!=='';
-    var match=hasData&&!isNaN(drawVal)&&!isNaN(measVal)&&drawVal===measVal;
-    var diff=hasData&&!isNaN(drawVal)&&!isNaN(measVal)?Math.abs(drawVal-measVal).toFixed(1):'';
+    var autoPass=hasData&&!isNaN(drawVal)&&!isNaN(measVal)&&drawVal===measVal;
+    var accepted=d.accepted===true;
+    var rejected=d.accepted===false&&d.accepted!==undefined;
     html+='<tr>';
     html+='<td style="font-size:11px;font-weight:600;color:#1a3a5c;text-align:center">'+d.label+'</td>';
     html+='<td><input class="di" value="'+(d.lbl||'')+'" placeholder="e.g. Inside Dia" data-idx="'+i+'" data-f="lbl" oninput="upFabEl(this)" style="text-align:left;width:100%"></td>';
     html+='<td><input class="di" value="'+(d.draw||'')+'" placeholder="--" data-idx="'+i+'" data-f="draw" oninput="upFabEl(this)"></td>';
     html+='<td><input class="di" value="'+(d.meas||'')+'" placeholder="--" data-idx="'+i+'" data-f="meas" oninput="upFabEl(this)"></td>';
-    html+='<td style="text-align:center;font-size:12px;font-weight:600;color:'+(hasData?(match?'#27500A':'#A32D2D'):'#ccc')+'">';
-    if(hasData&&!isNaN(drawVal)&&!isNaN(measVal)){
-      html+=match?'✓ Pass':'✗ ±'+diff;
+    html+='<td style="text-align:center">';
+    if(hasData){
+      html+='<div style="display:flex;gap:6px;justify-content:center;align-items:center">';
+      html+='<label style="display:flex;align-items:center;gap:3px;font-size:11px;color:#27500A;cursor:pointer"><input type="radio" name="dim_'+i+'" data-idx="'+i+'" value="accept" '+(d.accepted===true?'checked':'')+' onchange="fabDims['+i+'].accepted=true;renderFab()"> ✓</label>';
+      html+='<label style="display:flex;align-items:center;gap:3px;font-size:11px;color:#A32D2D;cursor:pointer"><input type="radio" name="dim_'+i+'" data-idx="'+i+'" value="reject" '+(d.accepted===false&&d.accepted!==undefined?'checked':'')+' onchange="fabDims['+i+'].accepted=false;renderFab()"> ✗</label>';
+      html+='</div>';
     } else {
-      html+='--';
+      html+='<span style="color:#ccc">--</span>';
     }
     html+='</td></tr>';
   });
@@ -1858,7 +1862,7 @@ function printFromReg(btn){
   var rSup=r.reqSupervisor||(reqEntry&&reqEntry.supervisor)||'';var rDate=r.reqDate||(reqEntry&&reqEntry.date)||'';
   var reqPh2=(reqEntry&&reqEntry.reqPhotoData)||[];var inspPh2=r.inspPhotoData||[];
   var win=window.open('','_blank');
-  win.document.write('<!DOCTYPE html><html><head><title>IRN INS-C '+r.reportNo+(irqNo?' | IRQ-'+irqNo:'')+'</title><style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#1a1a1a}table{width:100%;border-collapse:collapse;margin-bottom:12px}th{background:#1a3a5c;color:#fff;padding:6px 8px;text-align:left;font-size:11px}.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:10px;margin-bottom:14px}.logo{height:52px}.result-pass{background:#EAF3DE;border:1.5px solid #1D9E75;padding:8px 12px;border-radius:6px;font-weight:700;color:#27500A;font-size:13px;margin-bottom:12px}.result-fail{background:#FCEBEB;border:1.5px solid #E24B4A;padding:8px 12px;border-radius:6px;font-weight:700;color:#A32D2D;font-size:13px;margin-bottom:12px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}.cell{background:#f9f9f9;padding:6px 8px;border-radius:4px;border:0.5px solid #eee}.cl{font-size:9px;color:#888;text-transform:uppercase;margin-bottom:2px}.cv{font-size:12px;font-weight:500}.req-banner{background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:6px;padding:8px 12px;margin-bottom:12px;display:flex;gap:16px}.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}.sign-box{border:0.5px solid #ddd;padding:8px 10px;border-radius:4px;min-height:60px}.footer{font-size:9px;color:#aaa;text-align:center;margin-top:16px;border-top:0.5px solid #eee;padding-top:8px}.no-print{text-align:center;margin:16px 0}@media print{.no-print{display:none}body{margin:10mm}}</style></head><body>');
+  win.document.write('<!DOCTYPE html><html><head><title>IRN INS-C '+r.reportNo+(irqNo?' | IRQ-'+irqNo:'')+'</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10px;color:#1a1a1a}table{width:100%;border-collapse:collapse;margin-bottom:6px}th{background:#1a3a5c;color:#fff;padding:4px 6px;text-align:left;font-size:9px}td{font-size:10px;padding:3px 6px}.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:6px;margin-bottom:8px}.logo{height:36px}.result-pass{background:#EAF3DE;border:1px solid #1D9E75;padding:4px 8px;border-radius:4px;font-weight:700;color:#27500A;font-size:11px;margin-bottom:6px}.result-fail{background:#FCEBEB;border:1px solid #E24B4A;padding:4px 8px;border-radius:4px;font-weight:700;color:#A32D2D;font-size:11px;margin-bottom:6px}.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px}.cell{background:#f9f9f9;padding:4px 6px;border-radius:3px;border:0.5px solid #eee}.cl{font-size:8px;color:#888;text-transform:uppercase;margin-bottom:1px}.cv{font-size:10px;font-weight:500}.req-banner{background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:4px;padding:4px 8px;margin-bottom:6px;display:flex;gap:12px}.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px}.sign-box{border:0.5px solid #ddd;padding:6px 8px;border-radius:3px}.footer{font-size:8px;color:#aaa;text-align:center;margin-top:8px;border-top:0.5px solid #eee;padding-top:4px}.no-print{margin:8px 0}@media print{.no-print{display:none}body{margin:6mm}html{height:100%}}@page{size:A4 portrait;margin:8mm}</style></head><body>');
   win.document.write('<div class="no-print" style="text-align:left;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back</button></div>');
   win.document.write('<div class="hdr"><div><img src="'+logoSrc+'" class="logo"><div style="margin-top:5px"><div style="font-size:16px;font-weight:500">Inspection Release Note</div><div style="font-size:12px;color:#555">FSE-QR-IRN.038 · Rev 02 · ISO9001 / ISO3834-2</div></div></div><div style="text-align:right"><div style="font-size:9px;color:#888;text-transform:uppercase">Report No</div><div style="font-size:24px;font-weight:700;color:#1a3a5c">INS-C '+r.reportNo+'</div>'+(irqNo?'<div style="font-size:11px;color:#185FA5">IRQ-'+irqNo+'</div>':'')+'</div></div>');
   win.document.write('<div class="'+(isPass?'result-pass':'result-fail')+'">'+(isPass?'✓ ACCEPTED — Released':'✗ REJECTED — Rework required')+'</div>');
@@ -1876,8 +1880,8 @@ function printFromReg(btn){
       var hasData=d.draw!==''&&d.meas!=='';
       var match=hasData&&!isNaN(drawVal)&&!isNaN(measVal)&&drawVal===measVal;
       var diff=hasData&&!isNaN(drawVal)&&!isNaN(measVal)?Math.abs(drawVal-measVal).toFixed(1):'';
-      var status=hasData?(match?'✓ Pass':'✗ ±'+diff):'--';
-      var color=hasData?(match?'#27500A':'#A32D2D'):'#888';
+      var status=d.accepted===true?'✓ Accept':d.accepted===false?'✗ Reject':'--';
+      var color=d.accepted===true?'#27500A':d.accepted===false?'#A32D2D':'#888';
       dimRows+='<tr>';
       dimRows+='<td style="padding:6px 10px;border:0.5px solid #ddd;font-weight:600;text-align:center;color:#1a3a5c">'+d.label+'</td>';
       dimRows+='<td style="padding:6px 10px;border:0.5px solid #ddd">'+(d.lbl||'--')+'</td>';
