@@ -371,7 +371,7 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
         <button onclick="toggleDims()" id="dimsToggleBtn" style="font-size:11px;padding:3px 10px;background:#f0f0f0;border:none;border-radius:6px;cursor:pointer;color:#666">+ Show</button>
       </div>
       <div id="dimsSection" style="display:none;padding:4px 14px 10px">
-        <table class="dt"><thead><tr><th style="width:24px">Dim</th><th>Description</th><th>Drawing</th><th>Measured</th><th style="width:60px;text-align:center">Status</th></tr></thead>
+        <table class="dt"><thead><tr><th style="width:24px">Dim</th><th>Description</th><th>Drawing</th><th>Measured</th><th style="width:70px;text-align:center">Pass/Fail</th></tr></thead>
         <tbody id="fabBody"></tbody></table>
         <button class="add-dim" onclick="addFab()"><i class="ti ti-plus" style="font-size:11px"></i> Add row</button>
       </div>
@@ -665,7 +665,7 @@ var iRes=null,openS=null,iCnt=3,tdCnt=0,reg=[],reqs=[],regFilt='all';
 var items=[{id:'i1',desc:'',qty:''},{id:'i2',desc:'',qty:''}];
 var inspPhotosArr=[];
 var ss={};
-var fabDims=['A','B','C','D','E','F','G','H','I','J','K','L','M'].map(function(l){return{label:l,lbl:'',draw:'',meas:''};});
+var fabDims=['A','B','C','D','E','F','G','H','I','J','K','L','M'].map(function(l){return{label:l,lbl:'',draw:'',meas:'',pf:''};});
 var lastIRNs={};
 
 var STAGES=[
@@ -1461,28 +1461,22 @@ function renderStages(){
   STAGES.forEach(function(s){var st=stSt(s.id);sumHtml+='<div class="ssc"><span style="font-size:11px">'+s.label+'</span><span class="pill '+st+'">'+map[st]+'</span></div>';});
   sumEl.innerHTML=sumHtml;
 }
-function addFab(){fabDims.push({label:String.fromCharCode(65+fabDims.length),lbl:'',draw:'',meas:''});renderFab();}
+function addFab(){fabDims.push({label:String.fromCharCode(65+fabDims.length),lbl:'',draw:'',meas:'',pf:''});renderFab();}
 function upFab(i,f,v){fabDims[i][f]=v;}
 function upFabEl(el){upFab(parseInt(el.dataset.idx),el.getAttribute('data-f'),el.value);}
 function renderFab(){
   var html='';
   fabDims.forEach(function(d,i){
-    var hasData=(d.draw!==''&&d.meas!=='')||(d.lbl!=='');
-    var status=d.accepted; // true=pass, false=fail, undefined=not set
+    var hasData=(d.lbl!=='')||(d.draw!=='')||(d.meas!=='');
     html+='<tr>';
     html+='<td style="font-size:11px;font-weight:600;color:#1a3a5c;text-align:center;width:24px">'+d.label+'</td>';
     html+='<td><input class="di" value="'+(d.lbl||'')+'" placeholder="e.g. Inside Dia" data-idx="'+i+'" data-f="lbl" oninput="upFabEl(this)" style="text-align:left;width:100%"></td>';
     html+='<td><input class="di" value="'+(d.draw||'')+'" placeholder="--" data-idx="'+i+'" data-f="draw" oninput="upFabEl(this)"></td>';
     html+='<td><input class="di" value="'+(d.meas||'')+'" placeholder="--" data-idx="'+i+'" data-f="meas" oninput="upFabEl(this)"></td>';
-    html+='<td style="text-align:center;width:60px">';
-    if(hasData){
-      var bg=status===true?'#1D9E75':status===false?'#E24B4A':'#e0e0e0';
-      var icon=status===true?'✓':status===false?'✗':'?';
-      var color=status!==undefined?'#fff':'#999';
-      html+='<div onclick="fabDims['+i+'].accepted=fabDims['+i+'].accepted===true?false:fabDims['+i+'].accepted===false?undefined:true;renderFab()" style="width:32px;height:32px;border-radius:6px;background:'+bg+';color:'+color+';font-size:16px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;border:1.5px solid '+bg+'" title="Click to toggle Pass/Fail">'+icon+'</div>';
-    } else {
-      html+='<span style="color:#ddd">—</span>';
-    }
+    html+='<td>';
+    var pf=d.pf||'';
+    var col=pf.toLowerCase()==='pass'?'#27500A':pf.toLowerCase()==='fail'?'#A32D2D':'#888';
+    html+='<input class="di" value="'+pf+'" placeholder="Pass/Fail" data-idx="'+i+'" data-f="pf" oninput="upFabEl(this)" style="text-align:center;font-weight:600;color:'+col+';width:100%">';
     html+='</td></tr>';
   });
   document.getElementById('fabBody').innerHTML=html;
@@ -1602,7 +1596,6 @@ function sendWA(){
 }
 async function submitIRN(){
   var d=getForm();
-  if(!d.reportNo||d.reportNo==='--'){toast('Enter a report number','err');return;}
   if(!d.job){toast('Enter a job number','err');return;}
   if(d.result==='not set'){toast('Set Accept or Reject','err');return;}
   if(d.result==='reject'){
@@ -1615,6 +1608,11 @@ async function submitIRN(){
   var btn=document.getElementById('submitBtn');
   btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Submitting...';
   try{
+    // Always get a fresh IRN number
+    var freshIRN=await window.getNextIRN();
+    d.reportNo=freshIRN;
+    var el=document.getElementById('reportNo');
+    if(el)el.value=freshIRN;
     await fetch(ENDPOINT,{method:'POST',body:JSON.stringify(d),mode:'no-cors'});
     var ex=reg.findIndex(function(r){return r.reportNo===d.reportNo;});
     if(ex>=0)reg[ex]=d;else reg.unshift(d);
@@ -1875,8 +1873,9 @@ function printFromReg(btn){
       var hasData=d.draw!==''&&d.meas!=='';
       var match=hasData&&!isNaN(drawVal)&&!isNaN(measVal)&&drawVal===measVal;
       var diff=hasData&&!isNaN(drawVal)&&!isNaN(measVal)?Math.abs(drawVal-measVal).toFixed(1):'';
-      var status=d.accepted===true?'✓ Accept':d.accepted===false?'✗ Reject':'--';
-      var color=d.accepted===true?'#27500A':d.accepted===false?'#A32D2D':'#888';
+      var pf=d.pf||'';
+      var status=pf||'--';
+      var color=pf.toLowerCase()==='pass'?'#27500A':pf.toLowerCase()==='fail'?'#A32D2D':'#888';
       dimRows+='<tr>';
       dimRows+='<td style="padding:6px 10px;border:0.5px solid #ddd;font-weight:600;text-align:center;color:#1a3a5c">'+d.label+'</td>';
       dimRows+='<td style="padding:6px 10px;border:0.5px solid #ddd">'+(d.lbl||'--')+'</td>';
