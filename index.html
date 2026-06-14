@@ -177,10 +177,9 @@ window.saveIRNToFirebase=async function(data){
       });
       s.stageStates=cs;
     }
-    // Strip inspection photos base64 to save space — just save count
+    // Keep inspector photos but limit to 4 to save space
     if(s.inspPhotoData&&s.inspPhotoData.length>0){
-      s.inspPhotoCount=s.inspPhotoData.length;
-      s.inspPhotoData=[];
+      s.inspPhotoData=s.inspPhotoData.slice(0,4);
     }
     s.timestamp=new Date().toISOString();
     await addDoc(collection(db,'irns'),s);
@@ -1468,25 +1467,21 @@ function upFabEl(el){upFab(parseInt(el.dataset.idx),el.getAttribute('data-f'),el
 function renderFab(){
   var html='';
   fabDims.forEach(function(d,i){
-    var drawVal=parseFloat(d.draw);
-    var measVal=parseFloat(d.meas);
-    var hasData=d.draw!==''&&d.meas!=='';
-    var autoPass=hasData&&!isNaN(drawVal)&&!isNaN(measVal)&&drawVal===measVal;
-    var accepted=d.accepted===true;
-    var rejected=d.accepted===false&&d.accepted!==undefined;
+    var hasData=(d.draw!==''&&d.meas!=='')||(d.lbl!=='');
+    var status=d.accepted; // true=pass, false=fail, undefined=not set
     html+='<tr>';
-    html+='<td style="font-size:11px;font-weight:600;color:#1a3a5c;text-align:center">'+d.label+'</td>';
+    html+='<td style="font-size:11px;font-weight:600;color:#1a3a5c;text-align:center;width:24px">'+d.label+'</td>';
     html+='<td><input class="di" value="'+(d.lbl||'')+'" placeholder="e.g. Inside Dia" data-idx="'+i+'" data-f="lbl" oninput="upFabEl(this)" style="text-align:left;width:100%"></td>';
     html+='<td><input class="di" value="'+(d.draw||'')+'" placeholder="--" data-idx="'+i+'" data-f="draw" oninput="upFabEl(this)"></td>';
     html+='<td><input class="di" value="'+(d.meas||'')+'" placeholder="--" data-idx="'+i+'" data-f="meas" oninput="upFabEl(this)"></td>';
-    html+='<td style="text-align:center">';
+    html+='<td style="text-align:center;width:60px">';
     if(hasData){
-      html+='<div style="display:flex;gap:6px;justify-content:center;align-items:center">';
-      html+='<label style="display:flex;align-items:center;gap:3px;font-size:11px;color:#27500A;cursor:pointer"><input type="radio" name="dim_'+i+'" data-idx="'+i+'" value="accept" '+(d.accepted===true?'checked':'')+' onchange="fabDims['+i+'].accepted=true;renderFab()"> ✓</label>';
-      html+='<label style="display:flex;align-items:center;gap:3px;font-size:11px;color:#A32D2D;cursor:pointer"><input type="radio" name="dim_'+i+'" data-idx="'+i+'" value="reject" '+(d.accepted===false&&d.accepted!==undefined?'checked':'')+' onchange="fabDims['+i+'].accepted=false;renderFab()"> ✗</label>';
-      html+='</div>';
+      var bg=status===true?'#1D9E75':status===false?'#E24B4A':'#e0e0e0';
+      var icon=status===true?'✓':status===false?'✗':'?';
+      var color=status!==undefined?'#fff':'#999';
+      html+='<div onclick="fabDims['+i+'].accepted=fabDims['+i+'].accepted===true?false:fabDims['+i+'].accepted===false?undefined:true;renderFab()" style="width:32px;height:32px;border-radius:6px;background:'+bg+';color:'+color+';font-size:16px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;border:1.5px solid '+bg+'" title="Click to toggle Pass/Fail">'+icon+'</div>';
     } else {
-      html+='<span style="color:#ccc">--</span>';
+      html+='<span style="color:#ddd">—</span>';
     }
     html+='</td></tr>';
   });
