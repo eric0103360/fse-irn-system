@@ -164,7 +164,29 @@ window.peekNextIRN=async function(){try{const r=doc(db,'counters','irn');const d
 window.peekNextIRQ=async function(){try{const r=doc(db,'counters','irq');const d=await getDoc(r);const c=d.exists()?d.data().count:0;return String(c+1).padStart(4,'0');}catch(e){return'----';}};
 window.getNextIRQ=async function(){try{const r=doc(db,'counters','irq');const n=await runTransaction(db,async(t)=>{const d=await t.get(r);const c=d.exists()?d.data().count:0;const x=c+1;t.set(r,{count:x});return x;});return String(n).padStart(4,'0');}catch(e){return String(Date.now()).slice(-4);}};
 window.getNextIRN=async function(){try{const r=doc(db,'counters','irn');const n=await runTransaction(db,async(t)=>{const d=await t.get(r);const c=d.exists()?d.data().count:0;const x=c+1;t.set(r,{count:x});return x;});return String(n).padStart(4,'0');}catch(e){return String(Date.now()).slice(-4);}};
-window.saveIRNToFirebase=async function(data){try{var s=Object.assign({},data);if(s.stageStates){var cs={};Object.keys(s.stageStates).forEach(function(k){var st=Object.assign({},s.stageStates[k]);st.photos=st.photos?st.photos.length+' photo(s)':'0';cs[k]=st;});s.stageStates=cs;}s.timestamp=new Date().toISOString();await addDoc(collection(db,'irns'),s);return true;}catch(e){return false;}};
+window.saveIRNToFirebase=async function(data){
+  try{
+    var s=Object.assign({},data);
+    // Preserve stage states with criteria but strip photo base64
+    if(s.stageStates){
+      var cs={};
+      Object.keys(s.stageStates).forEach(function(k){
+        var st=Object.assign({},s.stageStates[k]);
+        st.photos=[]; // Strip photos to save space
+        cs[k]=st;
+      });
+      s.stageStates=cs;
+    }
+    // Strip inspection photos base64 to save space — just save count
+    if(s.inspPhotoData&&s.inspPhotoData.length>0){
+      s.inspPhotoCount=s.inspPhotoData.length;
+      s.inspPhotoData=[];
+    }
+    s.timestamp=new Date().toISOString();
+    await addDoc(collection(db,'irns'),s);
+    return true;
+  }catch(e){console.error('IRN save error:',e);return false;}
+};
 window.clearAllData=async function(){
   try{
     var isnap=await getDocs(collection(db,'irns'));
@@ -1802,8 +1824,26 @@ function printFromReg(btn){
   var r=reg.find(function(x){return x.reportNo===irnNo;});
   if(!r){toast('Report data not found','err');return;}
   var reqEntry=reqs.find(function(x){return x.reqNo===irqNo;});
-  var logoSrc=getLogoSrc();var isPass=r.result==='accept';var stageName=r.stageName||'';var criteriaRows='';
-  if(r.stageStates){STAGES.forEach(function(s){var st3=r.stageStates[s.id];if(st3&&st3.gate){stageName=stageName||s.label;criteriaRows+=s.criteria.map(function(c,ci){return '<tr><td style="padding:5px 8px;border:0.5px solid #ddd">'+c+'</td><td style="padding:5px 8px;border:0.5px solid #ddd;text-align:center;color:'+(st3.crit&&st3.crit[ci]?'#1D9E75':'#E24B4A')+';font-weight:600">'+(st3.crit&&st3.crit[ci]?'✓ Pass':'✗ Fail')+'</td></tr>';}).join('');}});}
+  var logoSrc=getLogoSrc();var isPass=r.result==='accept';
+  var stageName=r.stageName||r.stage||'';
+  var criteriaRows='';
+  if(r.stageStates){
+    STAGES.forEach(function(s){
+      var st3=r.stageStates[s.id];
+      if(st3&&(st3.gate||( st3.crit&&st3.crit.some(Boolean)))){
+        stageName=stageName||s.label;
+        criteriaRows+=s.criteria.map(function(c,ci){
+          var pass=st3.crit&&st3.crit[ci];
+          return '<tr><td style="padding:6px 10px;border:0.5px solid #ddd;font-size:12px">'+c+'</td><td style="padding:6px 10px;border:0.5px solid #ddd;text-align:center;color:'+(pass?'#1D9E75':'#E24B4A')+';font-weight:600;font-size:13px">'+(pass?'✓ Pass':'✗ Fail')+'</td></tr>';
+        }).join('');
+      }
+    });
+  }
+  // Fallback — use inspTypes from linked request
+  if(!stageName){
+    var reqEntry2=reqs.find(function(x){return x.reqNo===irqNo;});
+    if(reqEntry2)stageName=reqEntry2.inspTypes||'';
+  }
   var itemRows=(r.items||[]).filter(function(i){return i.desc;}).map(function(i,idx){return '<tr><td style="padding:5px 8px;border:0.5px solid #ddd;text-align:center">'+(idx+1)+'</td><td style="padding:5px 8px;border:0.5px solid #ddd">'+i.desc+'</td><td style="padding:5px 8px;border:0.5px solid #ddd;text-align:center">'+(i.qty||1)+'</td></tr>';}).join('');
   var rSup=r.reqSupervisor||(reqEntry&&reqEntry.supervisor)||'';var rDate=r.reqDate||(reqEntry&&reqEntry.date)||'';
   var reqPh2=(reqEntry&&reqEntry.reqPhotoData)||[];var inspPh2=r.inspPhotoData||[];
