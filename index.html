@@ -999,11 +999,12 @@ function renderQuickChecklist(instructionText){
   }
   var items=instructionText.split(/[,\n]+/).map(function(s){return s.trim();}).filter(function(s){return s.length>2;});
   if(!items.length){el.innerHTML='<div style="font-size:12px;color:#aaa;padding:4px 0">'+instructionText+'</div>';return;}
-  var html='';
+  var html='<div style="font-size:10px;color:#888;margin-bottom:6px">All items pre-ticked — untick anything that fails</div>';
   items.forEach(function(item,i){
-    html+='<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:0.5px solid #eee" id="qc-row-'+i+'">';
-    html+='<div onclick="toggleCheck('+i+')" id="qc-box-'+i+'" style="width:22px;height:22px;border-radius:5px;border:2px solid #ccc;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:14px;color:#fff;background:#fff"></div>';
-    html+='<div style="font-size:13px;color:#333;flex:1">'+item+'</div>';
+    // Pre-ticked by default
+    html+='<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid #eee" id="qc-row-'+i+'">';
+    html+='<div onclick="toggleCheck('+i+')" id="qc-box-'+i+'" data-checked="1" style="width:24px;height:24px;border-radius:5px;border:2px solid #1D9E75;background:#1D9E75;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:14px;color:#fff">✓</div>';
+    html+='<div style="font-size:13px;color:#1a1a1a;flex:1">'+item+'</div>';
     html+='</div>';
   });
   el.innerHTML=html;
@@ -1649,7 +1650,8 @@ async function submitIRN(){
       msg+='*Action required:* '+(gv('rejectionAction')||'--')+'\n';
       msg+='================================\n';
     }
-    msg+='Register: https://eric0103360.github.io/fse-irn-system';
+    msg+='Register: https://eric0103360.github.io/fse-irn-system\n';
+    msg+='View report: https://eric0103360.github.io/fse-irn-system?print='+d.reportNo+(irqRef?'&irq='+_irqParam:'');
     window.open('https://wa.me/?text='+encodeURIComponent(msg));
     // Send to Google endpoint in background — don't wait
     fetch(ENDPOINT,{method:'POST',body:JSON.stringify(d),mode:'no-cors'}).catch(function(){});
@@ -1864,7 +1866,8 @@ function printFromReg(btn){
   win.document.write('<!DOCTYPE html><html><head><title>IRN INS-C '+r.reportNo+(irqNo?' | IRQ-'+irqNo:'')+'</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10px;color:#1a1a1a}table{width:100%;border-collapse:collapse;margin-bottom:6px}th{background:#1a3a5c;color:#fff;padding:4px 6px;text-align:left;font-size:9px}td{font-size:10px;padding:3px 6px}.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:6px;margin-bottom:8px}.logo{height:36px}.result-pass{background:#EAF3DE;border:1px solid #1D9E75;padding:4px 8px;border-radius:4px;font-weight:700;color:#27500A;font-size:11px;margin-bottom:6px}.result-fail{background:#FCEBEB;border:1px solid #E24B4A;padding:4px 8px;border-radius:4px;font-weight:700;color:#A32D2D;font-size:11px;margin-bottom:6px}.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px}.cell{background:#f9f9f9;padding:4px 6px;border-radius:3px;border:0.5px solid #eee}.cl{font-size:8px;color:#888;text-transform:uppercase;margin-bottom:1px}.cv{font-size:10px;font-weight:500}.req-banner{background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:4px;padding:4px 8px;margin-bottom:6px;display:flex;gap:12px}.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px}.sign-box{border:0.5px solid #ddd;padding:6px 8px;border-radius:3px}.footer{font-size:8px;color:#aaa;text-align:center;margin-top:8px;border-top:0.5px solid #eee;padding-top:4px}.no-print{margin:8px 0}@media print{.no-print{display:none}body{margin:6mm}html{height:100%}}@page{size:A4 portrait;margin:8mm}</style></head><body>');
   win.document.write('<div class="no-print" style="text-align:left;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back</button></div>');
   win.document.write('<div class="hdr"><div><img src="'+logoSrc+'" class="logo"><div style="margin-top:5px"><div style="font-size:16px;font-weight:500">Inspection Release Note</div><div style="font-size:12px;color:#555">FSE-QR-IRN.038 · Rev 02 · ISO9001 / ISO3834-2</div></div></div><div style="text-align:right"><div style="font-size:9px;color:#888;text-transform:uppercase">Report No</div><div style="font-size:24px;font-weight:700;color:#1a3a5c">INS-C '+r.reportNo+'</div>'+(irqNo?'<div style="font-size:11px;color:#185FA5">IRQ-'+irqNo+'</div>':'')+'</div></div>');
-  win.document.write('<div class="'+(isPass?'result-pass':'result-fail')+'">'+(isPass?'✓ ACCEPTED — Released':'✗ REJECTED — Rework required')+(stageName?' &nbsp;|&nbsp; <span style="font-weight:400">Stage: '+stageName+'</span>':'')+'</div>');
+  win.document.write('<div class="'+(isPass?'result-pass':'result-fail')+'">'+(isPass?'✓ ACCEPTED — Released':'✗ REJECTED — Rework required')+'</div>');
+  if(stageName)win.document.write('<div style="background:#1a3a5c;color:#fff;padding:5px 10px;border-radius:4px;font-size:11px;font-weight:600;margin-bottom:6px">Inspection stage: '+stageName+'</div>');
   if(irqNo||rSup)win.document.write('<div class="req-banner">'+(irqNo?'<div><div class="cl">Request ref</div><div class="cv" style="color:#185FA5">IRQ-'+irqNo+'</div></div>':'')+(rSup?'<div><div class="cl">Requested by</div><div class="cv">'+rSup+'</div></div>':'')+(rDate?'<div><div class="cl">Request date</div><div class="cv">'+rDate+'</div></div>':'')+'</div>');
   win.document.write('<div class="grid"><div class="cell"><div class="cl">Job / Order</div><div class="cv">'+r.job+'</div></div><div class="cell"><div class="cl">Client</div><div class="cv">'+(r.project||'--')+'</div></div><div class="cell"><div class="cl">PO Number</div><div class="cv">'+(r.po||'--')+'</div></div><div class="cell"><div class="cl">Artisan</div><div class="cv">'+(r.artisan||'--')+'</div></div><div class="cell"><div class="cl">Drawing / Rev</div><div class="cv">'+(r.drawing||'--')+'</div></div><div class="cell"><div class="cl">Inspection stage</div><div class="cv" style="color:#1a3a5c;font-weight:600">'+(stageName||'--')+'</div></div></div>');
   if(itemRows)win.document.write('<table><thead><tr><th style="width:30px">#</th><th>Item description</th><th style="width:50px;text-align:center">Qty</th></tr></thead><tbody>'+itemRows+'</tbody></table>');
@@ -1893,7 +1896,7 @@ function printFromReg(btn){
   }
   if(dimRows)win.document.write('<table><thead><tr><th style="width:30px;text-align:center">Dim</th><th>Description</th><th style="width:80px;text-align:center">Drawing</th><th style="width:80px;text-align:center">Measured</th><th style="width:80px;text-align:center">Status</th></tr></thead><tbody>'+dimRows+'</tbody></table>');
   // Photos
-  [{label:'Request photos (supervisor)',arr:reqPh2},{label:'Inspection photos (QC)',arr:inspPh2}].forEach(function(pg){if(pg.arr&&pg.arr.length>0){win.document.write('<div style="margin-bottom:12px"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:6px">'+pg.label+'</div><div style="display:flex;flex-wrap:wrap;gap:8px">');pg.arr.forEach(function(src){win.document.write('<img src="'+src+'" style="width:130px;height:130px;object-fit:cover;border-radius:6px;border:0.5px solid #ddd">');});win.document.write('</div></div>');}});
+  [{label:'Request photos (supervisor)',arr:reqPh2},{label:'Inspection photos (QC)',arr:inspPh2}].forEach(function(pg){if(pg.arr&&pg.arr.length>0){win.document.write('<div style="margin-bottom:6px"><div style="font-size:8px;color:#888;text-transform:uppercase;margin-bottom:3px">'+pg.label+'</div><div style="display:flex;flex-wrap:wrap;gap:4px">');pg.arr.forEach(function(src){win.document.write('<img src="'+src+'" style="width:80px;height:80px;object-fit:cover;border-radius:4px;border:0.5px solid #ddd">');});win.document.write('</div></div>');}});
   // Sign-off — no signature lines, codes only
   var supCode=(reqEntry&&reqEntry.supCode)||r.supCode||'';
   win.document.write('<div class="sign-grid">');
@@ -1968,6 +1971,15 @@ function completeRequest(btn){
     }
     var instrEl=btn.dataset.instructions||'';
     renderQuickChecklist(instrEl);
+    // Pre-tick all criteria in the active stage
+    if(activeStageFilter){
+      activeStageFilter.forEach(function(sid){
+        if(ss[sid]){
+          ss[sid].crit=ss[sid].crit.map(function(){return true;});
+          ss[sid].gate=true;
+        }
+      });
+    }
     renderStages();
     showFormOrWaiting();
     renderIrqBanner();
@@ -2213,7 +2225,31 @@ if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){
   showFormOrWaiting();
 });}
 
-// Splash auto-dismiss
+var _printParam=_urlP.get('print');
+// If opened with ?print=XXXX — auto load and print that IRN
+if(_printParam&&window.loadIRNsFromFirebase){
+  window.loadIRNsFromFirebase(function(r){
+    reg=r;
+    var target=reg.find(function(x){return x.reportNo===_printParam;});
+    if(target){
+      // Also load requests for supervisor info
+      if(window.loadRequestsFromFirebase){
+        window.loadRequestsFromFirebase(function(reqs2){
+          reqs=reqs2;
+          setTimeout(function(){
+            var fakeBtn={dataset:{irn:target.reportNo,irq:target.irqRef||_urlP.get('irq')||''}};
+            printFromReg(fakeBtn);
+          },500);
+        });
+      } else {
+        setTimeout(function(){
+          var fakeBtn={dataset:{irn:target.reportNo,irq:target.irqRef||''}};
+          printFromReg(fakeBtn);
+        },500);
+      }
+    }
+  });
+}
 setTimeout(function(){
   enterApp();
   if(_irqParam){
