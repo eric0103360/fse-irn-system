@@ -1608,45 +1608,51 @@ async function submitIRN(){
   var btn=document.getElementById('submitBtn');
   btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Submitting...';
   try{
-    // Always get a fresh IRN number
-    var freshIRN=await window.getNextIRN();
-    d.reportNo=freshIRN;
+    // Only get new IRN number if not already assigned this session
     var el=document.getElementById('reportNo');
-    if(el)el.value=freshIRN;
-    await fetch(ENDPOINT,{method:'POST',body:JSON.stringify(d),mode:'no-cors'});
+    var currentIRN=el?el.value:'';
+    if(!currentIRN||currentIRN==='----'||currentIRN==='--'||window._irnSubmitted===currentIRN){
+      var freshIRN=await window.getNextIRN();
+      d.reportNo=freshIRN;
+      if(el)el.value=freshIRN;
+    } else {
+      d.reportNo=currentIRN;
+    }
+    // Save to Firebase immediately
+    if(window.saveIRNToFirebase)await window.saveIRNToFirebase(d);
     var ex=reg.findIndex(function(r){return r.reportNo===d.reportNo;});
     if(ex>=0)reg[ex]=d;else reg.unshift(d);
-    if(window.saveIRNToFirebase)window.saveIRNToFirebase(d);
     if(d.result==='reject'&&_irqParam){
       var linkedReq=reqs.find(function(x){return x.reqNo===_irqParam;});
       if(linkedReq&&linkedReq.firebaseId&&window.markRequestRework)window.markRequestRework(linkedReq.firebaseId);
     }
     toast(d.reportNo+' submitted','ok');
-    // Auto-send WhatsApp notification
-    setTimeout(function(){
-      var isPass=d.result==='accept';
-      var stageName=activeStageFilter&&STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;})?STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;}).label:'';
-      var irqRef=_irqParam?'IRQ-'+_irqParam:'';
-      var msg='*FSE INSPECTION RELEASE NOTE*\n';
+    window._irnSubmitted=d.reportNo;
+    // Open WhatsApp immediately
+    var isPass=d.result==='accept';
+    var stageName=activeStageFilter&&STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;})?STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;}).label:'';
+    var irqRef=_irqParam?'IRQ-'+_irqParam:'';
+    var msg='*FSE INSPECTION RELEASE NOTE*\n';
+    msg+='================================\n';
+    msg+=(isPass?'✅ *PASSED — Released*':'❌ *REJECTED — Rework required*')+'\n';
+    msg+='================================\n';
+    msg+='IRN: *INS-C '+d.reportNo+'*'+(irqRef?' ('+irqRef+')':'')+'\n';
+    msg+='Job: *'+d.job+'*\n';
+    msg+='Client: '+(d.project||'--')+'\n';
+    if(stageName)msg+='Stage: '+stageName+'\n';
+    msg+='Drawing: '+(d.drawing||'--')+'\n';
+    msg+='Date: '+d.date+'\n';
+    msg+='QC: '+d.qc+' ('+d.qcCode+')\n';
+    msg+='================================\n';
+    if(!isPass){
+      msg+='*Reason:* '+(gv('rejectionReason')||'--')+'\n';
+      msg+='*Action required:* '+(gv('rejectionAction')||'--')+'\n';
       msg+='================================\n';
-      msg+=(isPass?'✅ *PASSED — Released*':'❌ *REJECTED — Rework required*')+'\n';
-      msg+='================================\n';
-      msg+='IRN: *INS-C '+d.reportNo+'*'+(irqRef?' ('+irqRef+')':'')+'\n';
-      msg+='Job: *'+d.job+'*\n';
-      msg+='Client: '+(d.project||'--')+'\n';
-      if(stageName)msg+='Stage: '+stageName+'\n';
-      msg+='Drawing: '+(d.drawing||'--')+'\n';
-      msg+='Date: '+d.date+'\n';
-      msg+='QC: '+d.qc+' ('+d.qcCode+')\n';
-      msg+='================================\n';
-      if(!isPass){
-        msg+='*Reason:* '+(gv('rejectionReason')||'--')+'\n';
-        msg+='*Action required:* '+(gv('rejectionAction')||'--')+'\n';
-        msg+='================================\n';
-      }
-      msg+='Register: https://eric0103360.github.io/fse-irn-system';
-      window.open('https://wa.me/?text='+encodeURIComponent(msg));
-    },800);
+    }
+    msg+='Register: https://eric0103360.github.io/fse-irn-system';
+    window.open('https://wa.me/?text='+encodeURIComponent(msg));
+    // Send to Google endpoint in background — don't wait
+    fetch(ENDPOINT,{method:'POST',body:JSON.stringify(d),mode:'no-cors'}).catch(function(){});
     renderReg();
   }catch(e){
     toast('Saved locally - check connection','err');
