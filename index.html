@@ -645,7 +645,7 @@ var codes={
     {code:'SUP-002',name:'Jaun Pieré Muller',active:true,pin:''},
     {code:'SUP-003',name:'Shaw Chamunorwa',active:true,pin:''},
     {code:'SUP-004',name:'Sidney Klaassen',active:true,pin:''},
-    {code:'SUP-005',name:'Khoabane Mokhesi',active:true,pin:''},
+    {code:'SUP-005',name:'Reuben Mokhesi',active:true,pin:''},
     {code:'SUP-006',name:'Paulus Muller',active:true,pin:''},
     {code:'SUP-007',name:'Guntter Nieuwenhuis',active:true,pin:''},
     {code:'SUP-008',name:'Richard Nolan',active:true,pin:''},
@@ -669,32 +669,43 @@ var fabDims=['A','B','C','D','E','F','G','H','I','J','K','L','M'].map(function(l
 var lastIRNs={};
 
 var STAGES=[
-  {id:'s0',num:0,label:'Prior to welding',gate:'Pre-weld inspection - 100% visual and dimensional',criteria:['Level','Square','Dimensional correct','PCD correct','Stiffeners fitted']},
-  {id:'s1',num:1,label:'After tack welding',gate:'Inspection after tack welding - 100% visual and dimensional',criteria:['Level','Square','Dimensional','PCD correct','Stiffeners fitted']},
-  {id:'s2',num:2,label:'After welding',gate:'Inspection after welding - 100% visual and dimensional',criteria:['Weld size correct','Weld profile ok','No mis-welds','Smalls fitted','No overgrinding','Stop starts ok','No pinholes']},
-  {id:'s3',num:3,label:'Trial assembly',isCritical:true,gate:'Trial assembly performed - all holes bolt-verified and match marked',criteria:['All holes drilled per drawing','Every hole bolt-verified (not 2nd/3rd)','No misaligned holes','Match marks applied','Marks correspond to mating part','Support feet drilled and verified','Assembly fits without forcing']},
-  {id:'s4',num:4,label:'Match-marking',gate:'Match-marking completed after trial assembly',criteria:['Sequential numbering correct','Colour coded where applicable','Marks clearly visible','Marks on mating faces only']},
-  {id:'s5',num:5,label:'Cleaning and NDT',gate:'Inspection after cleaning and NDT - 100% visual',criteria:['Spatter removed','Holes de-burred','No pinholes','No porosity','No structural defects']},
-  {id:'s6',num:6,label:'After primer',gate:'Inspection after primer - 100% visual',criteria:['Coverage uniform','No bare metal','DFT within spec','Surface prep confirmed']},
-  {id:'s7',num:7,label:'Final paint',gate:'Final inspection after paint - 100% visual',criteria:['Smooth and uniform finish','DFT correct','No pinholes','Colour correct','Touch-up checked']},
-  {id:'s8',num:8,label:'Final release / despatch',gate:'Final release inspection complete',criteria:['All stages complete','Documentation in order','Client sign-off obtained']}
+  {id:'s0',num:0,label:'Pre-weld — Tack stage',gate:'Pre-weld tack inspection complete',criteria:['Material certificate verified','Correct material used as per drawing','Dimensions correct as per drawing','Fit-up and alignment acceptable','Joint preparation correct (bevel/gap)','Tack welds acceptable (size/spacing)']},
+  {id:'s2',num:2,label:'Welding and NDT',gate:'Welding and NDT inspection complete',criteria:['Correct WPS / welder assigned','Visual weld inspection acceptable','No cracks, porosity or undercut','Weld size and profile acceptable','Distortion within acceptable limits','All welds completed as per drawing','Spatter removed and cleaned','NDT test results acceptable','NDT report available and signed']},
+  {id:'s3',num:3,label:'Trial assembly',isCritical:true,gate:'Trial assembly inspection complete',criteria:['Components assemble correctly','Alignment and fit acceptable','Bolt holes align correctly','Overall dimensions within tolerance']},
+  {id:'s4',num:4,label:'Match-marking',gate:'Match-marking inspection complete',criteria:['All mating parts clearly marked','Marking method acceptable','Erection marks match drawing']},
+  {id:'s5',num:5,label:'Cleaning',gate:'Cleaning inspection complete',criteria:['Surface cleanliness acceptable','All weld spatter and slag removed','Sharp edges dressed']},
+  {id:'s6',num:6,label:'Shot blasting',gate:'Shot blasting inspection complete',criteria:['Blast profile / SA grade acceptable','Surface free of dust and debris','Primer applied within recoat window']},
+  {id:'s7',num:7,label:'After primer',gate:'Primer inspection complete',criteria:['Correct primer product applied','DFT (dry film thickness) acceptable','No runs, sags or holidays','Coverage complete — no bare metal']},
+  {id:'s8',num:8,label:'Final paint',gate:'Final paint inspection complete',criteria:['Correct paint product and colour','DFT acceptable per specification','Finish quality acceptable','Total DFT system acceptable']},
+  {id:'s9',num:9,label:'Final release / despatch',gate:'Final release inspection complete',criteria:['All previous stages signed off','Documentation package complete','Client hold points released','Items correctly tagged and identified','Safe for transport / loading acceptable']}
 ];
 
 // Maps inspection type labels to stage IDs
 var INSP_TYPE_STAGE_MAP={
   'Prior to welding (pre-stage)':['s0'],
-  'S1: After tack welding':['s1'],
-  'S2: After welding':['s2'],
+  'Pre-weld — Tack stage':['s0'],
+  'S2: Welding and NDT':['s2'],
+  'Welding and NDT':['s2'],
   'S3: Trial assembly':['s3'],
+  'Trial assembly':['s3'],
   'S4: Match-marking':['s4'],
-  'S5: Cleaning and NDT':['s5'],
-  'S6: After primer':['s6'],
-  'S7: Final paint':['s7'],
-  'Final release / despatch':['s8']
+  'Match-marking':['s4'],
+  'S5: Cleaning':['s5'],
+  'Cleaning':['s5'],
+  'S6: Shot blasting':['s6'],
+  'Shot blasting':['s6'],
+  'S7: After primer':['s7'],
+  'After primer':['s7'],
+  'S6: After primer':['s7'],
+  'S8: Final paint':['s8'],
+  'Final paint':['s8'],
+  'S7: Final paint':['s8'],
+  'Final release / despatch':['s9'],
+  'S9: Final release / despatch':['s9']
 };
 
-var activeStageFilter=null; // null = show all
-STAGES.forEach(function(s){if(!ss[s.id])ss[s.id]={gate:false,na:false,crit:new Array(s.criteria.length).fill(false),tdims:[],result:null,rejectReason:'',rejectAction:'',photos:[]};});
+var activeStageFilter=null;
+STAGES.forEach(function(s){if(!ss[s.id])ss[s.id]={gate:false,na:false,crit:new Array(s.criteria.length).fill(null),tdims:[],result:null,rejectReason:'',rejectAction:'',photos:[]};});
 
 function toast(msg,type){
   if(!type)type='info';
@@ -968,7 +979,7 @@ var reqUrgency='normal';
 var reqSupValidated=false;
 var reqSupName='';
 var reqItemCnt=2;
-var REQ_INSP_TYPES=['Prior to welding (pre-stage)','S1: After tack welding','S2: After welding','S3: Trial assembly','S4: Match-marking','S5: Cleaning and NDT','S6: After primer','S7: Final paint','Final release / despatch'];
+var REQ_INSP_TYPES=['Prior to welding (pre-stage)','S2: Welding and NDT','S3: Trial assembly','S4: Match-marking','S5: Cleaning','S6: Shot blasting','S7: After primer','S8: Final paint','Final release / despatch'];
 
 function setDrawing(state){
   var okBtn=document.getElementById('drawOkBtn');
@@ -1335,7 +1346,8 @@ function renderItems(){
 }
 function toggleS(sid){openS=openS===sid?null:sid;renderStages();}
 function toggleG(sid,e){e.stopPropagation();ss[sid].gate=!ss[sid].gate;renderStages();}
-function toggleC(sid,ci,e){e.stopPropagation();ss[sid].crit[ci]=!ss[sid].crit[ci];renderStages();}
+function setCrit(sid,ci,val){if(!ss[sid])return;ss[sid].crit[ci]=(ss[sid].crit[ci]===val)?null:val;renderStages();}
+function toggleC(sid,ci,e){if(e)e.stopPropagation();setCrit(sid,ci,true);}
 function toggleNA(sid,e){e.stopPropagation();ss[sid].na=!ss[sid].na;if(ss[sid].na){ss[sid].gate=false;ss[sid].crit=ss[sid].crit.map(function(){return false;});}renderStages();}
 function addTD(sid){ss[sid].tdims.push({id:'td'+(++tdCnt),lbl:'',draw:'',meas:''});renderStages();}
 function upTD(sid,id,f,v){var d=ss[sid].tdims.find(function(x){return x.id===id;});if(d)d[f]=v;}
@@ -1382,10 +1394,12 @@ function setStageResult(sid,r){
 }
 function stSt(sid){
   var st=ss[sid];if(st.na)return'na';
-  var cd=st.crit.filter(Boolean).length;
   var s=STAGES.find(function(x){return x.id===sid;});
-  if(st.gate&&cd===s.criteria.length)return'complete';
-  if(st.gate||cd>0)return'partial';return'empty';
+  var checked=st.crit.filter(function(v){return v===true||v===false||v==='na';}).length;
+  var passed=st.crit.filter(function(v){return v===true||v==='na';}).length;
+  var failed=st.crit.filter(function(v){return v===false;}).length;
+  if(st.gate&&checked===s.criteria.length)return'complete';
+  if(st.gate||checked>0)return'partial';return'empty';
 }
 function renderStages(){
   var html='';
@@ -1401,14 +1415,18 @@ function renderStages(){
     html+='</div>';
     html+='<div style="border:1.5px solid #1a3a5c;border-top:none;border-radius:0 0 8px 8px;overflow:hidden">';
     s.criteria.forEach(function(c,ci){
-      var checked=st.crit[ci];
-      var isLast=ci===s.criteria.length-1;
-      html+='<div data-sid="'+s.id+'" data-ci="'+ci+'" onclick="toggleC(this.dataset.sid,parseInt(this.dataset.ci),event)" style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:'+(checked?'#f0faf5':'#fff')+';border-bottom:'+(isLast?'none':'0.5px solid #eee')+';cursor:pointer">';
-      html+='<div style="width:26px;height:26px;border-radius:6px;border:2px solid '+(checked?'#1D9E75':'#ddd')+';background:'+(checked?'#1D9E75':'#fff')+';display:flex;align-items:center;justify-content:center;flex-shrink:0">';
-      html+=(checked?'<i class="ti ti-check" style="font-size:14px;color:#fff"></i>':'');
-      html+='</div>';
-      html+='<span style="font-size:13px;color:'+(checked?'#27500A':'#1a1a1a')+';font-weight:'+(checked?'500':'400')+'">'+c+'</span>';
-      html+='</div>';
+      var val=st.crit[ci];
+      var isPass=val===true;
+      var isFail=val===false&&val!==null;
+      var isNA=val==='na';
+      var rowBg=isPass?'#f0faf5':isFail?'#fff5f5':isNA?'#f8f8f8':'#fff';
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:11px 14px;background:'+rowBg+';border-bottom:0.5px solid #eee">';
+      html+='<span style="flex:1;font-size:13px;color:'+(isNA?'#aaa':isPass?'#27500A':isFail?'#A32D2D':'#1a1a1a')+';text-decoration:'+(isNA?'line-through':'none')+'">'+c+'</span>';
+      html+='<div style="display:flex;gap:4px">';
+      html+='<div onclick="setCrit(\''+s.id+'\','+ci+',true)" style="width:34px;height:34px;border-radius:6px;border:1.5px solid '+(isPass?'#1D9E75':'#ddd')+';background:'+(isPass?'#1D9E75':'#fff')+';display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700;color:'+(isPass?'#fff':'#bbb')+'">✓</div>';
+      html+='<div onclick="setCrit(\''+s.id+'\','+ci+',false)" style="width:34px;height:34px;border-radius:6px;border:1.5px solid '+(isFail?'#E24B4A':'#ddd')+';background:'+(isFail?'#E24B4A':'#fff')+';display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700;color:'+(isFail?'#fff':'#bbb')+'">✗</div>';
+      html+='<div onclick="setCrit(\''+s.id+'\','+ci+',\'na\')" style="width:34px;height:34px;border-radius:6px;border:1.5px solid '+(isNA?'#888':'#ddd')+';background:'+(isNA?'#888':'#fff')+';display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:10px;font-weight:700;color:'+(isNA?'#fff':'#bbb')+'">N/A</div>';
+      html+='</div></div>';
     });
     html+='</div>';
     html+='<div style="margin-top:8px;text-align:center"><button onclick="activeStageFilter=null;renderStages()" style="font-size:11px;color:#888;background:none;border:0.5px solid #ddd;border-radius:6px;padding:5px 14px;cursor:pointer"><i class="ti ti-list" style="font-size:12px"></i> Show all stages</button></div>';
@@ -1438,7 +1456,20 @@ function renderStages(){
       if(s.isCritical&&!st.na){html+='<div class="wb"><i class="ti ti-alert-triangle" style="font-size:15px;flex-shrink:0"></i><div><strong>Critical checkpoint:</strong> Every hole must have a bolt during trial assembly.</div></div>';}
       html+='<div class="sublbl g"><i class="ti ti-lock-open" style="font-size:11px"></i> Stage gate</div><div class="gr'+(st.gate&&!st.na?' on':'')+'" data-sid="'+s.id+'" onclick="toggleG(this.dataset.sid,event)"><div class="gcb'+(st.gate&&!st.na?' on':'')+'">'+(st.gate&&!st.na?'<i class="ti ti-check" style="font-size:10px;color:#fff"></i>':'')+'</div><div class="gt">'+s.gate+'</div></div>';
       html+='<div class="sublbl c"><i class="ti ti-list-check" style="font-size:11px"></i> Criteria</div><div class="cg">';
-      s.criteria.forEach(function(c,ci){html+='<div class="ci'+(st.crit[ci]&&!st.na?' on':'')+'" data-sid="'+s.id+'" data-ci="'+ci+'" onclick="toggleC(this.dataset.sid,parseInt(this.dataset.ci),event)"><div class="ccb'+(st.crit[ci]&&!st.na?' on':'')+'">'+(st.crit[ci]&&!st.na?'<i class="ti ti-check" style="font-size:8px;color:#fff"></i>':'')+'</div><span class="ct2">'+c+'</span></div>';});
+      s.criteria.forEach(function(c,ci){
+        var val=st.crit[ci]; // null=unchecked, true=pass, false=fail, 'na'=N/A
+        var isPass=val===true;
+        var isFail=val===false&&val!==null;
+        var isNA=val==='na';
+        var rowBg=isPass?'#f0faf5':isFail?'#fff5f5':isNA?'#f8f8f8':'#fff';
+        html+='<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;background:'+rowBg+';border-bottom:0.5px solid #eee">';
+        html+='<span style="flex:1;font-size:13px;color:'+(isNA?'#aaa':isPass?'#27500A':isFail?'#A32D2D':'#1a1a1a')+';text-decoration:'+(isNA?'line-through':'none')+'">'+c+'</span>';
+        html+='<div style="display:flex;gap:4px">';
+        html+='<div onclick="setCrit(\''+s.id+'\','+ci+',true)" style="width:30px;height:30px;border-radius:5px;border:1.5px solid '+(isPass?'#1D9E75':'#ddd')+';background:'+(isPass?'#1D9E75':'#fff')+';display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;font-weight:700;color:'+(isPass?'#fff':'#aaa')+'">✓</div>';
+        html+='<div onclick="setCrit(\''+s.id+'\','+ci+',false)" style="width:30px;height:30px;border-radius:5px;border:1.5px solid '+(isFail?'#E24B4A':'#ddd')+';background:'+(isFail?'#E24B4A':'#fff')+';display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;font-weight:700;color:'+(isFail?'#fff':'#aaa')+'">✗</div>';
+        html+='<div onclick="setCrit(\''+s.id+'\','+ci+',\'na\')" style="width:30px;height:30px;border-radius:5px;border:1.5px solid '+(isNA?'#888':'#ddd')+';background:'+(isNA?'#888':'#fff')+';display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:9px;font-weight:700;color:'+(isNA?'#fff':'#aaa')+'">N/A</div>';
+        html+='</div></div>';
+      });
       html+='</div>';
       html+='<div class="sublbl p"><i class="ti ti-camera" style="font-size:11px"></i> Photos ('+(st.photos?st.photos.length:0)+')</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">';
       if(st.photos&&st.photos.length){st.photos.forEach(function(p,pi){html+='<div style="position:relative"><img src="'+p+'" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:0.5px solid #ddd" data-sid="'+s.id+'" data-pi="'+pi+'" onclick="viewPhoto(this.dataset.sid,parseInt(this.dataset.pi))"><button style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;color:#fff;font-size:10px;cursor:pointer" data-sid="'+s.id+'" data-pi="'+pi+'" onclick="removePhoto(this.dataset.sid,parseInt(this.dataset.pi))">x</button></div>';});}
@@ -1793,9 +1824,10 @@ function renderReg(){
       html+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;align-items:center">';
       stageIds.forEach(function(sid,si){
         var sd=latestIrn.stageStates[sid];
-        var isInspected=sd&&(sd.gate||(sd.crit&&sd.crit.some(Boolean)));
-        var allPassed=sd&&sd.crit&&sd.crit.length>0&&sd.crit.every(Boolean);
-        var dotColor=!isInspected?'#e0e0e0':(sd.gate||allPassed)?'#1D9E75':'#E24B4A';
+        var isInspected=sd&&(sd.gate||(sd.crit&&sd.crit.some(function(v){return v!==null&&v!==undefined;})));
+        var allPassed=sd&&sd.crit&&sd.crit.length>0&&sd.crit.every(function(v){return v===true||v==='na';});
+        var anyFailed=sd&&sd.crit&&sd.crit.some(function(v){return v===false;});
+        var dotColor=!isInspected?'#e0e0e0':(sd.gate||allPassed)&&!anyFailed?'#1D9E75':'#E24B4A';
         var dotTitle=stageShort[si];
         html+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
         html+='<div style="width:'+(isInspected?'22px':'16px')+';height:'+(isInspected?'22px':'16px')+';border-radius:50%;background:'+dotColor+'"></div>';
@@ -1848,8 +1880,13 @@ function printFromReg(btn){
       if(st3&&(st3.gate||( st3.crit&&st3.crit.some(Boolean)))){
         stageName=stageName||s.label;
         criteriaRows+=s.criteria.map(function(c,ci){
-          var pass=st3.crit&&st3.crit[ci];
-          return '<tr><td style="padding:6px 10px;border:0.5px solid #ddd;font-size:12px">'+c+'</td><td style="padding:6px 10px;border:0.5px solid #ddd;text-align:center;color:'+(pass?'#1D9E75':'#E24B4A')+';font-weight:600;font-size:13px">'+(pass?'✓ Pass':'✗ Fail')+'</td></tr>';
+          var val=st3.crit&&st3.crit[ci];
+          var isPass=val===true;
+          var isNA=val==='na';
+          var isFail=val===false&&val!==null;
+          var result=isPass?'✓ Pass':isNA?'N/A':isFail?'✗ Fail':'—';
+          var color=isPass?'#1D9E75':isNA?'#888':isFail?'#E24B4A':'#aaa';
+          return '<tr><td style="padding:4px 8px;border:0.5px solid #ddd;font-size:10px;color:'+(isNA?'#aaa':'#1a1a1a')+';text-decoration:'+(isNA?'line-through':'none')+'">'+c+'</td><td style="padding:4px 8px;border:0.5px solid #ddd;text-align:center;color:'+color+';font-weight:600;font-size:11px">'+result+'</td></tr>';
         }).join('');
       }
     });
