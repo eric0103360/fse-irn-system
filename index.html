@@ -1774,15 +1774,19 @@ function doSendEmail(){
   setEmailStatus('Sending...','info');
   fetch(_GAS_URL,{
     method:'POST',
-    mode:'no-cors',
-    headers:{'Content-Type':'application/json'},
+    headers:{'Content-Type':'text/plain'},
     body:JSON.stringify({to:to,cc:cc,subject:_emailSubject,htmlBody:_emailBody})
-  }).then(function(){
-    setEmailStatus('Email sent to '+to+' — check inbox in a few seconds','ok');
-    btn.innerHTML='<i class="ti ti-check" style="font-size:13px"></i> Sent!';
-    setTimeout(function(){closeEmailModal();},2500);
-  }).catch(function(err){
-    setEmailStatus('Network error — check connection and try again','err');
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.success){
+      setEmailStatus('Email sent to '+to+' — check inbox','ok');
+      btn.innerHTML='<i class="ti ti-check" style="font-size:13px"></i> Sent!';
+      setTimeout(function(){closeEmailModal();},2500);
+    }else{
+      setEmailStatus('Error: '+(d.error||'unknown'),'err');
+      btn.disabled=false;btn.innerHTML='<i class="ti ti-send" style="font-size:13px"></i> Send email';
+    }
+  }).catch(function(){
+    setEmailStatus('Network error — check connection','err');
     btn.disabled=false;btn.innerHTML='<i class="ti ti-send" style="font-size:13px"></i> Send email';
   });
 }
@@ -2503,6 +2507,27 @@ function printIRN(){
 
   // Checklist
   if(stageName&&criteriaRows){win.document.write('<table><thead><tr><th colspan="2">Inspection checklist — '+stageName+'</th></tr></thead><tbody>'+criteriaRows+'</tbody></table>');}
+
+  // Dimensions from stage states
+  var dimHtml='';var dimCount=0;
+  STAGES.forEach(function(s){
+    var st=ss[s.id];
+    if(!st||!st.tdims||!st.tdims.length)return;
+    st.tdims.forEach(function(d2){
+      if(!d2.lbl&&!d2.draw&&!d2.meas)return;
+      var pass=d2.meas&&d2.draw&&d2.meas.trim()===d2.draw.trim();
+      var color=pass?'#1D9E75':'#E24B4A';
+      var status=d2.meas?(pass?'Pass':'Fail'):'--';
+      dimHtml+='<tr>';
+      dimHtml+='<td style="padding:5px 8px;border:0.5px solid #ddd;text-align:center;font-weight:600;color:#1a3a5c">'+(++dimCount)+'</td>';
+      dimHtml+='<td style="padding:5px 8px;border:0.5px solid #ddd">'+(d2.lbl||'--')+'</td>';
+      dimHtml+='<td style="padding:5px 8px;border:0.5px solid #ddd;text-align:center">'+(d2.draw||'--')+'</td>';
+      dimHtml+='<td style="padding:5px 8px;border:0.5px solid #ddd;text-align:center">'+(d2.meas||'--')+'</td>';
+      dimHtml+='<td style="padding:5px 8px;border:0.5px solid #ddd;text-align:center;color:'+color+';font-weight:600">'+status+'</td>';
+      dimHtml+='</tr>';
+    });
+  });
+  if(dimHtml){win.document.write('<table><thead><tr><th style="width:30px;text-align:center">#</th><th>Description</th><th style="width:80px;text-align:center">Drawing</th><th style="width:80px;text-align:center">Measured</th><th style="width:80px;text-align:center">Status</th></tr></thead><tbody>'+dimHtml+'</tbody></table>');}
 
   // Notes
   if(d.notes){win.document.write('<div style="margin-bottom:12px;padding:8px;background:#f9f9f9;border-radius:4px;border:0.5px solid #eee"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:3px">Inspection notes</div><div style="font-size:12px">'+d.notes+'</div></div>');}
