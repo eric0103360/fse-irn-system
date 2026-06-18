@@ -177,9 +177,9 @@ window.saveIRNToFirebase=async function(data){
       });
       s.stageStates=cs;
     }
-    // Keep inspector photos but limit to 4 to save space
+    // Keep inspector photos — up to 15
     if(s.inspPhotoData&&s.inspPhotoData.length>0){
-      s.inspPhotoData=s.inspPhotoData.slice(0,4);
+      s.inspPhotoData=s.inspPhotoData.slice(0,15);
     }
     s.timestamp=new Date().toISOString();
     await addDoc(collection(db,'irns'),s);
@@ -263,7 +263,9 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
     <button class="nb on" onclick="showV('request',this)"><i class="ti ti-bell" style="font-size:12px"></i> Inspect Req</button>
     <button class="nb" onclick="handleNewIRNClick(this)" style="opacity:0.6" title="Accessible via WhatsApp inspection link only"><i class="ti ti-file-plus" style="font-size:12px"></i> New IRN <i class="ti ti-lock" style="font-size:9px"></i></button>
     <button class="nb" onclick="showV('register',this)"><i class="ti ti-list" style="font-size:12px"></i> Register</button>
+    <button class="nb" onclick="showV('mgmt',this)"><i class="ti ti-chart-bar" style="font-size:12px"></i> Mgmt</button>
     <button class="nb" onclick="showV('admin',this)"><i class="ti ti-settings" style="font-size:12px"></i> Admin</button>
+    <button class="nb" id="logoutBtn" onclick="signOut()" style="display:none;color:#A32D2D;border-right:none"><i class="ti ti-logout" style="font-size:12px"></i> Sign Out</button>
   </div>
 
   <div id="v-form" class="view on">
@@ -361,7 +363,7 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
           <i class="ti ti-camera" style="font-size:18px"></i> Take / add inspection photo
           <input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="addInspPhotos(this)">
         </label>
-        <div style="font-size:10px;color:#aaa;margin-top:4px">Photos will appear in the printed report</div>
+        <div style="font-size:10px;color:#aaa;margin-top:4px">Up to 15 photos — numbered Photo 1, Photo 2… in the printed report</div>
       </div>
     </div>
 
@@ -425,6 +427,7 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
     <div id="formActions" style="display:none">
     <div class="ag no-print" style="margin-top:8px">
       <button class="ab pr" onclick="printIRN()" style="padding:11px"><i class="ti ti-printer"></i> Print IRN</button>
+      <button class="ab" onclick="sendEmail()" style="padding:11px;border-color:#185FA5;color:#185FA5"><i class="ti ti-mail"></i> Email</button>
       <button class="ab sub" id="submitBtn" onclick="submitIRN()" style="padding:11px;background:#1D9E75;border-color:#1D9E75"><i class="ti ti-send"></i> Release &amp; Notify</button>
     </div>
     </div>
@@ -549,6 +552,11 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
       <div style="background:#E6F1FB;border-radius:8px;padding:8px 10px;text-align:center"><div style="font-size:22px;font-weight:500;color:#0C447C" id="statFTP">0%</div><div style="font-size:10px;color:#185FA5">1st pass</div></div>
     </div>
     <div id="stageChart" style="display:none;background:#fff;border:0.5px solid #eee;border-radius:10px;padding:12px;margin-bottom:8px"></div>
+    <div style="display:flex;align-items:center;gap:8px;background:#fff;border:0.5px solid #ddd;border-radius:10px;padding:8px 12px;margin-bottom:8px">
+      <i class="ti ti-search" style="font-size:15px;color:#aaa;flex-shrink:0"></i>
+      <input id="regSearch" type="text" placeholder="Search job, client or IRQ…" oninput="renderReg()" style="border:none;outline:none;width:100%;font-size:13px;color:#1a1a1a;background:transparent">
+      <button onclick="document.getElementById('regSearch').value='';renderReg()" style="background:none;border:none;color:#aaa;cursor:pointer;padding:0;display:flex;align-items:center"><i class="ti ti-x" style="font-size:13px"></i></button>
+    </div>
     <div class="filt-row">
       <button class="filt-btn on" onclick="setRegFilt('all',this)">All</button>
       <button class="filt-btn" onclick="setRegFilt('pending',this)">Pending</button>
@@ -605,6 +613,89 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
       <button onclick="clearAllTestData()" style="width:100%;padding:10px;background:#FCEBEB;color:#A32D2D;border:1px solid #E24B4A;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:12px"><i class="ti ti-trash" style="font-size:14px"></i> Clear all test IRNs &amp; requests</button>
     </div>
   </div>
+</div>
+
+<!-- MANAGEMENT DASHBOARD -->
+<div id="v-mgmt" class="view" style="display:none">
+  <div class="hdr">
+    <div class="hdr-top">
+      <div class="hdr-left">
+        <img id="mgmtLogo" class="fse-logo" alt="FSE">
+        <div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.55);margin-bottom:1px">FIELD SERVICES &amp; ENGINEERING</div>
+          <h1>Management View</h1>
+          <div class="hdr-meta" id="mgmtDate"></div>
+        </div>
+      </div>
+      <button onclick="renderMgmt()" style="background:rgba(255,255,255,0.15);border:0.5px solid rgba(255,255,255,0.3);color:#fff;border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer"><i class="ti ti-refresh" style="font-size:12px"></i> Refresh</button>
+    </div>
+  </div>
+
+  <!-- KPI tiles -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+    <div style="background:#fff;border:0.5px solid #ddd;border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:28px;font-weight:700;color:#1a3a5c" id="mg-total">0</div>
+      <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px">Total Jobs</div>
+    </div>
+    <div style="background:#FCEBEB;border:0.5px solid #f5c6c6;border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:28px;font-weight:700;color:#A32D2D" id="mg-pending">0</div>
+      <div style="font-size:10px;color:#A32D2D;text-transform:uppercase;letter-spacing:0.5px">Awaiting QC</div>
+    </div>
+    <div style="background:#EAF3DE;border:0.5px solid #c3dfa0;border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:28px;font-weight:700;color:#27500A" id="mg-released">0</div>
+      <div style="font-size:10px;color:#3B6D11;text-transform:uppercase;letter-spacing:0.5px">Released</div>
+    </div>
+    <div style="background:#FAEEDA;border:0.5px solid #f0c97a;border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:28px;font-weight:700;color:#633806" id="mg-rework">0</div>
+      <div style="font-size:10px;color:#BA7517;text-transform:uppercase;letter-spacing:0.5px">Rework</div>
+    </div>
+  </div>
+
+  <!-- FTP and today -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+    <div style="background:#E6F1FB;border:0.5px solid #b5d4f4;border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:28px;font-weight:700;color:#0C447C" id="mg-ftp">0%</div>
+      <div style="font-size:10px;color:#185FA5;text-transform:uppercase;letter-spacing:0.5px">1st Pass Rate</div>
+    </div>
+    <div style="background:#fff;border:0.5px solid #ddd;border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:28px;font-weight:700;color:#1a3a5c" id="mg-today">0</div>
+      <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px">Released Today</div>
+    </div>
+  </div>
+
+  <!-- Stage pass rate bar chart -->
+  <div style="background:#fff;border:0.5px solid #ddd;border-radius:10px;padding:12px;margin-bottom:10px">
+    <div style="font-size:11px;font-weight:600;color:#1a3a5c;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px">Stage Pass Rate</div>
+    <div id="mg-stageChart"><div style="font-size:12px;color:#aaa;text-align:center;padding:12px">No inspection data yet</div></div>
+  </div>
+
+  <!-- Awaiting QC -->
+  <div style="background:#fff;border:0.5px solid #ddd;border-radius:10px;overflow:hidden;margin-bottom:10px">
+    <div style="background:#FCEBEB;padding:9px 14px;font-size:11px;font-weight:600;color:#A32D2D;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:6px">
+      <i class="ti ti-clock" style="font-size:13px"></i> Awaiting QC Inspection
+      <span id="mg-pending-badge" style="background:#E24B4A;color:#fff;border-radius:8px;padding:1px 7px;font-size:10px;margin-left:auto">0</span>
+    </div>
+    <div id="mg-pending-list"><div style="padding:16px;text-align:center;color:#aaa;font-size:12px">No pending jobs</div></div>
+  </div>
+
+  <!-- Rework items -->
+  <div style="background:#fff;border:0.5px solid #ddd;border-radius:10px;overflow:hidden;margin-bottom:10px">
+    <div style="background:#FAEEDA;padding:9px 14px;font-size:11px;font-weight:600;color:#633806;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:6px">
+      <i class="ti ti-refresh-alert" style="font-size:13px"></i> Rework / Rejected
+      <span id="mg-rework-badge" style="background:#BA7517;color:#fff;border-radius:8px;padding:1px 7px;font-size:10px;margin-left:auto">0</span>
+    </div>
+    <div id="mg-rework-list"><div style="padding:16px;text-align:center;color:#aaa;font-size:12px">No rework items</div></div>
+  </div>
+
+  <!-- Recently released -->
+  <div style="background:#fff;border:0.5px solid #ddd;border-radius:10px;overflow:hidden;margin-bottom:10px">
+    <div style="background:#EAF3DE;padding:9px 14px;font-size:11px;font-weight:600;color:#27500A;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:6px">
+      <i class="ti ti-circle-check" style="font-size:13px"></i> Recently Released
+    </div>
+    <div id="mg-released-list"><div style="padding:16px;text-align:center;color:#aaa;font-size:12px">No released IRNs yet</div></div>
+  </div>
+
+  <div style="height:16px"></div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -757,6 +848,16 @@ function showV(v,btn){
   }
 
   if(v==='admin'){document.getElementById('admLogo').src=getLogoSrc();}
+  if(v==='mgmt'){
+    document.getElementById('mgmtLogo').src=getLogoSrc();
+    var mgLoaded={irns:false,reqs:false};
+    function checkMgReady(){if(mgLoaded.irns&&mgLoaded.reqs)renderMgmt();}
+    if(window.loadIRNsFromFirebase){window.loadIRNsFromFirebase(function(r){reg=r;mgLoaded.irns=true;checkMgReady();});}
+    else{mgLoaded.irns=true;checkMgReady();}
+    if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){reqs=r;mgLoaded.reqs=true;checkMgReady();});}
+    else{mgLoaded.reqs=true;}
+    renderMgmt();
+  }
 }
 function capturePhoto(input,sid){
   if(!input.files||!input.files[0])return;
@@ -853,7 +954,7 @@ function validateCode(role){
       inp.className='code-in valid';
       stat.innerHTML='<span style="color:#27500A">✓ Authorised — '+match.name+'</span>';
       if(role==='sup'){supValidated=true;supName=match.name;}else{qcValidated=true;qcName=match.name;}
-      removePinEntry(role);
+      removePinEntry(role);if(typeof checkLogoutBtn==='function')checkLogoutBtn();
     }
   }else{
     inp.className='code-in invalid';
@@ -877,6 +978,7 @@ function checkPin(el,role,code){
     el.style.borderColor='#1D9E75';
     stat.innerHTML='<span style="color:#27500A">✓ Authorised — '+match.name+'</span>';
     if(role==='sup'){supValidated=true;supName=match.name;}else{qcValidated=true;qcName=match.name;}
+    if(typeof checkLogoutBtn==='function')checkLogoutBtn();
     // Persist for tab switching
     if(role==='qc'){window._savedQC=document.getElementById('qcCode').value;window._savedQCv=true;window._savedQCn=match.name;}
     else{window._savedSUP=document.getElementById('supCode').value;window._savedSUPv=true;window._savedSUPn=match.name;}
@@ -1032,10 +1134,10 @@ function toggleCheck(i){
 function addInspPhotos(input){
   if(!input.files)return;
   Array.from(input.files).forEach(function(file){
+    if(inspPhotosArr.length>=15){toast('Maximum 15 photos reached','err');return;}
     var reader=new FileReader();
     reader.onload=function(e){
-      inspPhotosArr.push(e.target.result);
-      renderInspPhotos();
+      if(inspPhotosArr.length<15){inspPhotosArr.push(e.target.result);renderInspPhotos();}
     };
     reader.readAsDataURL(file);
   });
@@ -1046,9 +1148,10 @@ function renderInspPhotos(){
   if(!el)return;
   var html='';
   inspPhotosArr.forEach(function(src,i){
-    html+='<div style="position:relative;width:80px;height:80px">';
+    html+='<div style="position:relative;width:80px">';
     html+='<img src="'+src+'" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:0.5px solid #ddd">';
     html+='<button onclick="removeInspPhoto('+i+')" style="position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.6);border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">&times;</button>';
+    html+='<div style="font-size:9px;color:#666;text-align:center;margin-top:3px;font-weight:500">Photo '+(i+1)+'</div>';
     html+='</div>';
   });
   el.innerHTML=html;
@@ -1553,7 +1656,7 @@ function getForm(){
   b.items=JSON.parse(JSON.stringify(items));
   b.stageStates=JSON.parse(JSON.stringify(ss));
   b.fabDims=JSON.parse(JSON.stringify(fabDims));
-  b.inspPhotoData=inspPhotosArr.slice(0,8);
+  b.inspPhotoData=inspPhotosArr.slice(0,15);
   b.irqRef=_irqParam||'';
   b.reqSupervisor=_urlReq?(_urlReq.supervisor||''):'';
   b.reqDate=_urlReq?(_urlReq.date||''):'';
@@ -1623,6 +1726,62 @@ function sendWA(){
   msg+='================================\n';
   msg+='Register: https://eric0103360.github.io/fse-irn-system';
   window.open('https://wa.me/?text='+encodeURIComponent(msg));
+}
+function sendEmail(){
+  var d=getFormBasic();
+  var isPass=d.result==='accept';
+  var stageName=activeStageFilter&&STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;})?STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;}).label:'';
+  var subject='FSE IRN INS-C '+d.reportNo+' — Job '+d.job+' — '+(isPass?'RELEASED':'REWORK REQUIRED');
+  var body='FSE INSPECTION RELEASE NOTE\r\n';
+  body+='============================\r\n';
+  body+=(isPass?'RESULT: PASSED — Released':'RESULT: REJECTED — Rework required')+'\r\n';
+  body+='============================\r\n';
+  body+='IRN: INS-C '+d.reportNo+'\r\n';
+  body+='Job: '+d.job+'\r\n';
+  body+='Client: '+(d.project||'--')+'\r\n';
+  if(stageName)body+='Stage: '+stageName+'\r\n';
+  body+='Drawing: '+(d.drawing||'--')+'\r\n';
+  body+='Date: '+d.date+'\r\n';
+  body+='QC Inspector: '+d.qc+' ('+d.qcCode+')\r\n';
+  if(!isPass&&d.rejectionReason){
+    body+='============================\r\n';
+    body+='Reason: '+d.rejectionReason+'\r\n';
+    body+='Action required: '+d.rejectionAction+'\r\n';
+  }
+  body+='============================\r\n';
+  body+='Register: https://eric0103360.github.io/fse-irn-system\r\n\r\n';
+  body+='This notification was generated by the FSE eIRN System.';
+  window.location.href='mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+}
+function emailFromReg(btn){
+  var irnNo=btn.dataset.irn;var irqNo=btn.dataset.irq;
+  var job=btn.dataset.job||'--';var client=btn.dataset.client||'--';var sup=btn.dataset.sup||'--';
+  var r=reg.find(function(x){return x.reportNo===irnNo;});
+  var isPass=r&&r.result==='accept';
+  var subject='FSE IRN INS-C '+irnNo+' (IRQ-'+irqNo+') — Job '+job+' — '+(isPass?'RELEASED':'REWORK REQUIRED');
+  var body='FSE INSPECTION RELEASE NOTE\r\n';
+  body+='============================\r\n';
+  body+=(isPass?'RESULT: PASSED — Released':'RESULT: REJECTED — Rework required')+'\r\n';
+  body+='============================\r\n';
+  body+='IRN: INS-C '+irnNo+'\r\n';
+  body+='IRQ Ref: IRQ-'+irqNo+'\r\n';
+  body+='Job: '+job+'\r\n';
+  body+='Client: '+client+'\r\n';
+  if(r){
+    body+='Drawing: '+(r.drawing||'--')+'\r\n';
+    body+='Date: '+(r.date||'--')+'\r\n';
+    body+='QC Inspector: '+r.qc+' ('+r.qcCode+')\r\n';
+    body+='Supervisor: '+sup+'\r\n';
+    if(!isPass&&r.rejectionReason){
+      body+='============================\r\n';
+      body+='Reason: '+r.rejectionReason+'\r\n';
+      body+='Action required: '+(r.rejectionAction||'--')+'\r\n';
+    }
+  }
+  body+='============================\r\n';
+  body+='Register: https://eric0103360.github.io/fse-irn-system\r\n\r\n';
+  body+='This notification was generated by the FSE eIRN System.';
+  window.location.href='mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
 }
 async function submitIRN(){
   var d=getForm();
@@ -1704,6 +1863,138 @@ function stStFromSaved(st,s){
   if(st.gate&&cd===s.criteria.length)return'complete';
   if(st.gate||cd>0)return'partial';return'empty';
 }
+function renderMgmt(){
+  // Timestamp
+  var now=new Date();
+  var dateEl=document.getElementById('mgmtDate');
+  if(dateEl)dateEl.textContent='Last updated: '+now.toLocaleDateString('en-ZA',{day:'2-digit',month:'short',year:'numeric'})+' '+now.toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'});
+
+  // Build merged entry map same as register
+  var irqMap={};
+  reqs.forEach(function(r){var k=r.reqNo||('req_'+r.firebaseId);if(!irqMap[k])irqMap[k]={req:null,irns:[],reqNo:r.reqNo};irqMap[k].req=r;});
+  reg.forEach(function(r){var k=r.irqRef||('irn_'+r.reportNo);if(!irqMap[k])irqMap[k]={req:null,irns:[],reqNo:r.irqRef||''};irqMap[k].irns.push(r);});
+  var entries=Object.values(irqMap).sort(function(a,b){
+    var aD=(a.req&&a.req.timestamp)||(a.irns[0]&&a.irns[0].date)||'';
+    var bD=(b.req&&b.req.timestamp)||(b.irns[0]&&b.irns[0].date)||'';
+    return bD>aD?1:-1;
+  });
+
+  var total=entries.length;
+  var pending=entries.filter(function(e){var l=e.irns[e.irns.length-1];return !l;});
+  var released=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept';});
+  var rework=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='reject';});
+  var ftp=released.filter(function(e){var l=e.irns[e.irns.length-1];return l&&(!l.attempt||l.attempt===1);}).length;
+  var ftpPct=released.length>0?Math.round(ftp/released.length*100):0;
+  var todayStr=now.toISOString().slice(0,10);
+  var today=released.filter(function(e){var l=e.irns[e.irns.length-1];return l&&(l.date||'').slice(0,10)===todayStr;}).length;
+
+  // KPI tiles
+  document.getElementById('mg-total').textContent=total;
+  document.getElementById('mg-pending').textContent=pending.length;
+  document.getElementById('mg-released').textContent=released.length;
+  document.getElementById('mg-rework').textContent=rework.length;
+  document.getElementById('mg-ftp').textContent=ftpPct+'%';
+  document.getElementById('mg-today').textContent=today;
+  document.getElementById('mg-pending-badge').textContent=pending.length;
+  document.getElementById('mg-rework-badge').textContent=rework.length;
+
+  // Stage pass rate chart
+  var chartEl=document.getElementById('mg-stageChart');
+  if(reg.length>0&&chartEl){
+    var ch='';
+    STAGES.forEach(function(s){
+      var sp=0,st2=0;
+      reg.forEach(function(r){if(r.stageStates&&r.stageStates[s.id]){var x=r.stageStates[s.id];if(!x.na){st2++;var allTicked=x.crit&&x.crit.length>0&&x.crit.every(Boolean);if(x.gate||allTicked)sp++;}}});
+      if(st2===0)return;
+      var pct=Math.round(sp/st2*100);var fp=100-pct;
+      ch+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">';
+      ch+='<div style="width:90px;font-size:10px;color:#666;text-align:right;flex-shrink:0;line-height:1.2">'+s.label+'</div>';
+      ch+='<div style="flex:1;background:#f0f0f0;border-radius:4px;height:18px;overflow:hidden;display:flex">';
+      ch+='<div style="width:'+pct+'%;background:#1D9E75;height:100%;display:flex;align-items:center;justify-content:flex-end;padding-right:4px">'+(pct>15?'<span style="font-size:10px;color:#fff;font-weight:600">'+pct+'%</span>':'')+'</div>';
+      ch+='<div style="width:'+fp+'%;background:#E24B4A;height:100%"></div></div>';
+      ch+='<div style="width:36px;font-size:10px;color:#888;text-align:right">'+sp+'/'+st2+'</div></div>';
+    });
+    chartEl.innerHTML=ch||'<div style="font-size:12px;color:#aaa;text-align:center;padding:12px">No stage data yet</div>';
+  }else if(chartEl){chartEl.innerHTML='<div style="font-size:12px;color:#aaa;text-align:center;padding:12px">No inspection data yet</div>';}
+
+  // Pending list
+  var pEl=document.getElementById('mg-pending-list');
+  if(pEl){
+    if(!pending.length){pEl.innerHTML='<div style="padding:14px 16px;text-align:center;color:#aaa;font-size:12px">No pending jobs — all clear ✓</div>';}
+    else{
+      var ph='';
+      pending.forEach(function(e){
+        var req=e.req;
+        var job=(req&&req.job)||'--';
+        var client=(req&&req.client)||'--';
+        var sup=(req&&req.supervisor)||'--';
+        var date=(req&&(req.date||req.timestamp&&req.timestamp.slice(0,10)))||'--';
+        var stage=(req&&req.inspTypes)||'--';
+        var irqNo=e.reqNo||'--';
+        ph+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:0.5px solid #eee">';
+        ph+='<div><div style="font-size:12px;font-weight:600;color:#1a3a5c">IRQ-'+irqNo+' &nbsp;<span style="font-weight:400;color:#888;font-size:11px">'+job+'</span></div>';
+        ph+='<div style="font-size:11px;color:#666;margin-top:2px">'+client+' · '+stage+'</div>';
+        ph+='<div style="font-size:10px;color:#aaa;margin-top:1px">Raised by '+sup+' · '+date+'</div></div>';
+        ph+='<div style="width:8px;height:8px;border-radius:50%;background:#E24B4A;flex-shrink:0;margin-left:8px"></div>';
+        ph+='</div>';
+      });
+      pEl.innerHTML=ph;
+    }
+  }
+
+  // Rework list
+  var rEl=document.getElementById('mg-rework-list');
+  if(rEl){
+    if(!rework.length){rEl.innerHTML='<div style="padding:14px 16px;text-align:center;color:#aaa;font-size:12px">No rework items</div>';}
+    else{
+      var rh='';
+      rework.forEach(function(e){
+        var l=e.irns[e.irns.length-1];
+        var job=(e.req&&e.req.job)||(l&&l.job)||'--';
+        var client=(e.req&&e.req.client)||(l&&l.project)||'--';
+        var irqNo=e.reqNo||'--';
+        var reason=(l&&l.rejectionReason)||'--';
+        var action=(l&&l.rejectionAction)||'--';
+        var qc=(l&&(l.qc+' ('+l.qcCode+')'))||'--';
+        rh+='<div style="padding:10px 14px;border-bottom:0.5px solid #eee">';
+        rh+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">';
+        rh+='<span style="font-size:12px;font-weight:600;color:#1a3a5c">IRQ-'+irqNo+' &nbsp;<span style="font-weight:400;color:#888;font-size:11px">'+job+'</span></span>';
+        rh+='<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:#FAEEDA;color:#633806;font-weight:600">Rework</span></div>';
+        rh+='<div style="font-size:11px;color:#666;margin-bottom:2px">'+client+' · QC: '+qc+'</div>';
+        rh+='<div style="font-size:11px;color:#A32D2D"><strong>Reason:</strong> '+reason+'</div>';
+        rh+='<div style="font-size:11px;color:#633806"><strong>Action:</strong> '+action+'</div>';
+        rh+='</div>';
+      });
+      rEl.innerHTML=rh;
+    }
+  }
+
+  // Recently released (last 10)
+  var relEl=document.getElementById('mg-released-list');
+  if(relEl){
+    if(!released.length){relEl.innerHTML='<div style="padding:14px 16px;text-align:center;color:#aaa;font-size:12px">No released IRNs yet</div>';}
+    else{
+      var relH='';
+      released.slice(0,10).forEach(function(e){
+        var l=e.irns[e.irns.length-1];
+        var job=(e.req&&e.req.job)||(l&&l.job)||'--';
+        var client=(e.req&&e.req.client)||(l&&l.project)||'--';
+        var irqNo=e.reqNo||'--';
+        var irnNo=(l&&l.reportNo)||'--';
+        var qc=(l&&(l.qc+' ('+l.qcCode+')'))||'--';
+        var date=(l&&l.date)||'--';
+        var attempt=l&&l.attempt>1?'<span style="font-size:9px;padding:1px 5px;border-radius:6px;background:#FAEEDA;color:#633806;margin-left:4px">'+l.attempt+'nd pass</span>':'';
+        relH+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:0.5px solid #eee">';
+        relH+='<div><div style="font-size:12px;font-weight:600;color:#1a3a5c">INS-C '+irnNo+attempt+'</div>';
+        relH+='<div style="font-size:11px;color:#666;margin-top:1px">'+job+' · '+client+'</div>';
+        relH+='<div style="font-size:10px;color:#aaa;margin-top:1px">QC: '+qc+' · '+date+'</div></div>';
+        relH+='<i class="ti ti-circle-check" style="font-size:20px;color:#1D9E75;flex-shrink:0;margin-left:8px"></i>';
+        relH+='</div>';
+      });
+      relEl.innerHTML=relH;
+    }
+  }
+}
 function renderReg(){
   // Merge ALL requests and IRNs by IRQ
   var irqMap={};
@@ -1751,10 +2042,17 @@ function renderReg(){
   } else if(chartEl){chartEl.style.display='none';}
 
   // Filter
+  var searchTerm=(document.getElementById('regSearch')&&document.getElementById('regSearch').value||'').toLowerCase().trim();
   var filtered=entries;
   if(_regFilt==='pending')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return !l;});
   else if(_regFilt==='released')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept';});
   else if(_regFilt==='rework')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='reject';});
+  if(searchTerm){filtered=filtered.filter(function(e){
+    var job=((e.req&&e.req.job)||(e.irns[0]&&e.irns[0].job)||'').toLowerCase();
+    var client=((e.req&&e.req.client)||(e.irns[0]&&e.irns[0].project)||'').toLowerCase();
+    var irq=(e.reqNo||'').toLowerCase();
+    return job.indexOf(searchTerm)!==-1||client.indexOf(searchTerm)!==-1||irq.indexOf(searchTerm)!==-1;
+  });}
 
   if(!filtered.length){
     document.getElementById('regList').innerHTML='<div style="text-align:center;padding:32px 16px;color:#888;font-size:14px"><i class="ti ti-clipboard-list" style="font-size:40px;display:block;margin-bottom:8px"></i>No records found.</div>';
@@ -1843,7 +2141,10 @@ function renderReg(){
       var instructions=(req&&req.instructions)||'';
       html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-reqno="'+irqNo+'" data-job="'+job.replace(/"/g,'&quot;')+'" data-client="'+client.replace(/"/g,'&quot;')+'" data-items="'+items_str.replace(/"/g,'&quot;')+'" data-insptype="'+inspType.replace(/"/g,'&quot;')+'" data-instructions="'+instructions.replace(/"/g,'&quot;')+'" data-by="'+supName.replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:14px;padding:10px 20px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">Complete IRN</button>';
     } else if(latestIrn){
+      html+='<div style="display:flex;gap:8px">';
+      html+='<button data-irn="'+latestIrn.reportNo+'" data-irq="'+irqNo+'" data-job="'+job.replace(/"/g,'&quot;')+'" data-client="'+client.replace(/"/g,'&quot;')+'" data-sup="'+supName.replace(/"/g,'&quot;')+'" onclick="emailFromReg(this)" style="font-size:13px;padding:9px 14px;background:#fff;border:1.5px solid #185FA5;color:#185FA5;border-radius:8px;cursor:pointer;font-weight:600"><i class="ti ti-mail" style="font-size:14px"></i> Email</button>';
       html+='<button data-irn="'+latestIrn.reportNo+'" data-irq="'+irqNo+'" onclick="printFromReg(this)" style="font-size:13px;padding:9px 18px;background:#fff;border:1.5px solid #1a3a5c;color:#1a3a5c;border-radius:8px;cursor:pointer;font-weight:600"><i class="ti ti-printer" style="font-size:14px"></i> View / Print</button>';
+      html+='</div>';
     }
     html+='</div>';
     html+='</div></div>';
@@ -1932,7 +2233,7 @@ function printFromReg(btn){
   }
   if(dimRows)win.document.write('<table><thead><tr><th style="width:30px;text-align:center">Dim</th><th>Description</th><th style="width:80px;text-align:center">Drawing</th><th style="width:80px;text-align:center">Measured</th><th style="width:80px;text-align:center">Status</th></tr></thead><tbody>'+dimRows+'</tbody></table>');
   // Photos
-  [{label:'Request photos (supervisor)',arr:reqPh2},{label:'Inspection photos (QC)',arr:inspPh2}].forEach(function(pg){if(pg.arr&&pg.arr.length>0){win.document.write('<div style="margin-bottom:6px"><div style="font-size:8px;color:#888;text-transform:uppercase;margin-bottom:3px">'+pg.label+'</div><div style="display:flex;flex-wrap:wrap;gap:4px">');pg.arr.forEach(function(src){win.document.write('<img src="'+src+'" style="width:80px;height:80px;object-fit:cover;border-radius:4px;border:0.5px solid #ddd">');});win.document.write('</div></div>');}});
+  [{label:'Request photos (supervisor)',arr:reqPh2},{label:'Inspection photos (QC)',arr:inspPh2}].forEach(function(pg){if(pg.arr&&pg.arr.length>0){win.document.write('<div style="margin-bottom:6px"><div style="font-size:8px;color:#888;text-transform:uppercase;margin-bottom:3px">'+pg.label+' ('+pg.arr.length+')</div><div style="display:flex;flex-wrap:wrap;gap:6px">');pg.arr.forEach(function(src,i){win.document.write('<div style="text-align:center"><img src="'+src+'" style="width:80px;height:80px;object-fit:cover;border-radius:4px;border:0.5px solid #ddd;display:block"><div style="font-size:8px;color:#666;margin-top:2px;font-weight:500">Photo '+(i+1)+'</div></div>');});win.document.write('</div></div>');}});
   // Sign-off — no signature lines, codes only
   var supCode=(reqEntry&&reqEntry.supCode)||r.supCode||'';
   win.document.write('<div class="sign-grid">');
@@ -2185,8 +2486,8 @@ function printIRN(){
 
   // Photos
   if(inspPhotosArr.length>0){
-    win.document.write('<div style="margin-bottom:12px"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:6px">Inspection photos</div><div style="display:flex;flex-wrap:wrap;gap:8px">');
-    inspPhotosArr.forEach(function(src){win.document.write('<img src="'+src+'" style="width:130px;height:130px;object-fit:cover;border-radius:6px;border:0.5px solid #ddd">');});
+    win.document.write('<div style="margin-bottom:12px"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:6px">Inspection photos ('+inspPhotosArr.length+')</div><div style="display:flex;flex-wrap:wrap;gap:10px">');
+    inspPhotosArr.forEach(function(src,i){win.document.write('<div style="text-align:center"><img src="'+src+'" style="width:130px;height:130px;object-fit:cover;border-radius:6px;border:0.5px solid #ddd;display:block"><div style="font-size:9px;color:#666;margin-top:3px;font-weight:500">Photo '+(i+1)+'</div></div>');});
     win.document.write('</div></div>');
   }
 
@@ -2305,3 +2606,33 @@ renderPendingReqs();
 </script>
 </body>
 </html>
+<!-- LOGOUT INJECTED -->
+<script>
+function checkLogoutBtn(){
+  var active=qcValidated||supValidated||(document.getElementById('adminPanel')&&document.getElementById('adminPanel').style.display==='block');
+  var btn=document.getElementById('logoutBtn');
+  if(btn)btn.style.display=active?'flex':'none';
+}
+function signOut(){
+  // Clear QC/SUP session
+  qcValidated=false;supValidated=false;qcName='';supName='';
+  window._savedQC='';window._savedSUP='';window._savedQCv=false;window._savedSUPv=false;window._savedQCn='';window._savedSUPn='';
+  var qcEl=document.getElementById('qcCode');if(qcEl)qcEl.value='';
+  var supEl=document.getElementById('supCode');if(supEl)supEl.value='';
+  // Lock admin
+  lockAdmin();
+  // Reset form validation display
+  validateCode('qc');validateCode('sup');
+  // Go to request tab
+  var nb=document.querySelectorAll('.nb');
+  showV('request',nb[0]);
+  nb[0].classList.add('on');
+  checkLogoutBtn();
+  toast('Signed out successfully','ok');
+}
+// Patch unlockAdmin to show logout button
+var _origUnlockAdmin=unlockAdmin;
+unlockAdmin=function(){_origUnlockAdmin();checkLogoutBtn();};
+var _origLockAdmin=lockAdmin;
+lockAdmin=function(){_origLockAdmin();checkLogoutBtn();};
+</script>
