@@ -902,14 +902,13 @@ function removePhoto(sid,pi){
 }
 function viewPhoto(sid,pi){
   var src=ss[sid].photos[pi];
-  var overlay=document.createElement('div');
-  overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:pointer';
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:99999;display:flex;align-items:center;justify-content:center;cursor:pointer';
+  ov.onclick=function(){ov.remove();};
   var img=document.createElement('img');
-  img.src=src;
-  img.style.cssText='max-width:95%;max-height:95%;object-fit:contain;border-radius:8px';
-  overlay.appendChild(img);
-  overlay.onclick=function(){document.body.removeChild(overlay);};
-  document.body.appendChild(overlay);
+  img.src=src;img.style.cssText='max-width:90%;max-height:90%;border-radius:8px';
+  ov.appendChild(img);
+  document.body.appendChild(ov);
 }
 function showStageReject(sid){
   document.getElementById('sr_reject_'+sid).style.display='block';
@@ -2766,27 +2765,22 @@ if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){
 });}
 
 var _printParam=_urlP.get('print');
-// If opened with ?print=XXXX — auto load and print that IRN
+// If opened with ?print=XXXX — show a tap-to-open button (popup blocker workaround)
 if(_printParam&&window.loadIRNsFromFirebase){
   window.loadIRNsFromFirebase(function(r){
     reg=r;
     var target=reg.find(function(x){return x.reportNo===_printParam;});
     if(target){
-      // Also load requests for supervisor info
-      if(window.loadRequestsFromFirebase){
-        window.loadRequestsFromFirebase(function(reqs2){
-          reqs=reqs2;
-          setTimeout(function(){
-            var fakeBtn={dataset:{irn:target.reportNo,irq:target.irqRef||_urlP.get('irq')||''}};
-            printFromReg(fakeBtn);
-          },500);
-        });
-      } else {
-        setTimeout(function(){
-          var fakeBtn={dataset:{irn:target.reportNo,irq:target.irqRef||''}};
-          printFromReg(fakeBtn);
-        },500);
-      }
+      if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(reqs2){reqs=reqs2;});}
+      // Show a full-screen prompt to open the report
+      var overlay=document.createElement('div');
+      overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:#1a3a5c;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px;text-align:center';
+      var _pIrn=target.reportNo;var _pIrq=target.irqRef||'';
+      var td=document.createElement('div');td.style.cssText='color:#fff;font-size:18px;font-weight:600';td.textContent='FSE Inspection Release Note';overlay.appendChild(td);
+      var sd=document.createElement('div');sd.style.cssText='color:rgba(255,255,255,0.7);font-size:14px';sd.textContent='INS-C '+_pIrn+' — '+(target.job||'');overlay.appendChild(sd);
+      var ob=document.createElement('button');ob.textContent='Open Full Report';ob.style.cssText='margin-top:8px;padding:14px 32px;background:#1D9E75;border:none;border-radius:10px;color:#fff;font-size:16px;font-weight:600;cursor:pointer';ob.onclick=function(){var fb={dataset:{irn:_pIrn,irq:_pIrq}};printFromReg(fb);overlay.remove();};overlay.appendChild(ob);
+      var sb=document.createElement('button');sb.textContent='Go to register';sb.style.cssText='padding:8px 20px;background:transparent;border:1px solid rgba(255,255,255,0.3);border-radius:8px;color:rgba(255,255,255,0.7);font-size:13px;cursor:pointer;margin-top:4px';sb.onclick=function(){overlay.remove();};overlay.appendChild(sb);
+      document.body.appendChild(overlay);
     }
   });
 }
