@@ -160,6 +160,7 @@ import{initializeApp}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-ap
 import{getFirestore,doc,getDoc,getDocs,addDoc,updateDoc,setDoc,deleteDoc,collection,query,orderBy,onSnapshot,runTransaction}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
 const app=initializeApp({apiKey:"AIzaSyC3sKMm02GnikBdgXPd4RUm7RxnsR90A_I",authDomain:"fse-irn-system.firebaseapp.com",projectId:"fse-irn-system",storageBucket:"fse-irn-system.firebasestorage.app",messagingSenderId:"1097944808267",appId:"1:1097944808267:web:d8f1f3a52e2223253f86ce"});
 const db=getFirestore(app);
+window._db=db;
 window.peekNextIRN=async function(){try{const r=doc(db,'counters','irn');const d=await getDoc(r);const c=d.exists()?d.data().count:0;return String(c+1).padStart(4,'0');}catch(e){return'----';}};
 window.peekNextIRQ=async function(){try{const r=doc(db,'counters','irq');const d=await getDoc(r);const c=d.exists()?d.data().count:0;return String(c+1).padStart(4,'0');}catch(e){return'----';}};
 window.getNextIRQ=async function(){try{const r=doc(db,'counters','irq');const n=await runTransaction(db,async(t)=>{const d=await t.get(r);const c=d.exists()?d.data().count:0;const x=c+1;t.set(r,{count:x});return x;});return String(n).padStart(4,'0');}catch(e){return String(Date.now()).slice(-4);}};
@@ -1876,7 +1877,6 @@ function saveCorrectionFromPrint(jsonStr){
     if(st){st.style.display='block';st.style.background='#FCEBEB';st.style.color='#A32D2D';st.textContent='Error: '+e.message;}
   }
 }
-window._db=db;
 window.openEmailFromPrint=function(reportNo){
   var r=reg.find(function(x){return x.reportNo===reportNo;});
   if(!r)return;
