@@ -2735,13 +2735,14 @@ function loadCorrectionData(){
   if(!_correctParam)return;
   var corrIRN=reg.find(function(x){return x.reportNo===_correctParam;});
   if(!corrIRN){toast('IRN '+_correctParam+' not found — reload and try again','err');return;}
-  // Force IRN form tab — hide request view completely
-  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on');v.style.display='none';});
-  document.querySelectorAll('.nb').forEach(function(b){b.classList.remove('on');});
+  // Force IRN form tab directly — bypass handleNewIRNClick lock
+  document.querySelectorAll('.view').forEach(function(el){el.classList.remove('on');});
+  document.querySelectorAll('.nb').forEach(function(el){el.classList.remove('on');});
   var formView=document.getElementById('v-form');
+  if(formView)formView.classList.add('on');
+  // Highlight the New IRN nav button
   var formBtn=document.querySelectorAll('.nb')[1];
-  if(formView){formView.classList.add('on');formView.style.display='block';}
-  if(formBtn)formBtn.classList.add('on');
+  if(formBtn){formBtn.classList.add('on');formBtn.style.opacity='1';}
   // Load all IRN data into form
   var flds={job:corrIRN.job||'',project:corrIRN.project||'',drawing:corrIRN.drawing||'',po:corrIRN.po||'',artisan:corrIRN.artisan||'',notes:corrIRN.notes||'',rejectionReason:corrIRN.rejectionReason||'',rejectionAction:corrIRN.rejectionAction||''};
   Object.keys(flds).forEach(function(k){var el=document.getElementById(k);if(el)el.value=flds[k];});
@@ -2754,16 +2755,18 @@ function loadCorrectionData(){
   if(resEl)resEl.textContent=iRes==='accept'?'Accepted':iRes==='reject'?'Rejected':'Not set';
   window._correctionIRN=corrIRN.reportNo;
   window._correctionFirebaseId=corrIRN.firebaseId||null;
-  // Show form content
-  var mc=document.getElementById('mainFormContent');if(mc)mc.style.display='block';
-  var fa=document.getElementById('formActions');if(fa)fa.style.display='block';
-  var ws=document.getElementById('waitingScreen');if(ws)ws.style.display='none';
+  // Show form content — bypass waiting screen
+  var mc=document.getElementById('mainFormContent');if(mc){mc.style.display='block';}
+  var fa=document.getElementById('formActions');if(fa){fa.style.display='block';}
+  var ws=document.getElementById('waitingScreen');if(ws){ws.style.display='none';}
+  // Set _irqParam so form thinks it has a valid request context
+  if(!_irqParam)_irqParam=corrIRN.irqRef||'correction';
   renderStages();
   if(typeof renderFabDims==='function')renderFabDims();
   toast('INS-C '+corrIRN.reportNo+' loaded for correction — make changes and resubmit','ok');
 }
 renderItems();renderStages();renderFab();
-showFormOrWaiting();
+if(!_urlP.get('correct'))showFormOrWaiting();
 if(window.loadCodesFromFirebase)window.loadCodesFromFirebase();
 document.getElementById('irnDate').value=new Date().toISOString().split('T')[0];
 initRequest();
