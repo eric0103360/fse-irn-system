@@ -1785,9 +1785,12 @@ function doSendEmail(){
     mode:'no-cors',
     body:JSON.stringify({to:to,cc:cc,subject:_emailSubject,htmlBody:_emailBody})
   }).then(function(){
-    setEmailStatus('Email sent to '+to+' — check inbox in a few seconds','ok');
+    setEmailStatus('Email sent — opening full report to print...','ok');
     btn.innerHTML='<i class="ti ti-check" style="font-size:13px"></i> Sent!';
-    setTimeout(function(){closeEmailModal();},2500);
+    setTimeout(function(){
+      closeEmailModal();
+      if(typeof printIRN==='function')printIRN();
+    },1500);
   }).catch(function(){
     setEmailStatus('Network error — check connection','err');
     btn.disabled=false;btn.innerHTML='<i class="ti ti-send" style="font-size:13px"></i> Send email';
@@ -1873,6 +1876,15 @@ function saveCorrectionFromPrint(jsonStr){
     if(st){st.style.display='block';st.style.background='#FCEBEB';st.style.color='#A32D2D';st.textContent='Error: '+e.message;}
   }
 }
+window._db=db;
+window.openEmailFromPrint=function(reportNo){
+  var r=reg.find(function(x){return x.reportNo===reportNo;});
+  if(!r)return;
+  var isPass=r.result==='accept';
+  var subject='FSE IRN INS-C '+reportNo+' — Job '+(r.job||'--')+' — '+(isPass?'RELEASED':'REWORK REQUIRED');
+  var fields={reportNo:reportNo,job:r.job||'--',project:r.project||'--',stage:r.stage||'--',drawing:r.drawing||'--',date:r.date||'--',qc:r.qc||'--',qcCode:r.qcCode||'--',sup:r.sup||'--',result:r.result||'reject',rejectionReason:r.rejectionReason||'',rejectionAction:r.rejectionAction||''};
+  openEmailModal(subject,buildEmailHtml(fields),'INS-C '+reportNo+' · '+(r.job||'--'));
+};
 function saveIRNCorrection(reportNo,firebaseId,result,reason,action,cb){
   var r=reg.find(function(x){return x.reportNo===reportNo;});
   if(!r){cb&&cb(false);return;}
