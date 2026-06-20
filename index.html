@@ -1867,17 +1867,15 @@ async function submitIRN(){
   var btn=document.getElementById('submitBtn');
   btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Submitting...';
   try{
-    // Only get new IRN number if not already assigned this session
     var el=document.getElementById('reportNo');
-    var currentIRN=el?el.value:'';
-    // If correction mode, keep original IRN number
-    if(window._correctionIRN){currentIRN=window._correctionIRN;if(el)el.value=currentIRN;}
-    if(!currentIRN||currentIRN==='----'||currentIRN==='--'||window._irnSubmitted===currentIRN){
+    // Correction mode — keep original IRN. Otherwise always get fresh number from Firebase.
+    if(window._correctionIRN){
+      d.reportNo=window._correctionIRN;
+      if(el)el.value=window._correctionIRN;
+    } else {
       var freshIRN=await window.getNextIRN();
       d.reportNo=freshIRN;
       if(el)el.value=freshIRN;
-    } else {
-      d.reportNo=currentIRN;
     }
     // Save to Firebase immediately
     if(window.saveIRNToFirebase)await window.saveIRNToFirebase(d);
@@ -2298,7 +2296,7 @@ function printFromReg(btn){
   var win=window.open('','_blank');
   win.document.write('<!DOCTYPE html><html><head><title>IRN INS-C '+r.reportNo+(irqNo?' | IRQ-'+irqNo:'')+'</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10px;color:#1a1a1a}table{width:100%;border-collapse:collapse;margin-bottom:6px}th{background:#1a3a5c;color:#fff;padding:4px 6px;text-align:left;font-size:9px}td{font-size:10px;padding:3px 6px}.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:6px;margin-bottom:8px}.logo{height:36px}.result-pass{background:#EAF3DE;border:1px solid #1D9E75;padding:4px 8px;border-radius:4px;font-weight:700;color:#27500A;font-size:11px;margin-bottom:6px}.result-fail{background:#FCEBEB;border:1px solid #E24B4A;padding:4px 8px;border-radius:4px;font-weight:700;color:#A32D2D;font-size:11px;margin-bottom:6px}.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px}.cell{background:#f9f9f9;padding:4px 6px;border-radius:3px;border:0.5px solid #eee}.cl{font-size:8px;color:#888;text-transform:uppercase;margin-bottom:1px}.cv{font-size:10px;font-weight:500}.req-banner{background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:4px;padding:4px 8px;margin-bottom:6px;display:flex;gap:12px}.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px}.sign-box{border:0.5px solid #ddd;padding:6px 8px;border-radius:3px}.footer{font-size:8px;color:#aaa;text-align:center;margin-top:8px;border-top:0.5px solid #eee;padding-top:4px}.no-print{margin:8px 0}@media print{.no-print{display:none}body{margin:6mm}html{height:100%}}@page{size:A4 portrait;margin:8mm}</style></head><body>');
   var _rForCorr=r;var _irqForCorr=irqNo||'';
-  win.document.write('<div class="no-print" style="display:flex;gap:8px;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back</button><button onclick="if(window.opener&&window.opener.openCorrectionFromPrint){window.opener.openCorrectionFromPrint('+JSON.stringify(JSON.stringify({irnNo:r.reportNo,irqNo:irqNo||'',data:r}))+');window.close();}else{alert(\'Open from the FSE IRN register\');}" style="padding:6px 14px;background:#BA7517;border:none;border-radius:6px;font-size:12px;cursor:pointer;color:#fff;font-weight:600">&#9998; Make Correction</button></div>');
+  win.document.write('<div class="no-print" style="display:flex;gap:8px;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back</button><button onclick="window.location.href=\'https://eric0103360.github.io/fse-irn-system/?correct='+r.reportNo+'\'" style="padding:6px 14px;background:#BA7517;border:none;border-radius:6px;font-size:12px;cursor:pointer;color:#fff;font-weight:600">&#9998; Make Correction</button></div>');
   win.document.write('<div class="hdr"><div><img src="'+logoSrc+'" class="logo"><div style="margin-top:5px"><div style="font-size:16px;font-weight:500">Inspection Release Note</div><div style="font-size:12px;color:#555">FSE-QR-IRN.038 · Rev 02 · ISO9001 / ISO3834-2</div></div></div><div style="text-align:right"><div style="font-size:9px;color:#888;text-transform:uppercase">Report No</div><div style="font-size:24px;font-weight:700;color:#1a3a5c">INS-C '+r.reportNo+'</div>'+(irqNo?'<div style="font-size:11px;color:#185FA5">IRQ-'+irqNo+'</div>':'')+'</div></div>');
   win.document.write('<div class="'+(isPass?'result-pass':'result-fail')+'">'+(isPass?'✓ ACCEPTED — Released':'✗ REJECTED — Rework required')+'</div>');
   if(stageName)win.document.write('<div style="background:#1a3a5c;color:#fff;padding:5px 10px;border-radius:4px;font-size:11px;font-weight:600;margin-bottom:6px">Inspection stage: '+stageName+'</div>');
@@ -2726,6 +2724,40 @@ setTimeout(function(){
   if(window.peekNextIRN){window.peekNextIRN().then(function(n){var el=document.getElementById('reportNo');if(el&&!el.value){el.value=n;el.style.color='rgba(255,255,255,0.6)';}});}
 },600);
 
+// Handle correction URL parameter
+var _correctParam=_urlP.get('correct');
+if(_correctParam&&window.loadIRNsFromFirebase){
+  window.loadIRNsFromFirebase(function(r2){
+    reg=r2;
+    var corrIRN=reg.find(function(x){return x.reportNo===_correctParam;});
+    if(corrIRN){
+      setTimeout(function(){
+        var flds={job:corrIRN.job||'',project:corrIRN.project||'',drawing:corrIRN.drawing||'',po:corrIRN.po||'',artisan:corrIRN.artisan||'',notes:corrIRN.notes||'',rejectionReason:corrIRN.rejectionReason||'',rejectionAction:corrIRN.rejectionAction||''};
+        Object.keys(flds).forEach(function(k){var el=document.getElementById(k);if(el)el.value=flds[k];});
+        var rnEl=document.getElementById('reportNo');if(rnEl){rnEl.value=corrIRN.reportNo;rnEl.style.color='rgba(255,255,255,0.9)';}
+        if(corrIRN.stageStates){Object.keys(corrIRN.stageStates).forEach(function(sid){ss[sid]=corrIRN.stageStates[sid];});}
+        if(corrIRN.fabDims&&corrIRN.fabDims.length){corrIRN.fabDims.forEach(function(fd,i){if(fabDims[i]){fabDims[i].lbl=fd.lbl||'';fabDims[i].draw=fd.draw||'';fabDims[i].meas=fd.meas||'';}});}
+        if(corrIRN.inspPhotoData){inspPhotosArr=corrIRN.inspPhotoData.slice();renderInspPhotos();}
+        iRes=corrIRN.result||null;
+        var resEl=document.getElementById('overallResult');
+        if(resEl)resEl.textContent=iRes==='accept'?'Accepted':iRes==='reject'?'Rejected':'Not set';
+        window._correctionIRN=corrIRN.reportNo;
+        window._correctionFirebaseId=corrIRN.firebaseId||null;
+        document.getElementById('mainFormContent').style.display='block';
+        document.getElementById('formActions').style.display='block';
+        var ws=document.getElementById('waitingScreen');if(ws)ws.style.display='none';
+        renderStages();
+        if(typeof renderFabDims==='function')renderFabDims();
+        // Switch to IRN form tab
+        var nbs=document.querySelectorAll('.nb');
+        showV('form',nbs[1]);
+        toast('INS-C '+corrIRN.reportNo+' loaded — correct and resubmit','ok');
+      },800);
+    } else {
+      toast('IRN '+_correctParam+' not found','err');
+    }
+  });
+}
 renderItems();renderStages();renderFab();
 showFormOrWaiting();
 if(window.loadCodesFromFirebase)window.loadCodesFromFirebase();
