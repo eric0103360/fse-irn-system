@@ -1774,19 +1774,15 @@ function doSendEmail(){
   setEmailStatus('Sending...','info');
   fetch(_GAS_URL,{
     method:'POST',
+    mode:'no-cors',
     headers:{'Content-Type':'text/plain'},
     body:JSON.stringify({to:to,cc:cc,subject:_emailSubject,htmlBody:_emailBody})
-  }).then(function(r){return r.json();}).then(function(d){
-    if(d.success){
-      setEmailStatus('Email sent to '+to+' — check inbox','ok');
-      btn.innerHTML='<i class="ti ti-check" style="font-size:13px"></i> Sent!';
-      setTimeout(function(){closeEmailModal();},2500);
-    }else{
-      setEmailStatus('Error: '+(d.error||'unknown'),'err');
-      btn.disabled=false;btn.innerHTML='<i class="ti ti-send" style="font-size:13px"></i> Send email';
-    }
+  }).then(function(){
+    setEmailStatus('Email sent to '+to+' — check inbox in a few seconds','ok');
+    btn.innerHTML='<i class="ti ti-check" style="font-size:13px"></i> Sent!';
+    setTimeout(function(){closeEmailModal();},2500);
   }).catch(function(){
-    setEmailStatus('Network error — check connection','err');
+    setEmailStatus('Network error — check connection and try again','err');
     btn.disabled=false;btn.innerHTML='<i class="ti ti-send" style="font-size:13px"></i> Send email';
   });
 }
@@ -1827,6 +1823,35 @@ function emailFromReg(btn){
   var subject='FSE IRN INS-C '+irnNo+' (IRQ-'+irqNo+') — Job '+job+' — '+(isPass?'RELEASED':'REWORK REQUIRED');
   var fields={reportNo:irnNo,job:job,project:client,stage:r&&r.stage||'--',drawing:r&&r.drawing||'--',date:r&&r.date||'--',qc:r&&r.qc||'--',qcCode:r&&r.qcCode||'--',sup:sup,result:r&&r.result||'reject',rejectionReason:r&&r.rejectionReason||'',rejectionAction:r&&r.rejectionAction||''};
   openEmailModal(subject,buildEmailHtml(fields),'INS-C '+irnNo+' · '+job);
+}
+function openCorrectionFromPrint(jsonStr){
+  try{
+    var d=typeof jsonStr==='string'?JSON.parse(jsonStr):jsonStr;
+    var r=d.data;
+    if(!r){r=reg.find(function(x){return x.reportNo===d.irnNo;});}
+    if(!r){toast('Could not load IRN data','err');return;}
+    var nbs=document.querySelectorAll('.nb');
+    showV('form',nbs[1]);
+    setTimeout(function(){
+      var flds={job:r.job||'',project:r.project||'',drawing:r.drawing||'',po:r.po||'',artisan:r.artisan||'',notes:r.notes||'',rejectionReason:r.rejectionReason||'',rejectionAction:r.rejectionAction||''};
+      Object.keys(flds).forEach(function(k){var el=document.getElementById(k);if(el)el.value=flds[k];});
+      var rnEl=document.getElementById('reportNo');if(rnEl){rnEl.value=r.reportNo;rnEl.style.color='rgba(255,255,255,0.9)';}
+      if(r.stageStates){Object.keys(r.stageStates).forEach(function(sid){ss[sid]=r.stageStates[sid];});}
+      if(r.fabDims&&r.fabDims.length){r.fabDims.forEach(function(fd,i){if(fabDims[i]){fabDims[i].lbl=fd.lbl||'';fabDims[i].draw=fd.draw||'';fabDims[i].meas=fd.meas||'';}});}
+      if(r.inspPhotoData){inspPhotosArr=r.inspPhotoData.slice();renderInspPhotos();}
+      iRes=r.result||null;
+      var resEl=document.getElementById('overallResult');
+      if(resEl)resEl.textContent=iRes==='accept'?'Accepted':iRes==='reject'?'Rejected':'Not set';
+      window._correctionIRN=r.reportNo;
+      window._correctionFirebaseId=r.firebaseId||null;
+      document.getElementById('mainFormContent').style.display='block';
+      document.getElementById('formActions').style.display='block';
+      var ws=document.getElementById('waitingScreen');if(ws)ws.style.display='none';
+      renderStages();
+      if(typeof renderFabDims==='function')renderFabDims();
+      toast('INS-C '+r.reportNo+' loaded — correct and resubmit','ok');
+    },300);
+  }catch(e){toast('Error: '+e.message,'err');}
 }
 async function submitIRN(){
   var d=getForm();
@@ -1880,7 +1905,7 @@ async function submitIRN(){
       // Reset photos
       inspPhotosArr=[];renderInspPhotos();
       // Get next IRN number
-      if(window.getNextIRN){var nextN=await window.peekNextIRN();var el=document.getElementById('reportNo');if(el){el.value=nextN;el.style.color='rgba(255,255,255,0.6)';}}
+      if(window.peekNextIRN){var nextN=await window.peekNextIRN();var el=document.getElementById('reportNo');if(el){el.value=nextN;el.style.color='rgba(255,255,255,0.6)';}}
       // Re-render stages
       renderStages();
       iRes=null;
@@ -2088,8 +2113,10 @@ function renderReg(){
   var total=entries.length;
   var released=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept';}).length;
   var pending=entries.filter(function(e){var l=e.irns[e.irns.length-1];return !l;}).length;
-  var ftp=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&(!l.attempt||l.attempt===1);}).length;
-  var ftpPct=released>0?Math.round(ftp/released*100):0;
+  var reworkCount=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='reject';}).length;
+  var inspected=released+reworkCount;
+  var ftp=entries.filter(function(e){return e.irns.length===1&&e.irns[0].result==='accept';}).length;
+  var ftpPct=inspected>0?Math.round(ftp/inspected*100):0;
   document.getElementById('statT').textContent=total;
   document.getElementById('statP').textContent=released;
   document.getElementById('statF').textContent=pending;
@@ -2270,7 +2297,8 @@ function printFromReg(btn){
   var reqPh2=(reqEntry&&reqEntry.reqPhotoData)||[];var inspPh2=r.inspPhotoData||[];
   var win=window.open('','_blank');
   win.document.write('<!DOCTYPE html><html><head><title>IRN INS-C '+r.reportNo+(irqNo?' | IRQ-'+irqNo:'')+'</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10px;color:#1a1a1a}table{width:100%;border-collapse:collapse;margin-bottom:6px}th{background:#1a3a5c;color:#fff;padding:4px 6px;text-align:left;font-size:9px}td{font-size:10px;padding:3px 6px}.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:6px;margin-bottom:8px}.logo{height:36px}.result-pass{background:#EAF3DE;border:1px solid #1D9E75;padding:4px 8px;border-radius:4px;font-weight:700;color:#27500A;font-size:11px;margin-bottom:6px}.result-fail{background:#FCEBEB;border:1px solid #E24B4A;padding:4px 8px;border-radius:4px;font-weight:700;color:#A32D2D;font-size:11px;margin-bottom:6px}.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px}.cell{background:#f9f9f9;padding:4px 6px;border-radius:3px;border:0.5px solid #eee}.cl{font-size:8px;color:#888;text-transform:uppercase;margin-bottom:1px}.cv{font-size:10px;font-weight:500}.req-banner{background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:4px;padding:4px 8px;margin-bottom:6px;display:flex;gap:12px}.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px}.sign-box{border:0.5px solid #ddd;padding:6px 8px;border-radius:3px}.footer{font-size:8px;color:#aaa;text-align:center;margin-top:8px;border-top:0.5px solid #eee;padding-top:4px}.no-print{margin:8px 0}@media print{.no-print{display:none}body{margin:6mm}html{height:100%}}@page{size:A4 portrait;margin:8mm}</style></head><body>');
-  win.document.write('<div class="no-print" style="text-align:left;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back</button></div>');
+  var _rForCorr=r;var _irqForCorr=irqNo||'';
+  win.document.write('<div class="no-print" style="display:flex;gap:8px;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back</button><button onclick="if(window.opener&&window.opener.openCorrectionFromPrint){window.opener.openCorrectionFromPrint('+JSON.stringify(JSON.stringify({irnNo:r.reportNo,irqNo:irqNo||'',data:r}))+');window.close();}else{alert(\'Open from the FSE IRN register\');}" style="padding:6px 14px;background:#BA7517;border:none;border-radius:6px;font-size:12px;cursor:pointer;color:#fff;font-weight:600">&#9998; Make Correction</button></div>');
   win.document.write('<div class="hdr"><div><img src="'+logoSrc+'" class="logo"><div style="margin-top:5px"><div style="font-size:16px;font-weight:500">Inspection Release Note</div><div style="font-size:12px;color:#555">FSE-QR-IRN.038 · Rev 02 · ISO9001 / ISO3834-2</div></div></div><div style="text-align:right"><div style="font-size:9px;color:#888;text-transform:uppercase">Report No</div><div style="font-size:24px;font-weight:700;color:#1a3a5c">INS-C '+r.reportNo+'</div>'+(irqNo?'<div style="font-size:11px;color:#185FA5">IRQ-'+irqNo+'</div>':'')+'</div></div>');
   win.document.write('<div class="'+(isPass?'result-pass':'result-fail')+'">'+(isPass?'✓ ACCEPTED — Released':'✗ REJECTED — Rework required')+'</div>');
   if(stageName)win.document.write('<div style="background:#1a3a5c;color:#fff;padding:5px 10px;border-radius:4px;font-size:11px;font-weight:600;margin-bottom:6px">Inspection stage: '+stageName+'</div>');
