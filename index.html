@@ -164,25 +164,33 @@ window.peekNextIRN=async function(){try{const r=doc(db,'counters','irn');const d
 window.peekNextIRQ=async function(){try{const r=doc(db,'counters','irq');const d=await getDoc(r);const c=d.exists()?d.data().count:0;return String(c+1).padStart(4,'0');}catch(e){return'----';}};
 window.getNextIRQ=async function(){try{const r=doc(db,'counters','irq');const n=await runTransaction(db,async(t)=>{const d=await t.get(r);const c=d.exists()?d.data().count:0;const x=c+1;t.set(r,{count:x});return x;});return String(n).padStart(4,'0');}catch(e){return String(Date.now()).slice(-4);}};
 window.getNextIRN=async function(){try{const r=doc(db,'counters','irn');const n=await runTransaction(db,async(t)=>{const d=await t.get(r);const c=d.exists()?d.data().count:0;const x=c+1;t.set(r,{count:x});return x;});return String(n).padStart(4,'0');}catch(e){return String(Date.now()).slice(-4);}};
-window.saveIRNToFirebase=async function(data){
+window.saveIRNToFirebase=async function(data,existingFirebaseId){
   try{
     var s=Object.assign({},data);
-    // Preserve stage states with criteria but strip photo base64
     if(s.stageStates){
       var cs={};
       Object.keys(s.stageStates).forEach(function(k){
         var st=Object.assign({},s.stageStates[k]);
-        st.photos=[]; // Strip photos to save space
+        st.photos=[];
         cs[k]=st;
       });
       s.stageStates=cs;
     }
-    // Keep inspector photos — up to 15
     if(s.inspPhotoData&&s.inspPhotoData.length>0){
       s.inspPhotoData=s.inspPhotoData.slice(0,15);
     }
     s.timestamp=new Date().toISOString();
-    await addDoc(collection(db,'irns'),s);
+    if(existingFirebaseId){
+      // Correction — update existing document
+      await setDoc(doc(db,'irns',existingFirebaseId),s);
+    } else {
+      // New IRN — find if one already exists with this reportNo and update it, else add new
+      var existing=await getDocs(collection(db,'irns'));
+      var existDoc=null;
+      existing.forEach(function(d){if(d.data().reportNo===s.reportNo)existDoc=d;});
+      if(existDoc){await setDoc(doc(db,'irns',existDoc.id),s);}
+      else{await addDoc(collection(db,'irns'),s);}
+    }
     return true;
   }catch(e){console.error('IRN save error:',e);return false;}
 };
@@ -1878,7 +1886,7 @@ async function submitIRN(){
       if(el)el.value=freshIRN;
     }
     // Save to Firebase immediately
-    if(window.saveIRNToFirebase)await window.saveIRNToFirebase(d);
+    if(window.saveIRNToFirebase)await window.saveIRNToFirebase(d,window._correctionFirebaseId||null);
     var ex=reg.findIndex(function(r){return r.reportNo===d.reportNo;});
     if(ex>=0)reg[ex]=d;else reg.unshift(d);
     if(_irqParam){
@@ -2206,7 +2214,8 @@ function renderReg(){
 
     // Supervisor and QC
     html+='<div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap">';
-    html+='<div><span style="font-size:11px;color:#999">Supervisor: </span><span style="font-size:13px;font-weight:500">'+supName+'</span></div>';
+    var supCode2=(req&&req.supCode)||(latestIrn&&latestIrn.supCode)||'';
+    html+='<div><span style="font-size:11px;color:#999">Supervisor: </span><span style="font-size:13px;font-weight:500">'+supName+'</span>'+(supCode2?'<span style="font-size:11px;color:#888;margin-left:4px">('+supCode2+')</span>':'')+'</div>';
     html+='<div><span style="font-size:11px;color:#999">QC: </span><span style="font-size:13px;font-weight:500">'+qcDisplay+'</span></div>';
     html+='</div>';
 
@@ -2539,7 +2548,8 @@ function printIRN(){
   win.document.write('</style></head><body>');
 
   // Back button
-  win.document.write('<div class="no-print" style="text-align:left;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back to form</button></div>');
+  var _irnNoForCorr=d.reportNo;
+  win.document.write('<div class="no-print" style="display:flex;gap:8px;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back to form</button><button onclick="window.location.href=\'https://eric0103360.github.io/fse-irn-system/?correct='+d.reportNo+'\'" style="padding:6px 14px;background:#BA7517;border:none;border-radius:6px;font-size:12px;cursor:pointer;color:#fff;font-weight:600">&#9998; Make Correction</button></div>');
 
   // Header
   win.document.write('<div class="hdr"><div><img src="'+logoSrc+'" class="logo"><div style="margin-top:5px"><h1>Inspection Release Note</h1><h2>FSE-QR-IRN.038 · Rev 02 · ISO9001 / ISO3834-2</h2></div></div>');
