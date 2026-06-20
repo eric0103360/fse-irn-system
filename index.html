@@ -1780,19 +1780,14 @@ function doSendEmail(){
   var btn=document.getElementById('emailSendBtn');
   btn.disabled=true;btn.innerHTML='<i class="ti ti-loader" style="font-size:13px"></i> Sending...';
   setEmailStatus('Sending...','info');
-  fetch(_GAS_URL,{
-    method:'POST',
-    mode:'no-cors',
-    headers:{'Content-Type':'text/plain'},
-    body:JSON.stringify({to:to,cc:cc,subject:_emailSubject,htmlBody:_emailBody})
-  }).then(function(){
+  var params=new URLSearchParams({to:to,cc:cc,subject:_emailSubject,htmlBody:_emailBody});
+  var img=new Image();
+  img.onload=img.onerror=function(){
     setEmailStatus('Email sent to '+to+' — check inbox in a few seconds','ok');
     btn.innerHTML='<i class="ti ti-check" style="font-size:13px"></i> Sent!';
     setTimeout(function(){closeEmailModal();},2500);
-  }).catch(function(){
-    setEmailStatus('Network error — check connection and try again','err');
-    btn.disabled=false;btn.innerHTML='<i class="ti ti-send" style="font-size:13px"></i> Send email';
-  });
+  };
+  img.src=_GAS_URL+'?'+params.toString();
 }
 function buildEmailHtml(fields){
   var isPass=fields.result==='accept';
@@ -2679,7 +2674,7 @@ if(_irqParam){
 }
 
 // Load from Firebase — updates the placeholder with real data
-if(window.loadIRNsFromFirebase){window.loadIRNsFromFirebase(function(r){reg=r;renderReg();});}
+if(window.loadIRNsFromFirebase){window.loadIRNsFromFirebase(function(r){reg=r;renderReg();if(_correctParam)loadCorrectionData();});}
 if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){
   reqs=r;
   if(_irqParam){
@@ -2688,7 +2683,7 @@ if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){
   }
   renderReg();
   renderPendingReqs();
-  showFormOrWaiting();
+  if(!_correctParam)showFormOrWaiting();
 });}
 
 var _printParam=_urlP.get('print');
@@ -2736,37 +2731,36 @@ setTimeout(function(){
 
 // Handle correction URL parameter
 var _correctParam=_urlP.get('correct');
-if(_correctParam&&window.loadIRNsFromFirebase){
-  window.loadIRNsFromFirebase(function(r2){
-    reg=r2;
-    var corrIRN=reg.find(function(x){return x.reportNo===_correctParam;});
-    if(corrIRN){
-      setTimeout(function(){
-        var flds={job:corrIRN.job||'',project:corrIRN.project||'',drawing:corrIRN.drawing||'',po:corrIRN.po||'',artisan:corrIRN.artisan||'',notes:corrIRN.notes||'',rejectionReason:corrIRN.rejectionReason||'',rejectionAction:corrIRN.rejectionAction||''};
-        Object.keys(flds).forEach(function(k){var el=document.getElementById(k);if(el)el.value=flds[k];});
-        var rnEl=document.getElementById('reportNo');if(rnEl){rnEl.value=corrIRN.reportNo;rnEl.style.color='rgba(255,255,255,0.9)';}
-        if(corrIRN.stageStates){Object.keys(corrIRN.stageStates).forEach(function(sid){ss[sid]=corrIRN.stageStates[sid];});}
-        if(corrIRN.fabDims&&corrIRN.fabDims.length){corrIRN.fabDims.forEach(function(fd,i){if(fabDims[i]){fabDims[i].lbl=fd.lbl||'';fabDims[i].draw=fd.draw||'';fabDims[i].meas=fd.meas||'';}});}
-        if(corrIRN.inspPhotoData){inspPhotosArr=corrIRN.inspPhotoData.slice();renderInspPhotos();}
-        iRes=corrIRN.result||null;
-        var resEl=document.getElementById('overallResult');
-        if(resEl)resEl.textContent=iRes==='accept'?'Accepted':iRes==='reject'?'Rejected':'Not set';
-        window._correctionIRN=corrIRN.reportNo;
-        window._correctionFirebaseId=corrIRN.firebaseId||null;
-        document.getElementById('mainFormContent').style.display='block';
-        document.getElementById('formActions').style.display='block';
-        var ws=document.getElementById('waitingScreen');if(ws)ws.style.display='none';
-        renderStages();
-        if(typeof renderFabDims==='function')renderFabDims();
-        // Switch to IRN form tab
-        var nbs=document.querySelectorAll('.nb');
-        showV('form',nbs[1]);
-        toast('INS-C '+corrIRN.reportNo+' loaded — correct and resubmit','ok');
-      },800);
-    } else {
-      toast('IRN '+_correctParam+' not found','err');
-    }
-  });
+function loadCorrectionData(){
+  if(!_correctParam)return;
+  var corrIRN=reg.find(function(x){return x.reportNo===_correctParam;});
+  if(!corrIRN){toast('IRN '+_correctParam+' not found — reload and try again','err');return;}
+  // Force IRN form tab — hide request view completely
+  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on');v.style.display='none';});
+  document.querySelectorAll('.nb').forEach(function(b){b.classList.remove('on');});
+  var formView=document.getElementById('v-form');
+  var formBtn=document.querySelectorAll('.nb')[1];
+  if(formView){formView.classList.add('on');formView.style.display='block';}
+  if(formBtn)formBtn.classList.add('on');
+  // Load all IRN data into form
+  var flds={job:corrIRN.job||'',project:corrIRN.project||'',drawing:corrIRN.drawing||'',po:corrIRN.po||'',artisan:corrIRN.artisan||'',notes:corrIRN.notes||'',rejectionReason:corrIRN.rejectionReason||'',rejectionAction:corrIRN.rejectionAction||''};
+  Object.keys(flds).forEach(function(k){var el=document.getElementById(k);if(el)el.value=flds[k];});
+  var rnEl=document.getElementById('reportNo');if(rnEl){rnEl.value=corrIRN.reportNo;rnEl.style.color='rgba(255,255,255,0.9)';}
+  if(corrIRN.stageStates){Object.keys(corrIRN.stageStates).forEach(function(sid){ss[sid]=corrIRN.stageStates[sid];});}
+  if(corrIRN.fabDims&&corrIRN.fabDims.length){corrIRN.fabDims.forEach(function(fd,i){if(fabDims[i]){fabDims[i].lbl=fd.lbl||'';fabDims[i].draw=fd.draw||'';fabDims[i].meas=fd.meas||'';}});}
+  if(corrIRN.inspPhotoData){inspPhotosArr=corrIRN.inspPhotoData.slice();renderInspPhotos();}
+  iRes=corrIRN.result||null;
+  var resEl=document.getElementById('overallResult');
+  if(resEl)resEl.textContent=iRes==='accept'?'Accepted':iRes==='reject'?'Rejected':'Not set';
+  window._correctionIRN=corrIRN.reportNo;
+  window._correctionFirebaseId=corrIRN.firebaseId||null;
+  // Show form content
+  var mc=document.getElementById('mainFormContent');if(mc)mc.style.display='block';
+  var fa=document.getElementById('formActions');if(fa)fa.style.display='block';
+  var ws=document.getElementById('waitingScreen');if(ws)ws.style.display='none';
+  renderStages();
+  if(typeof renderFabDims==='function')renderFabDims();
+  toast('INS-C '+corrIRN.reportNo+' loaded for correction — make changes and resubmit','ok');
 }
 renderItems();renderStages();renderFab();
 showFormOrWaiting();
