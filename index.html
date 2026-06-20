@@ -1845,6 +1845,8 @@ async function submitIRN(){
     // Only get new IRN number if not already assigned this session
     var el=document.getElementById('reportNo');
     var currentIRN=el?el.value:'';
+    // If correction mode, keep original IRN number
+    if(window._correctionIRN){currentIRN=window._correctionIRN;if(el)el.value=currentIRN;}
     if(!currentIRN||currentIRN==='----'||currentIRN==='--'||window._irnSubmitted===currentIRN){
       var freshIRN=await window.getNextIRN();
       d.reportNo=freshIRN;
@@ -1865,6 +1867,8 @@ async function submitIRN(){
     }
     toast(d.reportNo+' submitted','ok');
     window._irnSubmitted=d.reportNo;
+    window._correctionFirebaseId=null;
+    window._correctionIRN=null;
     // Reset form for next IRN
     setTimeout(async function(){
       // Reset all form fields
