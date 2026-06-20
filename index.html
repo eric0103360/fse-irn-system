@@ -1827,6 +1827,62 @@ function emailFromReg(btn){
   var fields={reportNo:irnNo,job:job,project:client,stage:r&&r.stage||'--',drawing:r&&r.drawing||'--',date:r&&r.date||'--',qc:r&&r.qc||'--',qcCode:r&&r.qcCode||'--',sup:sup,result:r&&r.result||'reject',rejectionReason:r&&r.rejectionReason||'',rejectionAction:r&&r.rejectionAction||''};
   openEmailModal(subject,buildEmailHtml(fields),'INS-C '+irnNo+' · '+job);
 }
+function saveCorrectionFromPrint(jsonStr){
+  try{
+    var info=typeof jsonStr==='string'?JSON.parse(jsonStr):jsonStr;
+    var win2=window; // called from print window context
+    // Get values from correction panel
+    var passBtn=document.getElementById('corr-pass');
+    var failBtn=document.getElementById('corr-fail');
+    var isPass=passBtn&&passBtn.style.background.indexOf('rgb(29')!==-1||passBtn&&passBtn.style.background==='#1D9E75';
+    // Safer check - see which button has white text
+    isPass=failBtn&&(failBtn.style.color==='rgb(102, 102, 102)'||failBtn.style.color==='#666');
+    var result=isPass?'accept':'reject';
+    var reason=document.getElementById('corr-reason')?document.getElementById('corr-reason').value.trim():'';
+    var action=document.getElementById('corr-action')?document.getElementById('corr-action').value.trim():'';
+    if(result==='reject'&&!reason){
+      var st=document.getElementById('corr-status');
+      if(st){st.style.display='block';st.style.background='#FCEBEB';st.style.color='#A32D2D';st.textContent='Please enter a rejection reason';}
+      return;
+    }
+    var st=document.getElementById('corr-status');
+    if(st){st.style.display='block';st.style.background='#E6F1FB';st.style.color='#185FA5';st.textContent='Saving correction...';}
+    // Call parent window to save
+    if(window.opener&&window.opener.saveIRNCorrection){
+      window.opener.saveIRNCorrection(info.reportNo,info.firebaseId,result,reason,action,function(ok){
+        if(ok){
+          if(st){st.style.background='#EAF3DE';st.style.color='#27500A';st.textContent='Correction saved — register updated';}
+          setTimeout(function(){window.close();},1500);
+        } else {
+          if(st){st.style.background='#FCEBEB';st.style.color='#A32D2D';st.textContent='Save failed — try again';}
+        }
+      });
+    } else {
+      if(st){st.style.background='#FCEBEB';st.style.color='#A32D2D';st.textContent='Error — please open View/Print from the register';}
+    }
+  }catch(e){
+    var st=document.getElementById('corr-status');
+    if(st){st.style.display='block';st.style.background='#FCEBEB';st.style.color='#A32D2D';st.textContent='Error: '+e.message;}
+  }
+}
+function saveIRNCorrection(reportNo,firebaseId,result,reason,action,cb){
+  var r=reg.find(function(x){return x.reportNo===reportNo;});
+  if(!r){cb&&cb(false);return;}
+  r.result=result;
+  r.rejectionReason=reason||'';
+  r.rejectionAction=action||'';
+  // Save to Firebase
+  if(window.saveIRNToFirebase){
+    window.saveIRNToFirebase(r,firebaseId||r.firebaseId||null).then(function(ok){
+      renderReg();
+      toast('INS-C '+reportNo+' corrected to '+(result==='accept'?'PASS':'FAIL'),'ok');
+      cb&&cb(ok);
+    });
+  } else {
+    renderReg();
+    cb&&cb(true);
+  }
+}
 function openCorrectionFromPrint(jsonStr){
   try{
     var d=typeof jsonStr==='string'?JSON.parse(jsonStr):jsonStr;
@@ -2300,7 +2356,14 @@ function printFromReg(btn){
   var win=window.open('','_blank');
   win.document.write('<!DOCTYPE html><html><head><title>IRN INS-C '+r.reportNo+(irqNo?' | IRQ-'+irqNo:'')+'</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10px;color:#1a1a1a}table{width:100%;border-collapse:collapse;margin-bottom:6px}th{background:#1a3a5c;color:#fff;padding:4px 6px;text-align:left;font-size:9px}td{font-size:10px;padding:3px 6px}.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:6px;margin-bottom:8px}.logo{height:36px}.result-pass{background:#EAF3DE;border:1px solid #1D9E75;padding:4px 8px;border-radius:4px;font-weight:700;color:#27500A;font-size:11px;margin-bottom:6px}.result-fail{background:#FCEBEB;border:1px solid #E24B4A;padding:4px 8px;border-radius:4px;font-weight:700;color:#A32D2D;font-size:11px;margin-bottom:6px}.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px}.cell{background:#f9f9f9;padding:4px 6px;border-radius:3px;border:0.5px solid #eee}.cl{font-size:8px;color:#888;text-transform:uppercase;margin-bottom:1px}.cv{font-size:10px;font-weight:500}.req-banner{background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:4px;padding:4px 8px;margin-bottom:6px;display:flex;gap:12px}.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px}.sign-box{border:0.5px solid #ddd;padding:6px 8px;border-radius:3px}.footer{font-size:8px;color:#aaa;text-align:center;margin-top:8px;border-top:0.5px solid #eee;padding-top:4px}.no-print{margin:8px 0}@media print{.no-print{display:none}body{margin:6mm}html{height:100%}}@page{size:A4 portrait;margin:8mm}</style></head><body>');
   var _rForCorr=r;var _irqForCorr=irqNo||'';
-  win.document.write('<div class="no-print" style="display:flex;gap:8px;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back</button><button onclick="window.location.href=\'https://eric0103360.github.io/fse-irn-system/?correct='+r.reportNo+'\'" style="padding:6px 14px;background:#BA7517;border:none;border-radius:6px;font-size:12px;cursor:pointer;color:#fff;font-weight:600">&#9998; Make Correction</button></div>');
+  var _corrR=r;var _corrIrq=irqNo||'';
+  win.document.write('<div class="no-print" style="display:flex;gap:8px;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back</button><button onclick="document.getElementById(\'corr-panel\').style.display=\'block\';this.style.display=\'none\';" style="padding:6px 14px;background:#BA7517;border:none;border-radius:6px;font-size:12px;cursor:pointer;color:#fff;font-weight:600">&#9998; Make Correction</button></div>');
+  var corrPass=r.result==='accept';
+  win.document.write('<div id="corr-panel" class="no-print" style="display:none;background:#FFF8E6;border:2px solid #BA7517;border-radius:10px;padding:16px;margin-bottom:16px"><div style="font-size:14px;font-weight:700;color:#633806;margin-bottom:12px">&#9998; Make Correction — INS-C '+r.reportNo+'</div>');
+  win.document.write('<div style="margin-bottom:10px"><label style="font-size:11px;font-weight:600;color:#666;display:block;margin-bottom:4px">Result</label><div style="display:flex;gap:8px"><button id="corr-pass" onclick="document.getElementById(\'corr-pass\').style.background=\'#1D9E75\';document.getElementById(\'corr-pass\').style.color=\'#fff\';document.getElementById(\'corr-fail\').style.background=\'#fff\';document.getElementById(\'corr-fail\').style.color=\'#666\';document.getElementById(\'corr-reject-fields\').style.display=\'none\';" style="flex:1;padding:8px;border:2px solid #1D9E75;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;background:'+(corrPass?'#1D9E75':'#fff')+';color:'+(corrPass?'#fff':'#666')+'">&#10003; PASS</button><button id="corr-fail" onclick="document.getElementById(\'corr-fail\').style.background=\'#E24B4A\';document.getElementById(\'corr-fail\').style.color=\'#fff\';document.getElementById(\'corr-pass\').style.background=\'#fff\';document.getElementById(\'corr-pass\').style.color=\'#666\';document.getElementById(\'corr-reject-fields\').style.display=\'block\';" style="flex:1;padding:8px;border:2px solid #E24B4A;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;background:'+(corrPass?'#fff':'#E24B4A')+';color:'+(corrPass?'#666':'#fff')+'">&#10007; FAIL / REWORK</button></div></div>');
+  win.document.write('<div id="corr-reject-fields" style="display:'+(corrPass?'none':'block')+'"><div style="margin-bottom:8px"><label style="font-size:11px;font-weight:600;color:#666;display:block;margin-bottom:4px">Rejection reason</label><textarea id="corr-reason" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:12px;resize:none;height:60px">'+( r.rejectionReason||'')+'</textarea></div><div style="margin-bottom:8px"><label style="font-size:11px;font-weight:600;color:#666;display:block;margin-bottom:4px">Action required</label><textarea id="corr-action" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:12px;resize:none;height:60px">'+(r.rejectionAction||'')+'</textarea></div></div>');
+  win.document.write('<div id="corr-status" style="display:none;font-size:12px;padding:8px;border-radius:6px;margin-bottom:8px"></div>');
+  win.document.write('<div style="display:flex;gap:8px"><button onclick="document.getElementById(\'corr-panel\').style.display=\'none\';" style="padding:8px 16px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">Cancel</button><button onclick="saveCorrectionFromPrint('+JSON.stringify(JSON.stringify({reportNo:r.reportNo,firebaseId:r.firebaseId||''}))+');" style="flex:1;padding:8px;background:#BA7517;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;color:#fff">&#10003; Save Correction</button></div></div>');
   win.document.write('<div class="hdr"><div><img src="'+logoSrc+'" class="logo"><div style="margin-top:5px"><div style="font-size:16px;font-weight:500">Inspection Release Note</div><div style="font-size:12px;color:#555">FSE-QR-IRN.038 · Rev 02 · ISO9001 / ISO3834-2</div></div></div><div style="text-align:right"><div style="font-size:9px;color:#888;text-transform:uppercase">Report No</div><div style="font-size:24px;font-weight:700;color:#1a3a5c">INS-C '+r.reportNo+'</div>'+(irqNo?'<div style="font-size:11px;color:#185FA5">IRQ-'+irqNo+'</div>':'')+'</div></div>');
   win.document.write('<div class="'+(isPass?'result-pass':'result-fail')+'">'+(isPass?'✓ ACCEPTED — Released':'✗ REJECTED — Rework required')+'</div>');
   if(stageName)win.document.write('<div style="background:#1a3a5c;color:#fff;padding:5px 10px;border-radius:4px;font-size:11px;font-weight:600;margin-bottom:6px">Inspection stage: '+stageName+'</div>');
@@ -2543,8 +2606,7 @@ function printIRN(){
   win.document.write('</style></head><body>');
 
   // Back button
-  var _irnNoForCorr=d.reportNo;
-  win.document.write('<div class="no-print" style="display:flex;gap:8px;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back to form</button><button onclick="window.location.href=\'https://eric0103360.github.io/fse-irn-system/?correct='+d.reportNo+'\'" style="padding:6px 14px;background:#BA7517;border:none;border-radius:6px;font-size:12px;cursor:pointer;color:#fff;font-weight:600">&#9998; Make Correction</button></div>');
+  win.document.write('<div class="no-print" style="display:flex;gap:8px;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back to form</button></div>');
 
   // Header
   win.document.write('<div class="hdr"><div><img src="'+logoSrc+'" class="logo"><div style="margin-top:5px"><h1>Inspection Release Note</h1><h2>FSE-QR-IRN.038 · Rev 02 · ISO9001 / ISO3834-2</h2></div></div>');
