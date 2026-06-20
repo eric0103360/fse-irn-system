@@ -1780,14 +1780,18 @@ function doSendEmail(){
   var btn=document.getElementById('emailSendBtn');
   btn.disabled=true;btn.innerHTML='<i class="ti ti-loader" style="font-size:13px"></i> Sending...';
   setEmailStatus('Sending...','info');
-  var params=new URLSearchParams({to:to,cc:cc,subject:_emailSubject,htmlBody:_emailBody});
-  var img=new Image();
-  img.onload=img.onerror=function(){
+  fetch(_GAS_URL,{
+    method:'POST',
+    mode:'no-cors',
+    body:JSON.stringify({to:to,cc:cc,subject:_emailSubject,htmlBody:_emailBody})
+  }).then(function(){
     setEmailStatus('Email sent to '+to+' — check inbox in a few seconds','ok');
     btn.innerHTML='<i class="ti ti-check" style="font-size:13px"></i> Sent!';
     setTimeout(function(){closeEmailModal();},2500);
-  };
-  img.src=_GAS_URL+'?'+params.toString();
+  }).catch(function(){
+    setEmailStatus('Network error — check connection','err');
+    btn.disabled=false;btn.innerHTML='<i class="ti ti-send" style="font-size:13px"></i> Send email';
+  });
 }
 function buildEmailHtml(fields){
   var isPass=fields.result==='accept';
