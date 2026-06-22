@@ -1399,24 +1399,13 @@ async function submitRequest(){
   document.getElementById('reqNo').value=d.reqNo;
   var urgIcon=d.urgency==='urgent'?'URGENT - ':'';
   var itemList=reqItems.filter(function(i){return i.desc;}).map(function(i,idx){return '  '+(idx+1)+'. '+i.desc+(i.qty?' x'+i.qty:'');}).join('\n');
-  var msg='*FSE INSPECTION REQUEST*\n';
-  msg+=(d.urgency==='urgent'?'*================================*\n*            URGENT REQUEST          *\n':'');
-  msg+='*================================*\n';
-  msg+='Req No: *IRQ-'+d.reqNo+'*\n';
-  msg+='Job/Order: *'+d.job+'*\n';
-  msg+='Client: '+(d.client||'--')+'\n';
-  msg+='Date: '+d.date+'\n';
-  msg+='================================\n';
-  msg+='*Items for inspection:*\n'+itemList+'\n';
-  msg+='*Inspection type:* '+d.inspTypes+'\n';
-  if(d.instructions)msg+='*What to check:* '+d.instructions+'\n';
-  msg+='================================\n';
-  if(d.photos>0)msg+='Photos: '+d.photos+' attached (see form)\n';
-  msg+='\n*QC - please attend and complete IRN on release*\n';
-  msg+='================================\n';
-  var itemSummary=reqItems.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(' | ');
   var liveLink='https://eric0103360.github.io/fse-irn-system?irq='+encodeURIComponent(d.reqNo);
-  msg+='*Open IRN System to respond:*\n'+liveLink;
+  var msg=(d.urgency==='urgent'?'🚨 *URGENT — ':'🔔 *')+'IRQ-'+d.reqNo+' — INSPECTION REQUEST*\n';
+  msg+='Job: '+d.job+' | Client: '+(d.client||'--')+'\n';
+  msg+='Stage: '+d.inspTypes+'\n';
+  msg+='Items: '+itemList.replace(/\n/g,' | ').replace(/\s+/g,' ').trim()+'\n';
+  if(d.instructions)msg+='Check: '+d.instructions+'\n';
+  msg+='🔗 '+liveLink;
   // Save to Firebase FIRST before anything else
   if(window.saveRequestToFirebase){
     await window.saveRequestToFirebase(d);
