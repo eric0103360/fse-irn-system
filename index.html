@@ -241,6 +241,11 @@ window.loadRequestsFromFirebase=function(cb){
     });
   }catch(e){console.error('Load requests error:',e);cb([]);}
 };
+window.deleteFirebaseDoc=function(collName,firebaseId,cb){
+  try{
+    deleteDoc(doc(db,collName,firebaseId)).then(function(){if(cb)cb(true);}).catch(function(){if(cb)cb(false);});
+  }catch(e){if(cb)cb(false);}
+};
 window.markRequestComplete=async function(firebaseId){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'complete'});return true;}catch(e){return false;}};
 window.markRequestRework=async function(firebaseId){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'rework'});return true;}catch(e){return false;}};
 window.loadIRNsFromFirebase=function(cb){try{var q=query(collection(db,'irns'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);});}catch(e){cb([]);}};
@@ -619,6 +624,13 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
       <div style="padding:8px 0 16px;font-size:11px;color:#888;text-align:center">Deactivated codes cannot sign off new IRNs.</div>
       <button onclick="if(window.saveCodesToFirebase)window.saveCodesToFirebase().then(function(){toast('Codes saved','ok');})" style="width:100%;padding:10px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:8px"><i class="ti ti-device-floppy" style="font-size:14px"></i> Save all names &amp; codes</button>
       <button onclick="clearAllTestData()" style="width:100%;padding:10px;background:#FCEBEB;color:#A32D2D;border:1px solid #E24B4A;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:12px"><i class="ti ti-trash" style="font-size:14px"></i> Clear all test IRNs &amp; requests</button>
+      <div class="card" style="margin-bottom:8px">
+        <div class="ct" style="display:flex;align-items:center;justify-content:space-between">
+          <span><i class="ti ti-database" style="font-size:13px"></i> Records management</span>
+          <button onclick="loadAdminRecords()" style="font-size:10px;padding:4px 8px;background:#f0f0f0;border:none;border-radius:6px;cursor:pointer"><i class="ti ti-refresh" style="font-size:11px"></i> Load</button>
+        </div>
+        <div id="adminRecordsList" style="padding:8px 0;font-size:11px;color:#888;text-align:center">Tap Load to view records</div>
+      </div>
     </div>
   </div>
 </div>
@@ -2161,6 +2173,47 @@ function renderMgmt(){
       });
       relEl.innerHTML=relH;
     }
+  }
+}
+function loadAdminRecords(){
+  var el=document.getElementById('adminRecordsList');
+  if(el)el.innerHTML='<div style="padding:8px;color:#888;font-size:11px">Loading...</div>';
+  var allEntries=[];
+  // Load requests
+  reqs.forEach(function(r){allEntries.push({type:'req',id:r.firebaseId,label:'IRQ-'+r.reqNo+' — '+(r.job||'--')+' / '+(r.client||'--'),sub:(r.status||'pending')+' · '+( r.date||''),firebaseId:r.firebaseId});});
+  // Load IRNs
+  reg.forEach(function(r){allEntries.push({type:'irn',id:r.firebaseId,label:'INS-C '+r.reportNo+' — '+(r.job||'--')+' / '+(r.project||'--'),sub:(r.result==='accept'?'Released':'Rework')+' · '+(r.date||''),firebaseId:r.firebaseId});});
+  if(!allEntries.length){if(el)el.innerHTML='<div style="padding:8px;color:#888;font-size:11px;text-align:center">No records found — try refreshing the register first</div>';return;}
+  var html='';
+  allEntries.forEach(function(e){
+    var delBtn='<button onclick="deleteAdminRecord(this)" data-type="'+e.type+'" data-fid="'+e.firebaseId+'" data-label="'+e.label.replace(/"/g,'&quot;')+'" style="padding:5px 10px;background:#FCEBEB;border:1px solid #E24B4A;border-radius:6px;font-size:10px;color:#A32D2D;cursor:pointer;flex-shrink:0;margin-left:8px"><i class=\"ti ti-trash\" style=\"font-size:11px\"></i></button>';
+    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:0.5px solid #f0f0f0">';
+    html+='<div><div style="font-size:12px;font-weight:500;color:#1a3a5c">'+e.label+'</div>';
+    html+='<div style="font-size:10px;color:#888">'+e.type.toUpperCase()+' · '+e.sub+'</div></div>';
+    html+=delBtn;
+    html+='</div>';
+  });
+  if(el)el.innerHTML=html;
+}
+function deleteAdminRecord(btn){
+  var type=btn.dataset.type;var firebaseId=btn.dataset.fid;var label=btn.dataset.label;
+  if(!firebaseId){toast('No Firebase ID — cannot delete','err');return;}
+  if(!confirm('Delete: '+label+'?'))return;
+  var collName=type==='req'?'requests':'irns';
+  if(window.deleteFirebaseDoc){
+    window.deleteFirebaseDoc(collName,firebaseId,function(ok){
+      if(ok){
+        toast('Deleted: '+label,'ok');
+        if(type==='req')reqs=reqs.filter(function(r){return r.firebaseId!==firebaseId;});
+        else reg=reg.filter(function(r){return r.firebaseId!==firebaseId;});
+        renderReg();
+        loadAdminRecords();
+      } else {
+        toast('Delete failed','err');
+      }
+    });
+  } else {
+    toast('Delete function not available','err');
   }
 }
 function renderReg(){
