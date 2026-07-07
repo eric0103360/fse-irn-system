@@ -264,6 +264,7 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
     <button class="nb" onclick="handleNewIRNClick(this)" style="opacity:0.6" title="Accessible via WhatsApp inspection link only"><i class="ti ti-file-plus" style="font-size:12px"></i> New IRN <i class="ti ti-lock" style="font-size:9px"></i></button>
     <button class="nb" onclick="showV('register',this)"><i class="ti ti-list" style="font-size:12px"></i> Register</button>
     <button class="nb" onclick="showV('admin',this)"><i class="ti ti-settings" style="font-size:12px"></i> Admin</button>
+    <button class="nb" onclick="showV('mgmt',this)"><i class="ti ti-chart-bar" style="font-size:12px"></i> Mgmt</button>
   </div>
 
   <div id="v-form" class="view on">
@@ -312,7 +313,6 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
       <div class="fr"><div class="fl">Job / order no.</div><input class="fi" id="job" placeholder="e.g. F52573"></div>
       <div class="fr"><div class="fl">Client</div><input class="fi" id="project" placeholder="e.g. TLT Lobster Bend VS2"></div>
       <div class="fr"><div class="fl">PO number</div><input class="fi" id="po" placeholder="e.g. 20840/2130/519"></div>
-      <div class="fr"><div class="fl">Artisan name</div><input class="fi" id="artisan" placeholder="Name (optional)"></div>
       <div class="fr"><div class="fl">Date</div><input class="fi" type="date" id="irnDate"></div>
     </div>
 
@@ -624,6 +624,85 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
     </div>
   </div>
 </div>
+
+  <!-- Management View -->
+  <div id="v-mgmt" class="view">
+    <div class="hdr">
+      <div class="hdr-top">
+        <div class="hdr-left">
+          <img id="mgmtLogo" class="fse-logo" alt="FSE">
+          <div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.55);margin-bottom:1px">FIELD SERVICES &amp; ENGINEERING</div>
+            <h1>Management View</h1>
+            <div class="hdr-meta">Live inspection dashboard</div>
+          </div>
+        </div>
+        <button onclick="renderMgmt()" style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:500;cursor:pointer"><i class="ti ti-refresh" style="font-size:13px"></i> Refresh</button>
+      </div>
+    </div>
+
+    <!-- Stat boxes -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
+      <div style="background:#f4f4f0;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#1a3a5c" id="mgStatTotal">0</div>
+        <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px">Total requests</div>
+      </div>
+      <div style="background:#FCEBEB;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#A32D2D" id="mgStatUrgent">0</div>
+        <div style="font-size:10px;color:#A32D2D;text-transform:uppercase;letter-spacing:0.5px">Urgent</div>
+      </div>
+      <div style="background:#EAF3DE;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#27500A" id="mgStatReleased">0</div>
+        <div style="font-size:10px;color:#3B6D11;text-transform:uppercase;letter-spacing:0.5px">Released</div>
+      </div>
+      <div style="background:#FAEEDA;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#633806" id="mgStatOnHold">0</div>
+        <div style="font-size:10px;color:#633806;text-transform:uppercase;letter-spacing:0.5px">On hold</div>
+      </div>
+      <div style="background:#E6F1FB;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#0C447C" id="mgStatFTP">0%</div>
+        <div style="font-size:10px;color:#185FA5;text-transform:uppercase;letter-spacing:0.5px">1st pass rate</div>
+      </div>
+      <div style="background:#f4f4f0;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#1a3a5c" id="mgStatPending">0</div>
+        <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px">Awaiting QC</div>
+      </div>
+    </div>
+
+    <!-- Stage pass rate chart -->
+    <div style="background:#fff;border:0.5px solid #eee;border-radius:10px;padding:12px;margin-bottom:10px">
+      <div style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Stage pass rate</div>
+      <div id="mgStageChart"><div style="font-size:12px;color:#aaa;text-align:center;padding:12px">No data yet</div></div>
+    </div>
+
+    <!-- Outstanding for inspection -->
+    <div style="border-radius:10px;overflow:hidden;margin-bottom:8px;border:0.5px solid #E24B4A">
+      <div style="background:#E24B4A;color:#fff;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;justify-content:space-between">
+        <span><i class="ti ti-clock" style="font-size:12px"></i> Outstanding for inspection</span>
+        <span id="mgOutstandingCount" style="background:rgba(255,255,255,0.25);border-radius:10px;padding:1px 8px;font-size:10px">0</span>
+      </div>
+      <div id="mgOutstanding"><div style="padding:14px;font-size:12px;color:#aaa;text-align:center">No records found</div></div>
+    </div>
+
+    <!-- Rework / Rejected -->
+    <div style="border-radius:10px;overflow:hidden;margin-bottom:8px;border:0.5px solid #BA7517">
+      <div style="background:#BA7517;color:#fff;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;justify-content:space-between">
+        <span><i class="ti ti-x" style="font-size:12px"></i> Rework / Rejected</span>
+        <span id="mgReworkCount" style="background:rgba(255,255,255,0.25);border-radius:10px;padding:1px 8px;font-size:10px">0</span>
+      </div>
+      <div id="mgRework"><div style="padding:14px;font-size:12px;color:#aaa;text-align:center">No records found</div></div>
+    </div>
+
+    <!-- Concession holds -->
+    <div style="border-radius:10px;overflow:hidden;margin-bottom:16px;border:0.5px solid #7C3AED">
+      <div style="background:#7C3AED;color:#fff;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;justify-content:space-between">
+        <span><i class="ti ti-lock" style="font-size:12px"></i> Concession holds</span>
+        <span id="mgConcessionCount" style="background:rgba(255,255,255,0.25);border-radius:10px;padding:1px 8px;font-size:10px">0</span>
+      </div>
+      <div id="mgConcession"><div style="padding:14px;font-size:12px;color:#aaa;text-align:center">No records found</div></div>
+    </div>
+  </div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -785,6 +864,15 @@ function showV(v,btn){
   }
 
   if(v==='admin'){document.getElementById('admLogo').src=getLogoSrc();}
+  if(v==='mgmt'){
+    document.getElementById('mgmtLogo').src=getLogoSrc();
+    var mgLoaded={irns:false,reqs:false};
+    function checkMgReady(){if(mgLoaded.irns&&mgLoaded.reqs)renderMgmt();}
+    if(window.loadIRNsFromFirebase){window.loadIRNsFromFirebase(function(r){reg=r;mgLoaded.irns=true;checkMgReady();});}
+    else{mgLoaded.irns=true;checkMgReady();}
+    if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){reqs=r;mgLoaded.reqs=true;checkMgReady();});}
+    else{mgLoaded.reqs=true;checkMgReady();}
+  }
 }
 function capturePhoto(input,sid){
   if(!input.files||!input.files[0])return;
@@ -2319,6 +2407,108 @@ function printIRN(){
   win.document.close();
 }
 
+
+function renderMgmt(){
+  // Build merged entries same as renderReg
+  var irqMap={};
+  reqs.forEach(function(r){
+    var key=r.reqNo||('req_'+r.firebaseId);
+    if(!irqMap[key])irqMap[key]={req:null,irns:[],reqNo:r.reqNo};
+    irqMap[key].req=r;
+  });
+  reg.forEach(function(r){
+    var key=r.irqRef||('irn_'+r.reportNo);
+    if(!irqMap[key])irqMap[key]={req:null,irns:[],reqNo:r.irqRef||''};
+    irqMap[key].irns.push(r);
+  });
+  var entries=Object.values(irqMap);
+
+  // Stats
+  var total=entries.length;
+  var urgent=entries.filter(function(e){return e.req&&e.req.urgency==='urgent';}).length;
+  var released=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept';}).length;
+  var rework=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='reject';}).length;
+  var pending=entries.filter(function(e){return e.irns.length===0;}).length;
+  var ftp=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&(!l.attempt||l.attempt===1);}).length;
+  var ftpPct=released>0?Math.round(ftp/released*100):0;
+
+  document.getElementById('mgStatTotal').textContent=total;
+  document.getElementById('mgStatUrgent').textContent=urgent;
+  document.getElementById('mgStatReleased').textContent=released;
+  document.getElementById('mgStatOnHold').textContent=rework;
+  document.getElementById('mgStatFTP').textContent=ftpPct+'%';
+  document.getElementById('mgStatPending').textContent=pending;
+
+  // Stage pass rate chart
+  var chartEl=document.getElementById('mgStageChart');
+  if(reg.length>0){
+    var ch='';
+    STAGES.forEach(function(s){
+      var sp=0,st2=0;
+      reg.forEach(function(r){
+        if(r.stageStates&&r.stageStates[s.id]){
+          var x=r.stageStates[s.id];
+          if(!x.na){st2++;if(x.gate||(x.crit&&x.crit.every(Boolean)))sp++;}
+        }
+      });
+      if(st2===0)return;
+      var pct=Math.round(sp/st2*100);
+      ch+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+      ch+='<div style="width:110px;font-size:10px;color:#666;text-align:right;flex-shrink:0">'+s.label+'</div>';
+      ch+='<div style="flex:1;background:#f0f0f0;border-radius:4px;height:16px;overflow:hidden;display:flex">';
+      ch+='<div style="width:'+pct+'%;background:#1D9E75;height:100%;display:flex;align-items:center;justify-content:flex-end;padding-right:4px">'+(pct>15?'<span style="font-size:9px;color:#fff;font-weight:600">'+pct+'%</span>':'')+'</div>';
+      ch+='<div style="flex:1;background:#FCEBEB;height:100%"></div></div>';
+      ch+='<div style="width:36px;font-size:10px;color:#888;text-align:right">'+sp+'/'+st2+'</div></div>';
+    });
+    chartEl.innerHTML=ch||'<div style="font-size:12px;color:#aaa;text-align:center;padding:8px">No stage data yet</div>';
+  } else {
+    chartEl.innerHTML='<div style="font-size:12px;color:#aaa;text-align:center;padding:8px">No inspections recorded yet</div>';
+  }
+
+  // Helper to build a row
+  function mkRow(e,borderColor){
+    var req=e.req;
+    var latestIrn=e.irns[e.irns.length-1];
+    var job=(req&&req.job)||(latestIrn&&latestIrn.job)||'--';
+    var client=(req&&req.client)||(latestIrn&&latestIrn.project)||'--';
+    var stage=(req&&req.inspTypes)||(latestIrn&&latestIrn.stageName)||'--';
+    var sup=(req&&req.supervisor)||(latestIrn&&latestIrn.reqSupervisor)||'--';
+    var date=(req&&req.date)||(latestIrn&&latestIrn.date)||'--';
+    var irqNo=e.reqNo||'--';
+    var isUrgent=req&&req.urgency==='urgent';
+    var html='<div style="padding:10px 12px;border-bottom:0.5px solid #eee;display:flex;align-items:flex-start;justify-content:space-between;gap:8px">';
+    html+='<div style="flex:1">';
+    html+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">';
+    html+='<span style="font-size:13px;font-weight:700;color:#1a3a5c">IRQ-'+irqNo+'</span>';
+    if(isUrgent)html+='<span style="font-size:9px;background:#E24B4A;color:#fff;border-radius:6px;padding:1px 6px;font-weight:600">URGENT</span>';
+    html+='</div>';
+    html+='<div style="font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:2px">'+job+'</div>';
+    html+='<div style="font-size:11px;color:#888">'+stage+' &middot; '+client+'</div>';
+    html+='<div style="font-size:10px;color:#aaa;margin-top:2px">SUP: '+sup+' &middot; '+date+'</div>';
+    html+='</div>';
+    html+='<div style="width:8px;height:8px;border-radius:50%;background:'+borderColor+';flex-shrink:0;margin-top:4px"></div>';
+    html+='</div>';
+    return html;
+  }
+
+  // Outstanding
+  var outstanding=entries.filter(function(e){return e.irns.length===0;});
+  document.getElementById('mgOutstandingCount').textContent=outstanding.length;
+  document.getElementById('mgOutstanding').innerHTML=outstanding.length
+    ?outstanding.map(function(e){return mkRow(e,'#E24B4A');}).join('')
+    :'<div style="padding:14px;font-size:12px;color:#aaa;text-align:center">No outstanding inspections</div>';
+
+  // Rework
+  var reworkList=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='reject';});
+  document.getElementById('mgReworkCount').textContent=reworkList.length;
+  document.getElementById('mgRework').innerHTML=reworkList.length
+    ?reworkList.map(function(e){return mkRow(e,'#BA7517');}).join('')
+    :'<div style="padding:14px;font-size:12px;color:#aaa;text-align:center">No rework items</div>';
+
+  // Concessions — flagged via concession WA message (no dedicated field yet, show placeholder)
+  document.getElementById('mgConcessionCount').textContent='0';
+  document.getElementById('mgConcession').innerHTML='<div style="padding:14px;font-size:12px;color:#aaa;text-align:center">No concession holds</div>';
+}
 
 function enterApp(){
   var sp=document.getElementById('splashScreen');
