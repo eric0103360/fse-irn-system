@@ -327,7 +327,6 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
       <div class="fr"><div class="fl">Job / order no.</div><input class="fi" id="job" placeholder="e.g. F52573"></div>
       <div class="fr"><div class="fl">Client</div><input class="fi" id="project" placeholder="e.g. TLT Lobster Bend VS2"></div>
       <div class="fr"><div class="fl">PO number</div><input class="fi" id="po" placeholder="e.g. 20840/2130/519"></div>
-      <div class="fr"><div class="fl">Artisan name</div><input class="fi" id="artisan" placeholder="Name (optional)"></div>
       <div class="fr"><div class="fl">Date</div><input class="fi" type="date" id="irnDate"></div>
     </div>
 
@@ -390,6 +389,12 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
         <tbody id="fabBody"></tbody></table>
         <button class="add-dim" onclick="addFab()"><i class="ti ti-plus" style="font-size:11px"></i> Add row</button>
       </div>
+    </div>
+
+    <div class="card" id="subcontractorCard" style="display:none">
+      <div class="ct"><i class="ti ti-calendar-check" style="font-size:13px"></i> Subcontractor release</div>
+      <div class="fr"><div class="fl">Date released by subcontractor</div><input class="fi" type="date" id="subcontractorDate"></div>
+      <div class="fr"><div class="fl">Service provider</div><input class="fi" id="subcontractorName" placeholder="e.g. ABC Heat Treatment"></div>
     </div>
 
     <div class="card" id="subcontractorCard" style="display:none">
@@ -506,6 +511,14 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
           <input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="addReqPhoto(this)">
         </label>
         <div style="font-size:10px;color:#888;margin-top:4px">Attach photos of the item requiring inspection</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><i class="ti ti-user" style="font-size:13px"></i> Artisan(s) assigned</div>
+      <div style="padding:10px 14px">
+        <div id="reqArtisanList"></div>
+        <button class="add-btn" onclick="addReqArtisan()"><i class="ti ti-plus"></i> Add artisan</button>
       </div>
     </div>
 
@@ -1135,6 +1148,20 @@ function addSlot(role){
 }
 // Inspection Request state
 var reqItems=[{id:'r1',desc:'',qty:''}];
+var reqArtisans=[''];
+function addReqArtisan(){reqArtisans.push('');renderReqArtisans();}
+function removeReqArtisan(i){if(reqArtisans.length>1)reqArtisans.splice(i,1);renderReqArtisans();}
+function renderReqArtisans(){
+  var el=document.getElementById('reqArtisanList');if(!el)return;
+  var html='';
+  reqArtisans.forEach(function(a,i){
+    html+='<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">';
+    html+='<input class="fi" style="flex:1;margin:0" placeholder="Artisan name" value="'+a.replace(/"/g,'&quot;')+'" oninput="reqArtisans['+i+']=this.value">';
+    if(reqArtisans.length>1)html+='<button onclick="removeReqArtisan('+i+')" style="padding:6px 10px;background:#FCEBEB;border:1px solid #E24B4A;border-radius:6px;color:#A32D2D;cursor:pointer;font-size:12px">✕</button>';
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
 var reqPhotos=[];
 var reqUrgency='normal';
 var reqSupValidated=false;
@@ -1271,6 +1298,7 @@ function toggleReqSubmit(){
   if(cb&&btn){btn.disabled=!cb.checked;btn.style.opacity=cb.checked?'1':'0.5';btn.style.cursor=cb.checked?'pointer':'not-allowed';}
 }
 function initRequest(){
+  renderReqArtisans();
   document.getElementById('reqDate').value=new Date().toISOString().split('T')[0];
   document.getElementById('reqLogo').src=getLogoSrc();
   renderReqItems();
@@ -1409,7 +1437,8 @@ function getRequestData(){
     supCode:document.getElementById('reqSupCode').value.toUpperCase(),
     supervisor:reqSupName,
     photos:reqPhotos.length,
-    reqPhotoData:reqPhotos.slice(0,5)
+    reqPhotoData:reqPhotos.slice(0,5),
+    artisans:reqArtisans.filter(function(a){return a.trim();})
   };
 }
 async function submitRequest(){
@@ -2335,7 +2364,9 @@ function renderReg(){
     // Supervisor and QC
     html+='<div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap">';
     var supCode2=(req&&req.supCode)||(latestIrn&&latestIrn.supCode)||'';
+    var artisanList=(req&&req.artisans&&req.artisans.length)?req.artisans.join(', '):'';
     html+='<div><span style="font-size:11px;color:#999">Supervisor: </span><span style="font-size:13px;font-weight:500">'+supName+'</span>'+(supCode2?'<span style="font-size:11px;color:#888;margin-left:4px">('+supCode2+')</span>':'')+'</div>';
+    if(artisanList)html+='<div><span style="font-size:11px;color:#999">Artisan(s): </span><span style="font-size:12px">'+artisanList+'</span></div>';
     html+='<div><span style="font-size:11px;color:#999">QC: </span><span style="font-size:13px;font-weight:500">'+qcDisplay+'</span></div>';
     html+='</div>';
 
@@ -2508,6 +2539,12 @@ function resubmitRequest(btn){
     if(window.resubmitRequest)window.resubmitRequest(firebaseId,attempt);
     toast('IRQ-'+reqNo+' re-submitted (Attempt '+attempt+')','ok');
   }
+}
+function checkSubcontractorCard(){
+  var reqType=(_urlReq&&_urlReq.inspTypes)||'';
+  var isSub=reqType.toLowerCase().includes('pwht')||reqType.toLowerCase().includes('balancing')||reqType.toLowerCase().includes('machining');
+  var card=document.getElementById('subcontractorCard');
+  if(card)card.style.display=isSub?'block':'none';
 }
 function checkSubcontractorCard(){
   var reqType=(_urlReq&&_urlReq.inspTypes)||'';
