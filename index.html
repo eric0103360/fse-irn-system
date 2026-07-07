@@ -392,6 +392,12 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
       </div>
     </div>
 
+    <div class="card" id="subcontractorCard" style="display:none">
+      <div class="ct"><i class="ti ti-calendar-check" style="font-size:13px"></i> Subcontractor release</div>
+      <div class="fr"><div class="fl">Date released by subcontractor</div><input class="fi" type="date" id="subcontractorDate"></div>
+      <div class="fr"><div class="fl">Service provider</div><input class="fi" id="subcontractorName" placeholder="e.g. ABC Heat Treatment"></div>
+    </div>
+
     <div class="card">
       <div class="ct"><i class="ti ti-lock" style="font-size:13px"></i> Step 4 — Notes &amp; sign-off</div>
       <div style="padding:0 14px 10px">
@@ -707,6 +713,23 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
     <div id="mg-rework-list"><div style="padding:16px;text-align:center;color:#aaa;font-size:12px">No rework items</div></div>
   </div>
 
+  <div style="background:#fff;border:0.5px solid #ddd;border-radius:10px;overflow:hidden;margin-bottom:10px">
+    <div style="background:#F3E5F5;padding:9px 14px;font-size:11px;font-weight:600;color:#6A1B9A;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:6px">
+      <i class="ti ti-lock-pause" style="font-size:13px"></i> Concession holds
+      <span id="mg-conc-badge" style="background:#7B1FA2;color:#fff;border-radius:8px;padding:1px 7px;font-size:10px;margin-left:auto">0</span>
+    </div>
+    <div id="mg-conc-list"><div style="padding:16px;text-align:center;color:#aaa;font-size:12px">No concession holds</div></div>
+  </div>
+
+  <!-- Awaiting subcontractor -->
+  <div style="background:#fff;border:0.5px solid #ddd;border-radius:10px;overflow:hidden;margin-bottom:10px">
+    <div style="background:#FFF3E0;padding:9px 14px;font-size:11px;font-weight:600;color:#E65100;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:6px">
+      <i class="ti ti-clock-cog" style="font-size:13px"></i> Awaiting subcontractor return
+      <span id="mg-sub-badge" style="background:#FF9800;color:#fff;border-radius:8px;padding:1px 7px;font-size:10px;margin-left:auto">0</span>
+    </div>
+    <div id="mg-sub-list"><div style="padding:16px;text-align:center;color:#aaa;font-size:12px">No outstanding subcontractor releases</div></div>
+  </div>
+
   <!-- Recently released -->
   <div style="background:#fff;border:0.5px solid #ddd;border-radius:10px;overflow:hidden;margin-bottom:10px">
     <div style="background:#EAF3DE;padding:9px 14px;font-size:11px;font-weight:600;color:#27500A;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:6px">
@@ -752,6 +775,7 @@ window.addEventListener('DOMContentLoaded',function(){
   document.getElementById('admLogo').src=src;
 });
 
+window.codes=window.codes||{};
 var codes={
   qc:[
     {code:'QC-001',name:'Teboho Molete',active:true,pin:''},
@@ -1660,7 +1684,9 @@ function getFormBasic(){
     job:gv('job'),
     project:gv('project'),
     drawing:gv('drawing'),
-    artisan:gv('artisan'),
+    artisan:((_urlReq&&_urlReq.artisans&&_urlReq.artisans.join(', '))||gv('artisan')||''),
+    subcontractorDate:gv('subcontractorDate'),
+    subcontractorName:gv('subcontractorName'),
     date:gv('irnDate')||new Date().toLocaleDateString('en-ZA'),
     result:iRes||'not set',
     rejectionReason:iRes==='reject'?gv('rejectionReason'):'',
@@ -2114,6 +2140,14 @@ function renderMgmt(){
     }
   }
 
+  // Concession holds
+  var concEl=document.getElementById('mg-conc-list');var concBadge=document.getElementById('mg-conc-badge');
+  if(concEl){var concP=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='concession';});if(concBadge)concBadge.textContent=concP.length;if(!concP.length){concEl.innerHTML='<div style="padding:14px;text-align:center;color:#aaa;font-size:12px">No concession holds</div>';}else{var ch='';concP.forEach(function(e){var l=e.irns[e.irns.length-1];var job=(e.req&&e.req.job)||(l&&l.job)||'--';var client=(e.req&&e.req.client)||(l&&l.project)||'--';var irqNo=e.reqNo||'--';ch+='<div style="padding:10px 14px;border-bottom:0.5px solid #eee"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:12px;font-weight:600;color:#1a3a5c">IRQ-'+irqNo+' · '+job+'</span><span style="font-size:10px;padding:2px 8px;border-radius:8px;background:#F3E5F5;color:#6A1B9A;font-weight:600">&#128274; Hold</span></div><div style="font-size:11px;color:#666">'+client+'</div><div style="font-size:11px;color:#6A1B9A"><b>NC:</b> '+(l&&l.nonConformance||'--')+'</div></div>';});concEl.innerHTML=ch;}}
+
+  // Subcontractor outstanding
+  var subEl=document.getElementById('mg-sub-list');var subBadge=document.getElementById('mg-sub-badge');
+  if(subEl){var subP=entries.filter(function(e){var l=e.irns[e.irns.length-1];var stage=(e.req&&e.req.inspTypes)||'';var isSub=stage.toLowerCase().includes('pwht')||stage.toLowerCase().includes('balancing')||stage.toLowerCase().includes('machining');return !l&&isSub;});if(subBadge)subBadge.textContent=subP.length;if(!subP.length){subEl.innerHTML='<div style="padding:14px;text-align:center;color:#aaa;font-size:12px">No outstanding subcontractor releases</div>';}else{var sh='';subP.forEach(function(e){var req=e.req;var job=(req&&req.job)||'--';var client=(req&&req.client)||'--';var irqNo=e.reqNo||'--';var stage=(req&&req.inspTypes)||'--';var days='';if(req&&req.date){var d=new Date(req.date);days=Math.floor((new Date()-d)/(864e5))+' days';}sh+='<div style="padding:10px 14px;border-bottom:0.5px solid #eee"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:12px;font-weight:600;color:#1a3a5c">IRQ-'+irqNo+' · '+job+'</span><span style="font-size:10px;padding:2px 8px;border-radius:8px;background:#FFF3E0;color:#E65100;font-weight:600">'+days+'</span></div><div style="font-size:11px;color:#666">'+client+' · '+stage+'</div></div>';});subEl.innerHTML=sh;}}
+
   // Recently released (last 10)
   var relEl=document.getElementById('mg-released-list');
   if(relEl){
@@ -2248,8 +2282,8 @@ function renderReg(){
   }
 
   // Build clean card list
-  var stageIds=['s0','s1','s2','s3','s4','s5','s6','s7','s8'];
-  var stageShort=['Pre','S1','S2','S3','S4','S5','S6','S7','Fin'];
+  var stageIds=['s0','s1','s2','s2b','s3','s4','s5','s6','s7','s8'];
+  var stageShort=['Pre','S1','S2','NDT','S3','S4','S5','S6','S7','Fin'];
   var html='';
 
   filtered.forEach(function(entry){
@@ -2391,7 +2425,8 @@ function printFromReg(btn){
   win.document.write('<!DOCTYPE html><html><head><title>IRN INS-C '+r.reportNo+(irqNo?' | IRQ-'+irqNo:'')+'</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10px;color:#1a1a1a}table{width:100%;border-collapse:collapse;margin-bottom:6px}th{background:#1a3a5c;color:#fff;padding:4px 6px;text-align:left;font-size:9px}td{font-size:10px;padding:3px 6px}.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:6px;margin-bottom:8px}.logo{height:36px}.result-pass{background:#EAF3DE;border:1px solid #1D9E75;padding:4px 8px;border-radius:4px;font-weight:700;color:#27500A;font-size:11px;margin-bottom:6px}.result-fail{background:#FCEBEB;border:1px solid #E24B4A;padding:4px 8px;border-radius:4px;font-weight:700;color:#A32D2D;font-size:11px;margin-bottom:6px}.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px}.cell{background:#f9f9f9;padding:4px 6px;border-radius:3px;border:0.5px solid #eee}.cl{font-size:8px;color:#888;text-transform:uppercase;margin-bottom:1px}.cv{font-size:10px;font-weight:500}.req-banner{background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:4px;padding:4px 8px;margin-bottom:6px;display:flex;gap:12px}.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px}.sign-box{border:0.5px solid #ddd;padding:6px 8px;border-radius:3px}.footer{font-size:8px;color:#aaa;text-align:center;margin-top:8px;border-top:0.5px solid #eee;padding-top:4px}.no-print{margin:8px 0}@media print{.no-print{display:none}body{margin:6mm}html{height:100%}}@page{size:A4 portrait;margin:8mm}</style></head><body>');
   var _rForCorr=r;var _irqForCorr=irqNo||'';
   var _corrR=r;var _corrIrq=irqNo||'';
-  win.document.write('<div class="no-print" style="display:flex;gap:8px;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back</button><button onclick="document.getElementById(\'corr-panel\').style.display=\'block\';this.style.display=\'none\';" style="padding:6px 14px;background:#BA7517;border:none;border-radius:6px;font-size:12px;cursor:pointer;color:#fff;font-weight:600">&#9998; Make Correction</button></div>');
+  var isConcRpt=r.result==='concession';
+  win.document.write('<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back</button><button onclick="document.getElementById(\'corr-panel\').style.display=\'block\';this.style.display=\'none\';" style="padding:6px 14px;background:#BA7517;border:none;border-radius:6px;font-size:12px;cursor:pointer;color:#fff;font-weight:600">&#9998; Make Correction</button>'+(isConcRpt?'<button onclick="document.getElementById(\'conc-panel\').style.display=\'block\';this.style.display=\'none\';" style="padding:6px 14px;background:#7B1FA2;border:none;border-radius:6px;font-size:12px;cursor:pointer;color:#fff;font-weight:600">&#128274; Concession Decision</button>':'')+' <button onclick="if(window.opener&&window.opener.openEmailFromPrint){window.opener.openEmailFromPrint(\''+r.reportNo+'\');}else{alert(\'Open from register\');}" style="padding:6px 14px;background:#185FA5;border:none;border-radius:6px;font-size:12px;cursor:pointer;color:#fff;font-weight:600">&#9993; Email</button></div>');
   var corrPass=r.result==='accept';
   win.document.write('<div id="corr-panel" class="no-print" style="display:none;background:#FFF8E6;border:2px solid #BA7517;border-radius:10px;padding:16px;margin-bottom:16px"><div style="font-size:14px;font-weight:700;color:#633806;margin-bottom:12px">&#9998; Make Correction — INS-C '+r.reportNo+'</div>');
   win.document.write('<div style="margin-bottom:10px"><label style="font-size:11px;font-weight:600;color:#666;display:block;margin-bottom:4px">Result</label><div style="display:flex;gap:8px"><button id="corr-pass" onclick="document.getElementById(\'corr-pass\').style.background=\'#1D9E75\';document.getElementById(\'corr-pass\').style.color=\'#fff\';document.getElementById(\'corr-fail\').style.background=\'#fff\';document.getElementById(\'corr-fail\').style.color=\'#666\';document.getElementById(\'corr-reject-fields\').style.display=\'none\';" style="flex:1;padding:8px;border:2px solid #1D9E75;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;background:'+(corrPass?'#1D9E75':'#fff')+';color:'+(corrPass?'#fff':'#666')+'">&#10003; PASS</button><button id="corr-fail" onclick="document.getElementById(\'corr-fail\').style.background=\'#E24B4A\';document.getElementById(\'corr-fail\').style.color=\'#fff\';document.getElementById(\'corr-pass\').style.background=\'#fff\';document.getElementById(\'corr-pass\').style.color=\'#666\';document.getElementById(\'corr-reject-fields\').style.display=\'block\';" style="flex:1;padding:8px;border:2px solid #E24B4A;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;background:'+(corrPass?'#fff':'#E24B4A')+';color:'+(corrPass?'#666':'#fff')+'">&#10007; FAIL / REWORK</button></div></div>');
@@ -2402,7 +2437,8 @@ function printFromReg(btn){
   win.document.write('<div class="'+(isPass?'result-pass':'result-fail')+'">'+(isPass?'✓ ACCEPTED — Released':'✗ REJECTED — Rework required')+'</div>');
   if(stageName)win.document.write('<div style="background:#1a3a5c;color:#fff;padding:5px 10px;border-radius:4px;font-size:11px;font-weight:600;margin-bottom:6px">Inspection stage: '+stageName+'</div>');
   if(irqNo||rSup)win.document.write('<div class="req-banner">'+(irqNo?'<div><div class="cl">Request ref</div><div class="cv" style="color:#185FA5">IRQ-'+irqNo+'</div></div>':'')+(rSup?'<div><div class="cl">Requested by</div><div class="cv">'+rSup+'</div></div>':'')+(rDate?'<div><div class="cl">Request date</div><div class="cv">'+rDate+'</div></div>':'')+'</div>');
-  win.document.write('<div class="grid"><div class="cell"><div class="cl">Job / Order</div><div class="cv">'+r.job+'</div></div><div class="cell"><div class="cl">Client</div><div class="cv">'+(r.project||'--')+'</div></div><div class="cell"><div class="cl">PO Number</div><div class="cv">'+(r.po||'--')+'</div></div><div class="cell"><div class="cl">Artisan</div><div class="cv">'+(r.artisan||'--')+'</div></div><div class="cell"><div class="cl">Drawing / Rev</div><div class="cv">'+(r.drawing||'--')+'</div></div><div class="cell"><div class="cl">Inspection stage</div><div class="cv" style="color:#1a3a5c;font-weight:600">'+(stageName||'--')+'</div></div></div>');
+  if(r.subcontractorDate||r.subcontractorName){win.document.write('<div style="background:#EAF3DE;border:1px solid #c3dfa0;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px"><strong>Subcontractor release:</strong> '+(r.subcontractorName||'--')+' &nbsp;&middot;&nbsp; Released: '+(r.subcontractorDate||'--')+'</div>');}
+win.document.write('<div class="grid"><div class="cell"><div class="cl">Job / Order</div><div class="cv">'+r.job+'</div></div><div class="cell"><div class="cl">Client</div><div class="cv">'+(r.project||'--')+'</div></div><div class="cell"><div class="cl">PO Number</div><div class="cv">'+(r.po||'--')+'</div></div><div class="cell"><div class="cl">Artisan</div><div class="cv">'+(r.artisan||'--')+'</div></div><div class="cell"><div class="cl">Drawing / Rev</div><div class="cv">'+(r.drawing||'--')+'</div></div><div class="cell"><div class="cl">Inspection stage</div><div class="cv" style="color:#1a3a5c;font-weight:600">'+(stageName||'--')+'</div></div></div>');
   if(itemRows)win.document.write('<table><thead><tr><th style="width:30px">#</th><th>Item description</th><th style="width:50px;text-align:center">Qty</th></tr></thead><tbody>'+itemRows+'</tbody></table>');
   if(stageName&&criteriaRows)win.document.write('<table><thead><tr><th colspan="2">Inspection checklist — '+stageName+'</th></tr></thead><tbody>'+criteriaRows+'</tbody></table>');
   if(r.notes)win.document.write('<div style="margin-bottom:12px;padding:8px;background:#f9f9f9;border-radius:4px;border:0.5px solid #eee"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:3px">Inspection notes</div><div style="font-size:12px">'+r.notes+'</div></div>');
@@ -2472,6 +2508,12 @@ function resubmitRequest(btn){
     if(window.resubmitRequest)window.resubmitRequest(firebaseId,attempt);
     toast('IRQ-'+reqNo+' re-submitted (Attempt '+attempt+')','ok');
   }
+}
+function checkSubcontractorCard(){
+  var reqType=(_urlReq&&_urlReq.inspTypes)||'';
+  var isSub=reqType.toLowerCase().includes('pwht')||reqType.toLowerCase().includes('balancing')||reqType.toLowerCase().includes('machining');
+  var card=document.getElementById('subcontractorCard');
+  if(card)card.style.display=isSub?'block':'none';
 }
 function completeRequest(btn){
   var firebaseId=btn.dataset.fid;
