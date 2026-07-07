@@ -127,7 +127,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .ra{font-size:11px;padding:5px 10px;border-radius:6px;border:0.5px solid #ddd;background:#fff;cursor:pointer;color:#666;display:flex;align-items:center;gap:4px}
 .ra.bl{border-color:#185FA5;color:#185FA5}
 .ra.wa{border-color:#25D366;color:#25D366}
-.sg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.sg{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px}
 .sc2{background:#f4f4f0;border-radius:8px;padding:8px 10px;text-align:center}
 .filt-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
 .filt-btn{font-size:11px;padding:4px 10px;border-radius:10px;border:0.5px solid #ddd;background:#fff;color:#666;cursor:pointer}
@@ -157,29 +157,90 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 <link rel="manifest" href="manifest.json">
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
-import{getFirestore,doc,getDoc,addDoc,collection,query,orderBy,onSnapshot,runTransaction}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
+import{getFirestore,doc,getDoc,getDocs,addDoc,updateDoc,setDoc,deleteDoc,collection,query,orderBy,onSnapshot,runTransaction}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
 const app=initializeApp({apiKey:"AIzaSyC3sKMm02GnikBdgXPd4RUm7RxnsR90A_I",authDomain:"fse-irn-system.firebaseapp.com",projectId:"fse-irn-system",storageBucket:"fse-irn-system.firebasestorage.app",messagingSenderId:"1097944808267",appId:"1:1097944808267:web:d8f1f3a52e2223253f86ce"});
 const db=getFirestore(app);
 window.peekNextIRN=async function(){try{const r=doc(db,'counters','irn');const d=await getDoc(r);const c=d.exists()?d.data().count:0;return String(c+1).padStart(4,'0');}catch(e){return'----';}};
+window.peekNextIRQ=async function(){try{const r=doc(db,'counters','irq');const d=await getDoc(r);const c=d.exists()?d.data().count:0;return String(c+1).padStart(4,'0');}catch(e){return'----';}};
+window.getNextIRQ=async function(){try{const r=doc(db,'counters','irq');const n=await runTransaction(db,async(t)=>{const d=await t.get(r);const c=d.exists()?d.data().count:0;const x=c+1;t.set(r,{count:x});return x;});return String(n).padStart(4,'0');}catch(e){return String(Date.now()).slice(-4);}};
 window.getNextIRN=async function(){try{const r=doc(db,'counters','irn');const n=await runTransaction(db,async(t)=>{const d=await t.get(r);const c=d.exists()?d.data().count:0;const x=c+1;t.set(r,{count:x});return x;});return String(n).padStart(4,'0');}catch(e){return String(Date.now()).slice(-4);}};
-window.saveIRNToFirebase=async function(data){try{var s=Object.assign({},data);if(s.stageStates){var cs={};Object.keys(s.stageStates).forEach(function(k){var st=Object.assign({},s.stageStates[k]);st.photos=st.photos?st.photos.length+' photo(s)':'0';cs[k]=st;});s.stageStates=cs;}s.timestamp=new Date().toISOString();await addDoc(collection(db,'irns'),s);return true;}catch(e){return false;}};
-window.saveRequestToFirebase=async function(data){try{var s=Object.assign({},data);s.timestamp=new Date().toISOString();await addDoc(collection(db,'requests'),s);return true;}catch(e){return false;}};
+window.saveIRNToFirebase=async function(data){
+  try{
+    var s=Object.assign({},data);
+    // Preserve stage states with criteria but strip photo base64
+    if(s.stageStates){
+      var cs={};
+      Object.keys(s.stageStates).forEach(function(k){
+        var st=Object.assign({},s.stageStates[k]);
+        st.photos=[]; // Strip photos to save space
+        cs[k]=st;
+      });
+      s.stageStates=cs;
+    }
+    // Keep inspector photos but limit to 15
+    if(s.inspPhotoData&&s.inspPhotoData.length>0){
+      s.inspPhotoData=s.inspPhotoData.slice(0,15);
+    }
+    s.timestamp=new Date().toISOString();
+    await addDoc(collection(db,'irns'),s);
+    return true;
+  }catch(e){console.error('IRN save error:',e);return false;}
+};
+window.clearAllData=async function(){
+  try{
+    var isnap=await getDocs(collection(db,'irns'));
+    var rsnap=await getDocs(collection(db,'requests'));
+    var batch=[];
+    isnap.forEach(function(d){batch.push(deleteDoc(doc(db,'irns',d.id)));});
+    rsnap.forEach(function(d){batch.push(deleteDoc(doc(db,'requests',d.id)));});
+    await Promise.all(batch);
+    // Reset counters
+    await setDoc(doc(db,'counters','irn'),{count:0});
+    await setDoc(doc(db,'counters','irq'),{count:0});
+    return true;
+  }catch(e){console.error(e);return false;}
+};
+window.saveCodesToFirebase=async function(){try{await setDoc(doc(db,'settings','codes'),{qc:codes.qc,sup:codes.sup});return true;}catch(e){return false;}};
+window.loadCodesFromFirebase=async function(){try{var d=await getDoc(doc(db,'settings','codes'));if(d.exists()){var data=d.data();if(data.qc){codes.qc=data.qc.map(function(c){return Object.assign({pin:''},c);});}if(data.sup){codes.sup=data.sup.map(function(c){return Object.assign({pin:''},c);});}}}catch(e){console.log('Codes load error:',e);}};
+window.saveRequestToFirebase=async function(data){
+  try{
+    var s=Object.assign({},data);
+    s.timestamp=new Date().toISOString();
+    s.status='pending';
+    s.attempt=data.attempt||1;
+    // Remove photo data from Firebase save if too large
+    if(s.reqPhotoData&&s.reqPhotoData.length>0){
+      var totalSize=s.reqPhotoData.join('').length;
+      if(totalSize>500000){s.reqPhotoData=[];} // Skip photos if over 500KB
+    }
+    var ref=await addDoc(collection(db,'requests'),s);
+    console.log('Request saved to Firebase:',ref.id,'IRQ:',data.reqNo);
+    return true;
+  }catch(e){
+    console.error('Firebase save error:',e);
+    return false;
+  }
+};
+window.resubmitRequest=async function(firebaseId,attempt){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'pending',attempt:attempt,resubmittedAt:new Date().toISOString()});return true;}catch(e){return false;}};
+window.loadRequestsFromFirebase=function(cb){
+  try{
+    var q=query(collection(db,'requests'),orderBy('timestamp','desc'));
+    return onSnapshot(q,function(snap){
+      var r=[];
+      snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});
+      console.log('Loaded',r.length,'requests from Firebase. Pending:',r.filter(function(x){return x.status==='pending';}).length);
+      cb(r);
+    });
+  }catch(e){console.error('Load requests error:',e);cb([]);}
+};
+window.markRequestComplete=async function(firebaseId){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'complete'});return true;}catch(e){return false;}};
+window.markRequestRework=async function(firebaseId){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'rework'});return true;}catch(e){return false;}};
 window.loadIRNsFromFirebase=function(cb){try{var q=query(collection(db,'irns'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);});}catch(e){cb([]);}};
 window.addEventListener('DOMContentLoaded',async function(){var n=await window.peekNextIRN();window._nextIRNNum=n;var el=document.getElementById('reportNo');if(el&&!el.value){el.value=n;el.style.color='rgba(255,255,255,0.6)';}});
 </script>
 </head>
 <body><script>
-(function(){
-  var start=new Date('2026-06-02');
-  var expiry=new Date('2026-07-02');
-  var today=new Date();
-  today.setHours(0,0,0,0);
-  if(today>expiry){
-    document.body.innerHTML='';
-    document.body.style.cssText='margin:0;padding:0;background:#0d2137;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:-apple-system,sans-serif';
-    document.body.innerHTML='<div style="text-align:center;max-width:320px;padding:40px 24px;color:#fff"><div style="width:80px;height:80px;background:#E24B4A;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;font-size:36px">&#128274;</div><div style="font-size:11px;color:rgba(255,255,255,0.5);letter-spacing:3px;text-transform:uppercase;margin-bottom:8px">Field Services &amp; Engineering</div><div style="font-size:22px;font-weight:600;margin-bottom:8px">Trial Period Expired</div><div style="font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:32px">Your 30-day trial of the FSE IRN System ended on 2 July 2026. Contact Xtreme SHEQ Solutions to activate your licence and retain all your data.</div><div style="background:rgba(255,255,255,0.08);border-radius:12px;padding:16px;margin-bottom:16px;border:0.5px solid rgba(255,255,255,0.15)"><div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Contact</div><div style="font-size:14px;font-weight:500;margin-bottom:4px">Xtreme SHEQ Solutions</div><div style="font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:4px">Eric Fredericks</div><div style="font-size:13px;color:#4FC3F7">083 764 5717</div></div><div style="font-size:11px;color:rgba(255,255,255,0.3)">Your inspection data is safe and will be restored on activation.</div></div>';
-  }
-})();
+// System active
 </script><div id="splashScreen" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0d2137;padding:40px 24px;box-sizing:border-box">
 <div style="text-align:center;max-width:320px;width:100%">
 <div style="width:100px;height:100px;background:#fff;border-radius:20px;display:flex;align-items:center;justify-content:center;margin:0 auto 24px"><img src="data:image/png;base64,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" style="width:80px;height:80px;object-fit:contain" alt="FSE"></div>
@@ -199,8 +260,8 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
 <img id="fseLogo" src="data:image/png;base64,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" style="display:none" alt="FSE">
 <div class="app">
   <div class="nav no-print">
-    <button class="nb on" onclick="showV('form',this)"><i class="ti ti-file-plus" style="font-size:12px"></i> New IRN</button>
-    <button class="nb" onclick="showV('request',this)"><i class="ti ti-bell" style="font-size:12px"></i> Inspect Req</button>
+    <button class="nb on" onclick="showV('request',this)"><i class="ti ti-bell" style="font-size:12px"></i> Inspect Req</button>
+    <button class="nb" onclick="handleNewIRNClick(this)" style="opacity:0.6" title="Accessible via WhatsApp inspection link only"><i class="ti ti-file-plus" style="font-size:12px"></i> New IRN <i class="ti ti-lock" style="font-size:9px"></i></button>
     <button class="nb" onclick="showV('register',this)"><i class="ti ti-list" style="font-size:12px"></i> Register</button>
     <button class="nb" onclick="showV('admin',this)"><i class="ti ti-settings" style="font-size:12px"></i> Admin</button>
   </div>
@@ -223,106 +284,154 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
       </div>
     </div>
 
-    <div class="card">
-      <div class="ct"><i class="ti ti-id-badge" style="font-size:13px"></i> Inspector &amp; book reference</div>
-      <div class="fr"><div class="fl">Inspector name</div><input class="fi" id="inspector" placeholder="Full name"></div>
-      <div class="fr"><div class="fl">Book reference</div><input class="fi" id="bookRef" placeholder="e.g. B03" oninput="suggestNext()"></div>
-      <div class="fr"><div class="fl">Next IRN no.</div><div id="irnSuggest" style="font-size:12px;color:#888">Enter book ref above</div></div>
+    <!-- Waiting screen — shown when no IRQ link -->
+    <div id="waitingScreen" style="display:none;text-align:center;padding:48px 24px">
+      <div style="width:72px;height:72px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+        <i class="ti ti-clock" style="font-size:32px;color:#185FA5"></i>
+      </div>
+      <div style="font-size:16px;font-weight:600;color:#1a3a5c;margin-bottom:8px">Waiting for inspection request</div>
+      <div style="font-size:13px;color:#888;margin-bottom:24px;line-height:1.5">When a supervisor raises an inspection request you will receive a WhatsApp notification with a direct link to the job.</div>
+      <div style="background:#f9f9f7;border-radius:10px;padding:16px;text-align:left;max-width:300px;margin:0 auto">
+        <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">How it works</div>
+        <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px"><div style="width:20px;height:20px;border-radius:50%;background:#1a3a5c;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</div><div style="font-size:12px;color:#444">Supervisor raises request on Inspect Req tab</div></div>
+        <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px"><div style="width:20px;height:20px;border-radius:50%;background:#1a3a5c;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</div><div style="font-size:12px;color:#444">You receive a WhatsApp with the job details and link</div></div>
+        <div style="display:flex;align-items:flex-start;gap:8px"><div style="width:20px;height:20px;border-radius:50%;background:#1a3a5c;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</div><div style="font-size:12px;color:#444">Tap the link — form pre-filled and ready to complete</div></div>
+      </div>
     </div>
 
+    <!-- IRQ notification banner — colour coded by urgency -->
+    <div id="irqNotifBanner" style="display:none;margin-bottom:8px;border-radius:10px;overflow:hidden">
+    </div>
+
+    <!-- Main form — hidden until IRQ received -->
+    <div id="mainFormContent" style="display:none">
+
     <div class="card">
-      <div class="ct"><i class="ti ti-briefcase" style="font-size:13px"></i> Job details</div>
+      <div class="ct"><i class="ti ti-briefcase" style="font-size:13px"></i> Step 1 — Job details</div>
+      <div id="inheritedBanner" style="display:none;background:#E6F1FB;border-radius:6px;padding:6px 10px;margin:0 14px 8px;font-size:11px;color:#0C447C"><i class="ti ti-link" style="font-size:13px"></i> Pre-filled from inspection request</div>
+      <div class="fr"><div class="fl">Job / order no.</div><input class="fi" id="job" placeholder="e.g. F52573"></div>
+      <div class="fr"><div class="fl">Client</div><input class="fi" id="project" placeholder="e.g. TLT Lobster Bend VS2"></div>
       <div class="fr"><div class="fl">PO number</div><input class="fi" id="po" placeholder="e.g. 20840/2130/519"></div>
-      <div class="fr"><div class="fl">Job number</div><input class="fi" id="job" placeholder="e.g. FSJ507"></div>
-      <div class="fr"><div class="fl">Project desc.</div><input class="fi" id="project" placeholder="e.g. DRYTECH-519-130"></div>
-      <div class="fr"><div class="fl">Drawing / Rev</div><input class="fi" id="drawing" placeholder="e.g. A1-519-130-19-08"></div>
-      <div class="fr"><div class="fl">Artisan</div><input class="fi" id="artisan" placeholder="Name"></div>
+      <div class="fr"><div class="fl">Artisan name</div><input class="fi" id="artisan" placeholder="Name (optional)"></div>
       <div class="fr"><div class="fl">Date</div><input class="fi" type="date" id="irnDate"></div>
-      <div class="res-row">
-        <div style="font-size:11px;color:#666;font-weight:500;margin-right:4px">Overall result:</div>
-        <button class="rb acc" id="btnAcc" onclick="setRes('accept')"><i class="ti ti-check"></i> Accept</button>
-        <button class="rb rej" id="btnRej" onclick="setRes('reject')"><i class="ti ti-x"></i> Reject</button>
-        <div style="font-size:10px;color:#888;margin-left:4px">Auto-set from stages</div>
-      </div>
-      <div id="rejectionPanel" style="display:none;margin:0 14px 12px;padding:12px;background:#FCEBEB;border:1px solid #E24B4A;border-radius:8px">
-        <div style="font-size:11px;font-weight:500;color:#A32D2D;margin-bottom:8px;display:flex;align-items:center;gap:5px"><i class="ti ti-alert-circle" style="font-size:14px"></i> Rejection details required before submission</div>
-        <div style="margin-bottom:8px">
-          <div style="font-size:10px;font-weight:500;color:#A32D2D;margin-bottom:4px">Rejection reason <span style="color:#E24B4A">*</span></div>
-          <textarea id="rejectionReason" style="width:100%;padding:8px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:60px;background:#fff;outline:none" placeholder="Describe what was found and why this is being rejected..."></textarea>
-        </div>
-        <div>
-          <div style="font-size:10px;font-weight:500;color:#A32D2D;margin-bottom:4px">Action required <span style="color:#E24B4A">*</span></div>
-          <textarea id="rejectionAction" style="width:100%;padding:8px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:60px;background:#fff;outline:none" placeholder="What must be done before re-inspection and release..."></textarea>
-        </div>
-      </div>
     </div>
 
     <div class="card">
-      <div class="ct"><i class="ti ti-list" style="font-size:13px"></i> Items being released</div>
-      <div id="itemList"></div>
-      <button class="add-btn" onclick="addItem()"><i class="ti ti-plus"></i> Add item</button>
-    </div>
-
-    <div class="card">
-      <div class="ct"><i class="ti ti-shield-check" style="font-size:13px"></i> Inspection stages</div>
-      <div style="padding:7px 14px 3px;font-size:11px;color:#666">
-        <span style="display:inline-flex;align-items:center;gap:3px;margin-right:10px"><span style="width:10px;height:10px;border-radius:2px;background:#1a3a5c;display:inline-block"></span> Gate</span>
-        <span style="display:inline-flex;align-items:center;gap:3px;margin-right:10px"><span style="width:10px;height:10px;border-radius:2px;background:#185FA5;display:inline-block"></span> Criteria</span>
-        <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:10px;height:10px;border-radius:2px;background:#25D366;display:inline-block"></span> Photo</span>
-      </div>
-      <div id="stageList"></div>
-      <div class="ssum" id="stageSummary"></div>
-    </div>
-
-    <div class="card">
-      <div class="ct"><i class="ti ti-ruler" style="font-size:13px"></i> Fabrication dimensions</div>
+      <div class="ct"><i class="ti ti-file-description" style="font-size:13px"></i> Step 2 — Drawing confirmation</div>
       <div style="padding:4px 14px 10px">
-        <table class="dt"><thead><tr><th style="width:24px">Dim</th><th>Drawing</th><th>Measured</th><th style="width:36px"></th></tr></thead>
+        <div style="font-size:11px;color:#666;margin-bottom:8px">Inspector confirms correct drawing and revision is being used</div>
+        <div class="fr"><div class="fl">Drawing no. &amp; Rev</div><input class="fi" id="drawing" placeholder="e.g. A1-519-130-19-08 Rev 0"></div>
+        <div style="display:flex;gap:8px;margin-top:8px;padding:0">
+          <button id="drawOkBtn" onclick="setDrawing('ok')" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid #ccc;background:#fff;font-size:12px;font-weight:500;cursor:pointer;color:#666;text-align:center">
+            <i class="ti ti-circle-check" style="font-size:16px;display:block;margin:0 auto 3px"></i>Drawing correct
+          </button>
+          <button id="drawFlagBtn" onclick="setDrawing('flag')" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid #ccc;background:#fff;font-size:12px;font-weight:500;cursor:pointer;color:#666;text-align:center">
+            <i class="ti ti-alert-triangle" style="font-size:16px;display:block;margin:0 auto 3px"></i>Wrong drawing
+          </button>
+        </div>
+        <div id="drawFlagNote" style="display:none;margin-top:8px;padding:8px;background:#FAEEDA;border:1px solid #BA7517;border-radius:6px">
+          <div style="font-size:11px;color:#633806;margin-bottom:4px;font-weight:500">Specify the issue</div>
+          <textarea id="drawingNote" style="width:100%;padding:6px 8px;border:1px solid #BA7517;border-radius:6px;font-size:12px;font-family:inherit;resize:none;height:50px;outline:none;background:#fff" placeholder="e.g. Old Rev 0 used, correct drawing is Rev 2..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct"><i class="ti ti-list-check" style="font-size:13px"></i> Step 3 — Items &amp; checklist</div>
+      <div style="padding:0 14px 4px">
+        <div id="irqRefBanner" style="display:none;background:#E6F1FB;border-radius:6px;padding:6px 10px;margin:0 0 8px;font-size:11px;color:#0C447C"><i class="ti ti-link" style="font-size:13px"></i> <span id="irqRefText"></span></div>
+        <div style="font-size:10px;font-weight:500;color:#666;text-transform:uppercase;letter-spacing:0.5px;padding:6px 0 4px;border-bottom:0.5px solid #eee;margin-bottom:4px">Items being released</div>
+        <div id="itemList"></div>
+        <button class="add-btn" onclick="addItem()"><i class="ti ti-plus"></i> Add item</button>
+      </div>
+      <div style="padding:0 14px 10px;margin-top:4px">
+        <div style="font-size:10px;font-weight:500;color:#666;text-transform:uppercase;letter-spacing:0.5px;padding:8px 0 6px;border-top:0.5px solid #eee;border-bottom:0.5px solid #eee;margin-bottom:8px">Inspection checklist — from request</div>
+        <div id="quickCheckList"><div style="font-size:12px;color:#aaa;padding:4px 0">No checklist from request — use stage checklist below</div></div>
+        <div style="margin-top:10px">
+          <div style="font-size:10px;font-weight:500;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Full stage checklist</div>
+          <div id="stageList"></div>
+          <div class="ssum" id="stageSummary"></div>
+        </div>
+      </div>
+      <!-- Inspector photos -->
+      <div style="padding:0 14px 12px;border-top:0.5px solid #eee;margin-top:4px">
+        <div style="font-size:10px;font-weight:500;color:#666;text-transform:uppercase;letter-spacing:0.5px;padding:8px 0 6px">Inspector photos</div>
+        <div id="inspPhotos" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px"></div>
+        <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;border:1.5px dashed #185FA5;background:#f0f6ff;color:#185FA5;font-size:12px;font-weight:500;cursor:pointer">
+          <i class="ti ti-camera" style="font-size:18px"></i> Take / add inspection photo
+          <input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="addInspPhotos(this)">
+        </label>
+        <div style="font-size:10px;color:#aaa;margin-top:4px">Photos will appear in the printed report</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px 4px">
+        <div style="font-size:12px;font-weight:500;color:#333"><i class="ti ti-ruler" style="font-size:13px"></i> Dimensions <span style="font-size:10px;font-weight:400;color:#888">(if applicable)</span></div>
+        <button onclick="toggleDims()" id="dimsToggleBtn" style="font-size:11px;padding:3px 10px;background:#f0f0f0;border:none;border-radius:6px;cursor:pointer;color:#666">+ Show</button>
+      </div>
+      <div id="dimsSection" style="display:none;padding:4px 14px 10px">
+        <table class="dt"><thead><tr><th style="width:24px">Dim</th><th>Description</th><th>Drawing</th><th>Measured</th><th style="width:70px;text-align:center">Pass/Fail</th></tr></thead>
         <tbody id="fabBody"></tbody></table>
         <button class="add-dim" onclick="addFab()"><i class="ti ti-plus" style="font-size:11px"></i> Add row</button>
       </div>
     </div>
 
     <div class="card">
-      <div class="ct"><i class="ti ti-note" style="font-size:13px"></i> Inspection notes</div>
-      <textarea style="width:100%;padding:10px 14px;background:transparent;border:none;resize:vertical;min-height:68px;font-size:13px;color:#1a1a1a;font-family:inherit;outline:none" id="notes" placeholder="Record findings, observations, deviations..."></textarea>
-    </div>
-
-    <div class="card">
-      <div class="ct"><i class="ti ti-lock" style="font-size:13px"></i> Sign-off &mdash; codes required</div>
-      <div class="signoff-block">
-        <div class="so-role"><i class="ti ti-hard-hat" style="font-size:14px;color:#1a3a5c"></i> Supervisor <span style="font-size:10px;color:#E24B4A;font-weight:400">* Required</span></div>
-        <div class="so-sub">Enter SUP code to authorise release</div>
-        <input class="code-in" id="supCode" placeholder="SUP-000" maxlength="7" oninput="validateCode('sup')">
-        <div class="code-status" id="supStatus"></div>
+      <div class="ct"><i class="ti ti-lock" style="font-size:13px"></i> Step 4 — Notes &amp; sign-off</div>
+      <div style="padding:0 14px 10px">
+        <div style="font-size:10px;color:#666;margin-bottom:4px;font-weight:500">Inspection notes</div>
+        <textarea style="width:100%;padding:8px 10px;background:#f9f9f7;border:0.5px solid #ddd;border-radius:6px;resize:none;min-height:60px;font-size:13px;color:#1a1a1a;font-family:inherit;outline:none" id="notes" placeholder="Record findings, observations, deviations..."></textarea>
       </div>
-      <div class="signoff-block">
-        <div class="so-role"><i class="ti ti-eye-check" style="font-size:14px;color:#185FA5"></i> Quality (QC) <span style="font-size:10px;color:#E24B4A;font-weight:400">* Required</span></div>
-        <div class="so-sub">Enter QC code to authorise release</div>
-        <input class="code-in" id="qcCode" placeholder="QC-000" maxlength="6" oninput="validateCode('qc')">
-        <div class="code-status" id="qcStatus"></div>
+      <div style="padding:0 14px 10px">
+        <div style="font-size:10px;color:#666;margin-bottom:6px;font-weight:500">Overall result</div>
+        <div style="display:flex;gap:8px">
+          <button class="rb acc" id="btnAcc" onclick="setRes('accept')" style="flex:1;padding:10px;font-size:13px"><i class="ti ti-check"></i> Accept / Release</button>
+          <button class="rb rej" id="btnRej" onclick="setRes('reject')" style="flex:1;padding:10px;font-size:13px"><i class="ti ti-x"></i> Reject</button>
+        </div>
+        <div id="rejectionPanel" style="display:none;margin-top:8px;padding:12px;background:#FCEBEB;border:1px solid #E24B4A;border-radius:8px">
+          <div style="font-size:11px;font-weight:500;color:#A32D2D;margin-bottom:8px"><i class="ti ti-alert-circle" style="font-size:14px"></i> Rejection details required</div>
+          <div style="margin-bottom:8px">
+            <div style="font-size:10px;font-weight:500;color:#A32D2D;margin-bottom:4px">Rejection reason <span style="color:#E24B4A">*</span></div>
+            <textarea id="rejectionReason" style="width:100%;padding:8px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:60px;background:#fff;outline:none" placeholder="Describe what was found..."></textarea>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:500;color:#A32D2D;margin-bottom:4px">Action required <span style="color:#E24B4A">*</span></div>
+            <textarea id="rejectionAction" style="width:100%;padding:8px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:60px;background:#fff;outline:none" placeholder="What must be done before re-inspection..."></textarea>
+          </div>
+        </div>
       </div>
-      <div class="signoff-block">
-        <div class="so-role"><i class="ti ti-building" style="font-size:14px;color:#888"></i> Client <span class="optional-tag">If applicable</span></div>
-        <div class="so-sub">Print report for wet signature if required</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
-          <div><div style="font-size:10px;color:#666;margin-bottom:3px">Client name</div><input class="fi" id="clientName" placeholder="Full name"></div>
-          <div><div style="font-size:10px;color:#666;margin-bottom:3px">Company</div><input class="fi" id="clientCo" placeholder="Company"></div>
+      <div style="padding:0 14px 12px">
+        <div style="font-size:10px;color:#666;margin-bottom:8px;font-weight:500">Sign-off codes</div>
+        <div>
+          <div style="font-size:10px;color:#666;margin-bottom:3px"><i class="ti ti-eye-check" style="font-size:12px;color:#185FA5"></i> QC inspector <span style="color:#E24B4A">*</span></div>
+          <input class="code-in" id="qcCode" placeholder="QC-000" maxlength="6" oninput="validateCode('qc')" style="width:100%">
+          <div class="code-status" id="qcStatus"></div>
+        </div>
+        <input type="hidden" id="supCode" value="">
+        <div id="supStatus"></div>
+        <div style="margin-top:10px">
+          <div style="font-size:10px;color:#888;margin-bottom:4px"><i class="ti ti-building" style="font-size:12px"></i> Client sign-off (if applicable)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <input class="fi" id="clientName" placeholder="Client name">
+            <input class="fi" id="clientCo" placeholder="Company">
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="ag no-print">
-      <button class="ab pr" onclick="printIRN()"><i class="ti ti-printer"></i> Print IRN</button>
-      <button class="ab wa" onclick="sendWA()"><i class="ti ti-brand-whatsapp"></i> WhatsApp</button>
-    </div>
+    </div> <!-- end mainFormContent -->
+
+    <div id="formActions" style="display:none">
     <div class="ag no-print" style="margin-top:8px">
-      <button class="ab sub" id="submitBtn" onclick="submitIRN()" style="grid-column:1/-1;padding:12px"><i class="ti ti-cloud-upload"></i> Submit &amp; notify FSE QC Releases</button>
+      <button class="ab pr" onclick="printIRN()" style="padding:11px"><i class="ti ti-printer"></i> Print IRN</button>
+      <button class="ab sub" id="submitBtn" onclick="submitIRN()" style="padding:11px;background:#1D9E75;border-color:#1D9E75"><i class="ti ti-send"></i> Release &amp; Notify</button>
+    </div>
     </div>
     <div style="height:16px"></div>
   </div>
 
-  <div id="v-request" class="view">
+    <div id="v-request" class="view">
     <div class="hdr">
       <div class="hdr-top">
         <div class="hdr-left">
@@ -361,8 +470,9 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
     </div>
 
     <div class="card">
-      <div class="ct"><i class="ti ti-note" style="font-size:13px"></i> Special instructions</div>
-      <textarea style="width:100%;padding:10px 14px;background:transparent;border:none;resize:vertical;min-height:80px;font-size:13px;color:#1a1a1a;font-family:inherit;outline:none" id="reqInstructions" placeholder="e.g. Access doors to be fitted after initial weld. Inspect prior to closing..."></textarea>
+      <div class="ct"><i class="ti ti-note" style="font-size:13px"></i> What must the inspector check?</div>
+      <textarea style="width:100%;padding:10px 14px;background:transparent;border:none;resize:vertical;min-height:80px;font-size:13px;color:#1a1a1a;font-family:inherit;outline:none" id="reqInstructions" placeholder="e.g. Check level, square, dimensional correct, dog tags attached, PCD correct on N°1, N°2 &amp; N°3 before welding..."></textarea>
+      <div style="padding:0 14px 8px;font-size:10px;color:#888">Type each check on a new line or separated by commas — these become the inspector's checklist</div>
     </div>
 
     <div class="card">
@@ -394,8 +504,22 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
       </div>
     </div>
 
+    <div style="margin-top:10px;background:#FCEBEB;border:1.5px solid #E24B4A;border-radius:10px;padding:12px 14px">
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
+        <i class="ti ti-alert-triangle" style="font-size:18px;color:#E24B4A;flex-shrink:0;margin-top:1px"></i>
+        <div>
+          <div style="font-size:12px;font-weight:600;color:#A32D2D;margin-bottom:4px">Pre-submission declaration — required</div>
+          <div style="font-size:12px;color:#A32D2D;line-height:1.5">I confirm that the item(s) listed have been physically verified by myself and the artisan prior to this inspection request being raised. All previous stage requirements have been met and the work is ready for QC inspection and release.</div>
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="reqAckCheck" onchange="toggleReqSubmit()" style="width:16px;height:16px;accent-color:#E24B4A;cursor:pointer">
+        <span style="font-size:12px;font-weight:600;color:#A32D2D">I acknowledge the above declaration</span>
+      </label>
+    </div>
+
     <div style="margin-top:10px">
-      <button class="ab sub" id="reqSubmitBtn" onclick="submitRequest()" style="width:100%;padding:12px;border-radius:8px"><i class="ti ti-send"></i> Submit request &amp; notify QC group</button>
+      <button class="ab sub" id="reqSubmitBtn" onclick="submitRequest()" disabled style="width:100%;padding:12px;border-radius:8px;opacity:0.5;cursor:not-allowed"><i class="ti ti-send"></i> Submit request &amp; notify QC group</button>
     </div>
 
     <div style="margin-top:8px">
@@ -406,31 +530,58 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
   </div>
 
   <div id="v-register" class="view">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div style="font-size:14px;font-weight:500">IRN Register</div>
-      <button class="ab pri" onclick="showV('form',document.querySelectorAll('.nb')[0])" style="font-size:11px;padding:5px 10px"><i class="ti ti-plus"></i> New IRN</button>
+    <div class="hdr">
+      <div class="hdr-top">
+        <div class="hdr-left">
+          <img id="regLogo" class="fse-logo" alt="FSE">
+          <div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.55);margin-bottom:1px">FIELD SERVICES &amp; ENGINEERING</div>
+            <h1>IRN Register</h1>
+            <div class="hdr-meta">Inspection request and release history</div>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="sg">
       <div class="sc2"><div style="font-size:22px;font-weight:500" id="statT">0</div><div style="font-size:10px;color:#666">Total</div></div>
-      <div style="background:#EAF3DE;border-radius:8px;padding:8px 10px;text-align:center"><div style="font-size:22px;font-weight:500;color:#27500A" id="statP">0</div><div style="font-size:10px;color:#3B6D11">Passed</div></div>
-      <div style="background:#FCEBEB;border-radius:8px;padding:8px 10px;text-align:center"><div style="font-size:22px;font-weight:500;color:#A32D2D" id="statF">0</div><div style="font-size:10px;color:#A32D2D">Failed</div></div>
+      <div style="background:#EAF3DE;border-radius:8px;padding:8px 10px;text-align:center"><div style="font-size:22px;font-weight:500;color:#27500A" id="statP">0</div><div style="font-size:10px;color:#3B6D11">Released</div></div>
+      <div style="background:#FCEBEB;border-radius:8px;padding:8px 10px;text-align:center"><div style="font-size:22px;font-weight:500;color:#A32D2D" id="statF">0</div><div style="font-size:10px;color:#A32D2D">Pending</div></div>
+      <div style="background:#E6F1FB;border-radius:8px;padding:8px 10px;text-align:center"><div style="font-size:22px;font-weight:500;color:#0C447C" id="statFTP">0%</div><div style="font-size:10px;color:#185FA5">1st pass</div></div>
     </div>
+    <div id="stageChart" style="display:none;background:#fff;border:0.5px solid #eee;border-radius:10px;padding:12px;margin-bottom:8px"></div>
     <div class="filt-row">
-      <button class="filt-btn on" onclick="setFilt('all',this)">All</button>
-      <button class="filt-btn" onclick="setFilt('pass',this)">Passed</button>
-      <button class="filt-btn" onclick="setFilt('fail',this)">Failed</button>
-      <button class="filt-btn" onclick="setFilt('partial',this)">Incomplete</button>
+      <button class="filt-btn on" onclick="setRegFilt('all',this)">All</button>
+      <button class="filt-btn" onclick="setRegFilt('pending',this)">Pending</button>
+      <button class="filt-btn" onclick="setRegFilt('released',this)">Released</button>
+      <button class="filt-btn" onclick="setRegFilt('rework',this)">Rework</button>
     </div>
-    <div id="regList"><div style="text-align:center;padding:32px 16px;color:#888;font-size:13px"><i class="ti ti-clipboard-list" style="font-size:32px;display:block;margin-bottom:8px"></i>No IRNs submitted yet.</div></div>
+    <div id="regList"><div style="text-align:center;padding:32px 16px;color:#888;font-size:13px"><i class="ti ti-clipboard-list" style="font-size:32px;display:block;margin-bottom:8px"></i>No records yet.</div></div>
+    <div style="display:flex;gap:16px;margin-top:8px;padding:0 4px;font-size:10px;color:#888;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:4px"><div style="width:3px;height:14px;background:#E24B4A;border-radius:2px"></div>Pending</div>
+      <div style="display:flex;align-items:center;gap:4px"><div style="width:3px;height:14px;background:#BA7517;border-radius:2px"></div>Rework</div>
+      <div style="display:flex;align-items:center;gap:4px"><div style="width:3px;height:14px;background:#1D9E75;border-radius:2px"></div>Released</div>
+    </div>
   </div>
 
   <div id="v-admin" class="view">
+    <div class="hdr">
+      <div class="hdr-top">
+        <div class="hdr-left">
+          <img id="admLogo" class="fse-logo" alt="FSE">
+          <div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.55);margin-bottom:1px">FIELD SERVICES &amp; ENGINEERING</div>
+            <h1>Admin Panel</h1>
+            <div class="hdr-meta">Code management &amp; system settings</div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div id="adminLocked">
       <div class="admin-locked">
         <i class="ti ti-lock" style="font-size:40px;color:#aaa;display:block;margin-bottom:12px"></i>
         <div style="font-size:14px;font-weight:500;margin-bottom:6px">Admin access required</div>
         <div style="font-size:12px;color:#888;margin-bottom:16px">Enter your admin code to manage codes</div>
-        <input class="admin-code-input" id="adminCodeIn" type="password" placeholder="Enter admin code" maxlength="20">
+        <input class="admin-code-input" id="adminCodeIn" type="password" placeholder="Enter admin code" maxlength="20" onkeydown="if(event.key==='Enter')unlockAdmin()">
         <button class="ab pri" style="width:100%;margin-top:8px" onclick="unlockAdmin()"><i class="ti ti-lock-open"></i> Unlock admin panel</button>
       </div>
     </div>
@@ -450,6 +601,8 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
         <div style="padding:8px 14px"><button class="add-btn" onclick="addSlot('sup')"><i class="ti ti-plus"></i> Add SUP slot</button></div>
       </div>
       <div style="padding:8px 0 16px;font-size:11px;color:#888;text-align:center">Deactivated codes cannot sign off new IRNs.</div>
+      <button onclick="if(window.saveCodesToFirebase)window.saveCodesToFirebase().then(function(){toast('Codes saved','ok');})" style="width:100%;padding:10px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:8px"><i class="ti ti-device-floppy" style="font-size:14px"></i> Save all names &amp; codes</button>
+      <button onclick="clearAllTestData()" style="width:100%;padding:10px;background:#FCEBEB;color:#A32D2D;border:1px solid #E24B4A;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:12px"><i class="ti ti-trash" style="font-size:14px"></i> Clear all test IRNs &amp; requests</button>
     </div>
   </div>
 </div>
@@ -465,30 +618,94 @@ function getLogoSrc(){return document.getElementById('fseLogo').src;}
 
 // Set visible logo
 window.addEventListener('DOMContentLoaded',function(){
-  document.getElementById('hdrLogo').src=getLogoSrc();
+  var src=getLogoSrc();
+  document.getElementById('hdrLogo').src=src;
+  document.getElementById('reqLogo').src=src;
+  document.getElementById('regLogo').src=src;
+  document.getElementById('admLogo').src=src;
 });
 
 var codes={
-  qc:Array.from({length:12},function(_,i){return{code:'QC-'+String(i+1).padStart(3,'0'),name:'',active:false};}),
-  sup:Array.from({length:10},function(_,i){return{code:'SUP-'+String(i+1).padStart(3,'0'),name:'',active:false};})
+  qc:[
+    {code:'QC-001',name:'Teboho Molete',active:true,pin:''},
+    {code:'QC-002',name:'Bongani Sithole',active:true,pin:''},
+    {code:'QC-003',name:'Peare Viljoen',active:true,pin:''},
+    {code:'QC-004',name:'Collins Mokwana',active:true,pin:''},
+    {code:'QC-005',name:'Quinton Jacobs',active:true,pin:''},
+    {code:'QC-006',name:'Minney Roos',active:true,pin:''},
+    {code:'QC-007',name:'Henning Oosthuyzen',active:true,pin:''},
+    {code:'QC-008',name:'Sinead Viljoen',active:true,pin:''},
+    {code:'QC-009',name:'',active:false,pin:''},
+    {code:'QC-010',name:'',active:false,pin:''},
+    {code:'QC-011',name:'',active:false,pin:''},
+    {code:'QC-012',name:'',active:false,pin:''}
+  ],
+  sup:[
+    {code:'SUP-001',name:'Shaun Engelbrecht',active:true,pin:''},
+    {code:'SUP-002',name:'Jaun Pieré Muller',active:true,pin:''},
+    {code:'SUP-003',name:'Shaw Chamunorwa',active:true,pin:''},
+    {code:'SUP-004',name:'Sidney Klaassen',active:true,pin:''},
+    {code:'SUP-005',name:'Reuben Mokhesi',active:true,pin:''},
+    {code:'SUP-006',name:'Paulus Muller',active:true,pin:''},
+    {code:'SUP-007',name:'Guntter Nieuwenhuis',active:true,pin:''},
+    {code:'SUP-008',name:'Richard Nolan',active:true,pin:''},
+    {code:'SUP-009',name:'Elton Sithole',active:true,pin:''},
+    {code:'SUP-010',name:'Juan-Pierre Van Heerden',active:true,pin:''},
+    {code:'SUP-011',name:'Cornelius Watson',active:true,pin:''},
+    {code:'SUP-012',name:'Godfrey Mshwamo',active:true,pin:''},
+    {code:'SUP-013',name:'Andries Van Zyl',active:true,pin:''},
+    {code:'SUP-014',name:'Khanya Kele',active:true,pin:''},
+    {code:'SUP-015',name:'Matikane Mohlabayi',active:true,pin:''},
+    {code:'SUP-016',name:'Nkosana Nonkonyane',active:true,pin:''},
+    {code:'SUP-017',name:'Thamsanga Gwentshe',active:true,pin:''}
+  ]
 };
 var supValidated=false,qcValidated=false,supName='',qcName='';
-var iRes=null,openS=null,iCnt=3,tdCnt=0,reg=[],regFilt='all';
+var iRes=null,openS=null,iCnt=3,tdCnt=0,reg=[],reqs=[],regFilt='all';
 var items=[{id:'i1',desc:'',qty:''},{id:'i2',desc:'',qty:''}];
+var inspPhotosArr=[];
 var ss={};
-var fabDims=['A','B','C','D','E','F','G','H','I','J','K','L','M'].map(function(l){return{label:l,draw:'',meas:''};});
+var fabDims=['A','B','C','D','E','F','G','H','I','J','K','L','M'].map(function(l){return{label:l,lbl:'',draw:'',meas:'',pf:''};});
 var lastIRNs={};
 
 var STAGES=[
-  {id:'s1',num:1,label:'After tack welding',gate:'Inspection after tack welding - 100% visual and dimensional',criteria:['Level','Square','Dimensional','PCD correct','Stiffeners fitted','Dog tags attached']},
-  {id:'s2',num:2,label:'After welding',gate:'Inspection after welding - 100% visual and dimensional',criteria:['Weld size correct','Weld profile ok','No mis-welds','Smalls fitted','No overgrinding','Stop starts ok','No pinholes']},
-  {id:'s3',num:3,label:'Trial assembly',isCritical:true,gate:'Trial assembly performed - all holes bolt-verified and match marked',criteria:['All holes drilled per drawing','Every hole bolt-verified (not 2nd/3rd)','No misaligned holes','Match marks applied','Marks correspond to mating part','Support feet drilled and verified','Assembly fits without forcing']},
-  {id:'s4',num:4,label:'Match-marking',gate:'Match-marking completed after trial assembly',criteria:['Sequential numbering correct','Colour coded where applicable','Marks clearly visible','Marks on mating faces only']},
-  {id:'s5',num:5,label:'Cleaning and NDT',gate:'Inspection after cleaning and NDT - 100% visual',criteria:['Spatter removed','Holes de-burred','No pinholes','No porosity','No structural defects']},
-  {id:'s6',num:6,label:'After primer',gate:'Inspection after primer - 100% visual',criteria:['Coverage uniform','No bare metal','DFT within spec','Surface prep confirmed']},
-  {id:'s7',num:7,label:'Final paint',gate:'Final inspection after paint - 100% visual',criteria:['Smooth and uniform finish','DFT correct','No pinholes','Colour correct','Touch-up checked']}
+  {id:'s0',num:0,label:'Pre-weld — Tack stage',gate:'Pre-weld tack inspection complete',criteria:['Material certificate verified','Correct material used as per drawing','Dimensions correct as per drawing','Fit-up and alignment acceptable','Joint preparation correct (bevel/gap)','Tack welds acceptable (size/spacing)']},
+  {id:'s2',num:2,label:'Welding and NDT',gate:'Welding and NDT inspection complete',criteria:['Correct WPS / welder assigned','Visual weld inspection acceptable','No cracks, porosity or undercut','Weld size and profile acceptable','Distortion within acceptable limits','All welds completed as per drawing','Spatter removed and cleaned','NDT test results acceptable','NDT report available and signed']},
+  {id:'s3',num:3,label:'Trial assembly',isCritical:true,gate:'Trial assembly inspection complete',criteria:['Components assemble correctly','Alignment and fit acceptable','Bolt holes align correctly','Overall dimensions within tolerance']},
+  {id:'s4',num:4,label:'Match-marking',gate:'Match-marking inspection complete',criteria:['All mating parts clearly marked','Marking method acceptable','Erection marks match drawing']},
+  {id:'s5',num:5,label:'Cleaning',gate:'Cleaning inspection complete',criteria:['Surface cleanliness acceptable','All weld spatter and slag removed','Sharp edges dressed']},
+  {id:'s6',num:6,label:'Shot blasting',gate:'Shot blasting inspection complete',criteria:['Blast profile / SA grade acceptable','Surface free of dust and debris','Primer applied within recoat window']},
+  {id:'s7',num:7,label:'After primer',gate:'Primer inspection complete',criteria:['Correct primer product applied','DFT (dry film thickness) acceptable','No runs, sags or holidays','Coverage complete — no bare metal']},
+  {id:'s8',num:8,label:'Final paint',gate:'Final paint inspection complete',criteria:['Correct paint product and colour','DFT acceptable per specification','Finish quality acceptable','Total DFT system acceptable']},
+  {id:'s9',num:9,label:'Final release / despatch',gate:'Final release inspection complete',criteria:['All previous stages signed off','Documentation package complete','Client hold points released','Items correctly tagged and identified','Safe for transport / loading acceptable']}
 ];
-STAGES.forEach(function(s){ss[s.id]={gate:false,na:false,crit:new Array(s.criteria.length).fill(false),tdims:[],result:null,rejectReason:'',rejectAction:'',photos:[]};});
+
+// Maps inspection type labels to stage IDs
+var INSP_TYPE_STAGE_MAP={
+  'Prior to welding (pre-stage)':['s0'],
+  'Pre-weld — Tack stage':['s0'],
+  'S2: Welding and NDT':['s2'],
+  'Welding and NDT':['s2'],
+  'S3: Trial assembly':['s3'],
+  'Trial assembly':['s3'],
+  'S4: Match-marking':['s4'],
+  'Match-marking':['s4'],
+  'S5: Cleaning':['s5'],
+  'Cleaning':['s5'],
+  'S6: Shot blasting':['s6'],
+  'Shot blasting':['s6'],
+  'S7: After primer':['s7'],
+  'After primer':['s7'],
+  'S6: After primer':['s7'],
+  'S8: Final paint':['s8'],
+  'Final paint':['s8'],
+  'S7: Final paint':['s8'],
+  'Final release / despatch':['s9'],
+  'S9: Final release / despatch':['s9']
+};
+
+var activeStageFilter=null;
+STAGES.forEach(function(s){if(!ss[s.id])ss[s.id]={gate:false,na:false,crit:new Array(s.criteria.length).fill(null),tdims:[],result:null,rejectReason:'',rejectAction:'',photos:[]};});
 
 function toast(msg,type){
   if(!type)type='info';
@@ -497,12 +714,49 @@ function toast(msg,type){
   setTimeout(function(){t.classList.remove('show');},3500);
 }
 function showV(v,btn){
+  // Save codes before switching away from form
+  var qcEl=document.getElementById('qcCode');
+  var supEl=document.getElementById('supCode');
+  if(qcEl&&qcEl.value){window._savedQC=qcEl.value;window._savedQCv=qcValidated;window._savedQCn=qcName;}
+  if(supEl&&supEl.value){window._savedSUP=supEl.value;window._savedSUPv=supValidated;window._savedSUPn=supName;}
   document.querySelectorAll('.view').forEach(function(x){x.classList.remove('on');});
   document.querySelectorAll('.nb').forEach(function(x){x.classList.remove('on');});
   document.getElementById('v-'+v).classList.add('on');
   if(btn)btn.classList.add('on');
-  if(v==='register'){if(window.loadIRNsFromFirebase&&!window._fbL){window._fbL=window.loadIRNsFromFirebase(function(r){if(r.length>0)reg=r;renderReg();});}else{renderReg();}}
-  if(v==='request'){document.getElementById('reqLogo').src=getLogoSrc();}
+  // Restore codes when returning to form
+  if(v==='form'){
+    setTimeout(function(){
+      var qc=document.getElementById('qcCode');
+      var sup=document.getElementById('supCode');
+      if(qc&&window._savedQC){qc.value=window._savedQC;qcValidated=window._savedQCv||false;qcName=window._savedQCn||'';validateCode('qc');}
+      if(sup&&window._savedSUP){sup.value=window._savedSUP;supValidated=window._savedSUPv||false;supName=window._savedSUPn||'';validateCode('sup');}
+    },150);
+  }
+  if(v==='register'){
+    document.getElementById('regLogo').src=getLogoSrc();
+    // Always reload both collections fresh
+    var regLoaded={irns:false,reqs:false};
+    function checkRegReady(){if(regLoaded.irns&&regLoaded.reqs)renderReg();}
+    if(window.loadIRNsFromFirebase){window.loadIRNsFromFirebase(function(r){reg=r;regLoaded.irns=true;checkRegReady();});}
+    else{regLoaded.irns=true;}
+    if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){reqs=r;regLoaded.reqs=true;checkRegReady();});}
+    else{regLoaded.reqs=true;}
+    renderReg();
+  }
+  if(v==='form'){
+    if(!window._keepStageFilter){activeStageFilter=null;}
+    showFormOrWaiting();
+    setTimeout(function(){renderStages();},50);
+  }
+  window._keepStageFilter=false;
+  if(v==='request'){
+    document.getElementById('reqLogo').src=getLogoSrc();
+    if(window.peekNextIRQ){window.peekNextIRQ().then(function(n){var el=document.getElementById('reqNo');if(el&&!el.value){el.value=n;el.style.color='rgba(255,255,255,0.6)';}});}
+    if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){reqs=r;renderPendingReqs();});}
+    else{renderPendingReqs();}
+  }
+
+  if(v==='admin'){document.getElementById('admLogo').src=getLogoSrc();}
 }
 function capturePhoto(input,sid){
   if(!input.files||!input.files[0])return;
@@ -579,21 +833,71 @@ function validateCode(role){
     return;
   }
   if(match){
-    inp.className='code-in valid';
-    stat.innerHTML='<span style="color:#27500A">&#10003; Authorised - '+match.name+'</span>';
-    if(role==='sup'){supValidated=true;supName=match.name;}else{qcValidated=true;qcName=match.name;}
+    // Check if PIN is set for this code
+    if(match.pin&&match.pin.length===4){
+      // Show PIN entry field
+      inp.className='code-in valid';
+      var pinId=role+'PinEntry';
+      if(!document.getElementById(pinId)){
+        var pinWrap=document.createElement('div');
+        pinWrap.id=pinId;
+        pinWrap.style.cssText='margin-top:6px;display:flex;align-items:center;gap:8px';
+        pinWrap.innerHTML='<input type="password" maxlength="4" placeholder="Enter PIN" style="width:100px;padding:6px 10px;border:1.5px solid #ccc;border-radius:6px;font-size:14px;letter-spacing:4px;font-family:monospace;text-align:center;outline:none" oninput="checkPin(this,\''+role+'\',\''+match.code+'\')">'+'<span style="font-size:11px;color:#888">Enter your 4-digit PIN</span>';
+        stat.parentNode.insertBefore(pinWrap,stat);
+        pinWrap.querySelector('input').focus();
+      }
+      stat.innerHTML='<span style="color:#185FA5">✓ '+match.name+' — enter your PIN to confirm</span>';
+      if(role==='sup'){supValidated=false;supName='';}else{qcValidated=false;qcName='';}
+    } else {
+      // No PIN set — validate directly
+      inp.className='code-in valid';
+      stat.innerHTML='<span style="color:#27500A">✓ Authorised — '+match.name+'</span>';
+      if(role==='sup'){supValidated=true;supName=match.name;}else{qcValidated=true;qcName=match.name;}
+      removePinEntry(role);
+    }
   }else{
     inp.className='code-in invalid';
-    stat.innerHTML='<span style="color:#A32D2D">&#10007; Invalid or inactive code</span>';
+    stat.innerHTML='<span style="color:#A32D2D">✗ Invalid or inactive code</span>';
+    if(role==='sup'){supValidated=false;supName='';}else{qcValidated=false;qcName='';}
+    removePinEntry(role);
+  }
+}
+function removePinEntry(role){
+  var el=document.getElementById(role+'PinEntry');
+  if(el)el.parentNode.removeChild(el);
+}
+function checkPin(el,role,code){
+  var val=el.value.replace(/\D/g,'');
+  el.value=val;
+  if(val.length<4)return;
+  var list=role==='sup'?codes.sup:codes.qc;
+  var match=list.find(function(c){return c.code===code;});
+  var stat=document.getElementById(role+'Status');
+  if(match&&match.pin===val){
+    el.style.borderColor='#1D9E75';
+    stat.innerHTML='<span style="color:#27500A">✓ Authorised — '+match.name+'</span>';
+    if(role==='sup'){supValidated=true;supName=match.name;}else{qcValidated=true;qcName=match.name;}
+    // Persist for tab switching
+    if(role==='qc'){window._savedQC=document.getElementById('qcCode').value;window._savedQCv=true;window._savedQCn=match.name;}
+    else{window._savedSUP=document.getElementById('supCode').value;window._savedSUPv=true;window._savedSUPn=match.name;}
+  }else{
+    el.style.borderColor='#E24B4A';
+    stat.innerHTML='<span style="color:#A32D2D">✗ Incorrect PIN — try again</span>';
+    el.value='';
     if(role==='sup'){supValidated=false;supName='';}else{qcValidated=false;qcName='';}
   }
 }
 function unlockAdmin(){
-  if(document.getElementById('adminCodeIn').value===ADMIN_CODE){
+  var entered=document.getElementById('adminCodeIn').value;
+  if(entered===ADMIN_CODE){
     document.getElementById('adminLocked').style.display='none';
     document.getElementById('adminPanel').style.display='block';
     renderCodeTables();
-  }else{toast('Incorrect admin code','err');document.getElementById('adminCodeIn').value='';}
+  }else{
+    toast('Incorrect admin code','err');
+    document.getElementById('adminCodeIn').value='';
+    document.getElementById('adminCodeIn').focus();
+  }
 }
 function lockAdmin(){
   document.getElementById('adminLocked').style.display='block';
@@ -603,21 +907,53 @@ function lockAdmin(){
 function renderCodeTables(){
   ['qc','sup'].forEach(function(role){
     var list=role==='qc'?codes.qc:codes.sup;
-    var rows='<tr><th>Code</th><th>Name assigned</th><th>Status</th><th>Action</th></tr>';
+    var rows='<tr><th>Code</th><th>Name assigned</th><th>PIN (4 digits)</th><th>Status</th><th>Action</th></tr>';
     list.forEach(function(c,i){
       rows+='<tr><td><span class="cbadge '+(c.active&&c.name?'active':'avail')+'">'+c.code+'</span></td>';
       rows+='<td><input class="name-in" value="'+c.name+'" placeholder="Assign name..." oninput="updateName(this,'+i+')"></td>';
+      rows+='<td><input class="name-in" type="password" value="'+(c.pin||'')+'" placeholder="PIN" maxlength="4" style="width:70px;letter-spacing:3px;font-family:monospace;text-align:center" oninput="updatePin(this,'+i+')"></td>';
       rows+='<td><span class="cbadge '+(c.active&&c.name?'active':c.name&&!c.active?'inactive':'avail')+'">'+(c.active&&c.name?'Active':c.name&&!c.active?'Inactive':'Available')+'</span></td>';
       rows+='<td><button class="toggle-btn" data-role="'+role+'" data-idx="'+i+'" onclick="toggleCode(this)">'+(c.active?'Deactivate':'Activate')+'</button></td></tr>';
     });
     document.getElementById(role+'Table').innerHTML=rows;
   });
 }
+function updatePin(el,i){
+  var val=el.value.replace(/\D/g,'').slice(0,4);
+  el.value=val;
+  var role=el.closest('table').id.replace('Table','');
+  if(role==='qc')codes.qc[i].pin=val;else codes.sup[i].pin=val;
+}
 function updateName(el,i){
   var val=el.value;
   var role=el.closest('table').id.replace('Table','');
   if(role==='qc')codes.qc[i].name=val;else codes.sup[i].name=val;
-  renderCodeTables();
+  var row=el.closest('tr');
+  var badge=row.querySelector('.cbadge');
+  var statusBadge=row.querySelectorAll('.cbadge')[1];
+  var list=role==='qc'?codes.qc:codes.sup;
+  var c=list[i];
+  if(badge){badge.className='cbadge '+(c.active&&val?'active':'avail');}
+  if(statusBadge){
+    statusBadge.className='cbadge '+(c.active&&val?'active':val&&!c.active?'inactive':'avail');
+    statusBadge.textContent=c.active&&val?'Active':val&&!c.active?'Inactive':'Available';
+  }
+}
+
+function clearAllTestData(){
+  if(!confirm('This will permanently delete ALL IRNs and requests from Firebase.\n\nAre you sure? This cannot be undone.')){return;}
+  if(!confirm('FINAL WARNING — Delete all test data and reset counters to zero?')){return;}
+  if(window.clearAllData){
+    window.clearAllData().then(function(ok){
+      if(ok){
+        reg=[];reqs=[];
+        renderReg();renderPendingReqs();
+        toast('All test data cleared — counters reset to zero','ok');
+      } else {
+        toast('Error clearing data — check console','err');
+      }
+    });
+  }
 }
 function toggleCode(el){
   var role=el.dataset.role;
@@ -627,12 +963,14 @@ function toggleCode(el){
   list[i].active=!list[i].active;
   renderCodeTables();
   toast(list[i].code+' '+(list[i].active?'activated':'deactivated'));
+  if(window.saveCodesToFirebase)window.saveCodesToFirebase();
 }
 function addSlot(role){
   var prefix=role==='qc'?'QC-':'SUP-';
   var list=role==='qc'?codes.qc:codes.sup;
   list.push({code:prefix+String(list.length+1).padStart(3,'0'),name:'',active:false});
   renderCodeTables();
+  if(window.saveCodesToFirebase)window.saveCodesToFirebase();
 }
 // Inspection Request state
 var reqItems=[{id:'r1',desc:'',qty:''}];
@@ -641,8 +979,147 @@ var reqUrgency='normal';
 var reqSupValidated=false;
 var reqSupName='';
 var reqItemCnt=2;
-var REQ_INSP_TYPES=['Prior to welding (pre-stage)','S1: After tack welding','S2: After welding','S3: Trial assembly','S4: Match-marking','S5: Cleaning and NDT','S6: After primer','S7: Final paint','Final release / despatch'];
+var REQ_INSP_TYPES=['Prior to welding (pre-stage)','S2: Welding and NDT','S3: Trial assembly','S4: Match-marking','S5: Cleaning','S6: Shot blasting','S7: After primer','S8: Final paint','Final release / despatch'];
 
+function setDrawing(state){
+  var okBtn=document.getElementById('drawOkBtn');
+  var flagBtn=document.getElementById('drawFlagBtn');
+  var flagNote=document.getElementById('drawFlagNote');
+  if(state==='ok'){
+    okBtn.style.background='#EAF3DE';okBtn.style.borderColor='#1D9E75';okBtn.style.color='#27500A';
+    flagBtn.style.background='#fff';flagBtn.style.borderColor='#ccc';flagBtn.style.color='#666';
+    if(flagNote)flagNote.style.display='none';
+  } else {
+    flagBtn.style.background='#FAEEDA';flagBtn.style.borderColor='#BA7517';flagBtn.style.color='#633806';
+    okBtn.style.background='#fff';okBtn.style.borderColor='#ccc';okBtn.style.color='#666';
+    if(flagNote)flagNote.style.display='block';
+  }
+}
+function toggleDims(){
+  var sec=document.getElementById('dimsSection');
+  var btn=document.getElementById('dimsToggleBtn');
+  if(sec.style.display==='none'){sec.style.display='block';btn.textContent='− Hide';}
+  else{sec.style.display='none';btn.textContent='+ Show';}
+}
+function renderQuickChecklist(instructionText){
+  var el=document.getElementById('quickCheckList');
+  if(!el)return;
+  if(!instructionText||!instructionText.trim()){
+    el.innerHTML='<div style="font-size:12px;color:#aaa;padding:4px 0">No checklist from request — use stage checklist below</div>';
+    return;
+  }
+  var items=instructionText.split(/[,\n]+/).map(function(s){return s.trim();}).filter(function(s){return s.length>2;});
+  if(!items.length){el.innerHTML='<div style="font-size:12px;color:#aaa;padding:4px 0">'+instructionText+'</div>';return;}
+  var html='';
+  items.forEach(function(item,i){
+    html+='<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid #eee" id="qc-row-'+i+'">';
+    html+='<div onclick="toggleCheck('+i+')" id="qc-box-'+i+'" data-checked="0" style="width:24px;height:24px;border-radius:5px;border:2px solid #ddd;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:14px;color:#fff"></div>';
+    html+='<div style="font-size:13px;color:#1a1a1a;flex:1">'+item+'</div>';
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
+function toggleCheck(i){
+  var box=document.getElementById('qc-box-'+i);
+  if(!box)return;
+  var checked=box.dataset.checked==='1';
+  if(checked){
+    box.dataset.checked='0';box.style.background='#fff';box.style.borderColor='#ccc';box.textContent='';
+  } else {
+    box.dataset.checked='1';box.style.background='#1D9E75';box.style.borderColor='#1D9E75';box.textContent='✓';
+  }
+}
+function addInspPhotos(input){
+  if(!input.files)return;
+  if(inspPhotosArr.length>=15){toast('Maximum 15 photos allowed','err');return;}
+  Array.from(input.files).forEach(function(file){
+    if(inspPhotosArr.length>=15){toast('Maximum 15 photos','err');return;}
+    var reader=new FileReader();
+    reader.onload=function(e){
+      inspPhotosArr.push(e.target.result);
+      renderInspPhotos();
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value='';
+}
+function renderInspPhotos(){
+  var el=document.getElementById('inspPhotos');
+  if(!el)return;
+  var html='';
+  inspPhotosArr.forEach(function(src,i){
+    html+='<div style="position:relative;width:80px">';
+    html+='<img src="'+src+'" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:0.5px solid #ddd;display:block">';
+    html+='<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.55);color:#fff;font-size:9px;font-weight:600;text-align:center;padding:2px;border-radius:0 0 8px 8px">Photo '+(i+1)+'</div>';
+    html+='<button onclick="removeInspPhoto('+i+')" style="position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.6);border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">&times;</button>';
+    html+='</div>';
+  });
+  if(inspPhotosArr.length<15){
+    html+='<label style="width:80px;height:80px;border:1.5px dashed #ccc;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:4px;background:var(--color-background-secondary)">';
+    html+='<i class="ti ti-camera-plus" style="font-size:22px;color:#aaa"></i>';
+    html+='<span style="font-size:9px;color:#aaa">Add photo</span>';
+    html+='<input type="file" accept="image/*" multiple capture="environment" style="display:none" onchange="addInspPhotos(this)">';
+    html+='</label>';
+  }
+  el.innerHTML=html;
+  var countEl=document.getElementById('inspPhotoCount');
+  if(countEl)countEl.textContent=inspPhotosArr.length>0?inspPhotosArr.length+' photo(s) added':'';
+}
+function removeInspPhoto(i){
+  inspPhotosArr.splice(i,1);
+  renderInspPhotos();
+}
+function handleNewIRNClick(btn){
+  if(_irqParam){
+    // Has IRQ — show form
+    showV('form',btn);
+  } else {
+    toast('New IRN is only accessible via an inspection request WhatsApp link','err');
+  }
+}
+var _regFilt='all';
+function setRegFilt(f,btn){
+  _regFilt=f;
+  document.querySelectorAll('.filt-btn').forEach(function(b){b.classList.remove('on');});
+  if(btn)btn.classList.add('on');
+  renderReg();
+}
+function showFormOrWaiting(){
+  var hasReq=!!_irqParam;
+  var waiting=document.getElementById('waitingScreen');
+  var form=document.getElementById('mainFormContent');
+  var actions=document.getElementById('formActions');
+  if(waiting)waiting.style.display=hasReq?'none':'block';
+  if(form)form.style.display=hasReq?'block':'none';
+  if(actions)actions.style.display=hasReq?'block':'none';
+  if(hasReq)renderIrqBanner();
+}
+function renderIrqBanner(){
+  var el=document.getElementById('irqNotifBanner');
+  if(!el||!_urlReq)return;
+  var isUrgent=(_urlReq.inspTypes||'').toLowerCase().includes('urgent');
+  var bg=isUrgent?'#E24B4A':'#1a3a5c';
+  var html='<div style="background:'+bg+';padding:10px 14px;display:flex;align-items:center;justify-content:space-between">';
+  html+='<div style="font-size:13px;font-weight:600;color:#fff">'+(isUrgent?'⚡ URGENT — ':'')+'IRQ-'+(_urlReq.reqNo||'----')+'</div>';
+  html+='<span style="font-size:10px;background:rgba(255,255,255,0.2);color:#fff;padding:2px 8px;border-radius:10px">'+(_urlReq.inspTypes||'')+'</span>';
+  html+='</div>';
+  html+='<div style="background:#fff8f0;border:1.5px solid '+bg+';border-top:none;border-radius:0 0 10px 10px;padding:10px 14px">';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px">';
+  html+='<div><div style="font-size:9px;color:#888;text-transform:uppercase">Job</div><div style="font-size:13px;font-weight:700">'+(_urlReq.job||'--')+'</div></div>';
+  html+='<div><div style="font-size:9px;color:#888;text-transform:uppercase">Client</div><div style="font-size:12px">'+(_urlReq.client||'--')+'</div></div>';
+  html+='</div>';
+  if(_urlReq.items)html+='<div style="font-size:11px;color:#555;margin-bottom:4px"><strong>Items:</strong> '+_urlReq.items+'</div>';
+  if(_urlReq.instructions)html+='<div style="font-size:11px;color:#555"><strong>Check:</strong> '+_urlReq.instructions+'</div>';
+  html+='<div style="font-size:11px;color:#888;margin-top:4px">Raised by: <strong>'+(_urlReq.supervisor||'--')+'</strong></div>';
+  html+='</div>';
+  el.innerHTML=html;
+  el.style.display='block';
+}
+function toggleReqSubmit(){
+  var cb=document.getElementById('reqAckCheck');
+  var btn=document.getElementById('reqSubmitBtn');
+  if(cb&&btn){btn.disabled=!cb.checked;btn.style.opacity=cb.checked?'1':'0.5';btn.style.cursor=cb.checked?'pointer':'not-allowed';}
+}
 function initRequest(){
   document.getElementById('reqDate').value=new Date().toISOString().split('T')[0];
   document.getElementById('reqLogo').src=getLogoSrc();
@@ -687,7 +1164,9 @@ function toggleInspType(t){
 }
 function addReqPhoto(input){
   if(!input.files)return;
+  if(reqPhotos.length>=15){toast('Maximum 15 photos allowed','err');return;}
   Array.from(input.files).forEach(function(file){
+    if(reqPhotos.length>=15){toast('Maximum 15 photos','err');return;}
     var reader=new FileReader();
     reader.onload=function(e){reqPhotos.push(e.target.result);renderReqPhotos();};
     reader.readAsDataURL(file);
@@ -698,11 +1177,19 @@ function removeReqPhoto(pi){reqPhotos.splice(pi,1);renderReqPhotos();}
 function renderReqPhotos(){
   var html='';
   reqPhotos.forEach(function(p,pi){
-    html+='<div style="position:relative">';
-    html+='<img src="'+p+'" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:0.5px solid #ddd;cursor:pointer" data-pi="'+pi+'" onclick="viewReqPhoto(parseInt(this.dataset.pi))">';
-    html+='<button style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;color:#fff;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center" data-pi="'+pi+'" onclick="removeReqPhoto(parseInt(this.dataset.pi))">x</button>';
+    html+='<div style="position:relative;width:80px">';
+    html+='<img src="'+p+'" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:0.5px solid #ddd;cursor:pointer;display:block" data-pi="'+pi+'" onclick="viewReqPhoto(parseInt(this.dataset.pi))">';
+    html+='<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.55);color:#fff;font-size:9px;font-weight:600;text-align:center;padding:2px;border-radius:0 0 6px 6px">Photo '+(pi+1)+'</div>';
+    html+='<button style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;color:#fff;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center" data-pi="'+pi+'" onclick="removeReqPhoto(parseInt(this.dataset.pi))">×</button>';
     html+='</div>';
   });
+  if(reqPhotos.length<15){
+    html+='<label style="width:80px;height:80px;border:1.5px dashed #ccc;border-radius:6px;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:4px;background:var(--color-background-secondary);vertical-align:top">';
+    html+='<i class="ti ti-camera-plus" style="font-size:22px;color:#aaa"></i>';
+    html+='<span style="font-size:9px;color:#aaa">Add photo</span>';
+    html+='<input type="file" accept="image/*" multiple capture="environment" style="display:none" onchange="addReqPhoto(this)">';
+    html+='</label>';
+  }
   document.getElementById('reqPhotoGrid').innerHTML=html;
 }
 function viewReqPhoto(pi){
@@ -726,15 +1213,47 @@ function validateReqSup(){
   var val=inp.value.trim().toUpperCase();
   var match=null;
   for(var i=0;i<codes.sup.length;i++){if(codes.sup[i].code===val&&codes.sup[i].active&&codes.sup[i].name){match=codes.sup[i];break;}}
-  if(val.length<5){inp.className='code-in';stat.innerHTML='';reqSupValidated=false;reqSupName='';return;}
+  if(val.length<5){inp.className='code-in';stat.innerHTML='';reqSupValidated=false;reqSupName='';removePinEntry('reqSup');return;}
   if(match){
-    inp.className='code-in valid';
-    stat.innerHTML='<span style="color:#27500A">&#10003; Authorised &mdash; '+match.name+'</span>';
-    reqSupValidated=true;reqSupName=match.name;
+    if(match.pin&&match.pin.length===4){
+      inp.className='code-in valid';
+      if(!document.getElementById('reqSupPinEntry')){
+        var pinWrap=document.createElement('div');
+        pinWrap.id='reqSupPinEntry';
+        pinWrap.style.cssText='margin-top:6px;display:flex;align-items:center;gap:8px';
+        pinWrap.innerHTML='<input type="password" maxlength="4" placeholder="Enter PIN" style="width:100px;padding:6px 10px;border:1.5px solid #ccc;border-radius:6px;font-size:14px;letter-spacing:4px;font-family:monospace;text-align:center;outline:none" oninput="checkReqSupPin(this,\''+match.code+'\')">'+'<span style="font-size:11px;color:#888">Enter your 4-digit PIN</span>';
+        stat.parentNode.insertBefore(pinWrap,stat);
+        pinWrap.querySelector('input').focus();
+      }
+      stat.innerHTML='<span style="color:#185FA5">✓ '+match.name+' — enter your PIN</span>';
+      reqSupValidated=false;reqSupName='';
+    } else {
+      inp.className='code-in valid';
+      stat.innerHTML='<span style="color:#27500A">✓ Authorised — '+match.name+'</span>';
+      reqSupValidated=true;reqSupName=match.name;
+      removePinEntry('reqSup');
+    }
   }else{
     inp.className='code-in invalid';
-    stat.innerHTML='<span style="color:#A32D2D">&#10007; Invalid or inactive SUP code</span>';
+    stat.innerHTML='<span style="color:#A32D2D">✗ Invalid or inactive SUP code</span>';
     reqSupValidated=false;reqSupName='';
+    removePinEntry('reqSup');
+  }
+}
+function checkReqSupPin(el,code){
+  var val=el.value.replace(/\D/g,'');
+  el.value=val;
+  if(val.length<4)return;
+  var match=codes.sup.find(function(c){return c.code===code;});
+  var stat=document.getElementById('reqSupStatus');
+  if(match&&match.pin===val){
+    el.style.borderColor='#1D9E75';
+    stat.innerHTML='<span style="color:#27500A">✓ Authorised — '+match.name+'</span>';
+    reqSupValidated=true;reqSupName=match.name;
+  }else{
+    el.style.borderColor='#E24B4A';
+    stat.innerHTML='<span style="color:#A32D2D">✗ Incorrect PIN — try again</span>';
+    el.value='';reqSupValidated=false;reqSupName='';
   }
 }
 function getRequestData(){
@@ -749,15 +1268,19 @@ function getRequestData(){
     urgency:reqUrgency,
     supCode:document.getElementById('reqSupCode').value.toUpperCase(),
     supervisor:reqSupName,
-    photos:reqPhotos.length
+    photos:reqPhotos.length,
+    reqPhotoData:reqPhotos.slice(0,15)
   };
 }
-function submitRequest(){
+async function submitRequest(){
   var d=getRequestData();
   if(!d.job){toast('Enter order/job number','err');return;}
   if(reqItems.filter(function(i){return i.desc;}).length===0){toast('Add at least one item','err');return;}
   if(selectedInspTypes.length===0){toast('Select at least one inspection type','err');return;}
   if(!reqSupValidated){toast('Supervisor code required','err');return;}
+  // Always get a fresh IRQ number — never reuse
+  d.reqNo=await window.getNextIRQ();
+  document.getElementById('reqNo').value=d.reqNo;
   var urgIcon=d.urgency==='urgent'?'URGENT - ':'';
   var itemList=reqItems.filter(function(i){return i.desc;}).map(function(i,idx){return '  '+(idx+1)+'. '+i.desc+(i.qty?' x'+i.qty:'');}).join('\n');
   var msg='*FSE INSPECTION REQUEST*\n';
@@ -770,13 +1293,27 @@ function submitRequest(){
   msg+='================================\n';
   msg+='*Items for inspection:*\n'+itemList+'\n';
   msg+='*Inspection type:* '+d.inspTypes+'\n';
-  if(d.instructions)msg+='*Special instructions:* '+d.instructions+'\n';
+  if(d.instructions)msg+='*What to check:* '+d.instructions+'\n';
   msg+='================================\n';
-  msg+='Raised by: '+d.supervisor+' ('+d.supCode+')\n';
   if(d.photos>0)msg+='Photos: '+d.photos+' attached (see form)\n';
-  msg+='\n*QC - please attend and complete IRN on release*';
-  window.open('https://wa.me/?text='+encodeURIComponent(msg));
+  msg+='\n*QC - please attend and complete IRN on release*\n';
+  msg+='================================\n';
+  var itemSummary=reqItems.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(' | ');
+  var liveLink='https://eric0103360.github.io/fse-irn-system?irq='+encodeURIComponent(d.reqNo);
+  msg+='*Open IRN System to respond:*\n'+liveLink;
+  // Save to Firebase FIRST before anything else
+  if(window.saveRequestToFirebase){
+    await window.saveRequestToFirebase(d);
+  }
   toast('Request submitted to QC group','ok');
+  window.open('https://wa.me/?text='+encodeURIComponent(msg));
+  // Reset form
+  var cb=document.getElementById('reqAckCheck');if(cb)cb.checked=false;
+  // Reset IRQ number for next request
+  var reqNoEl=document.getElementById('reqNo');
+  if(reqNoEl){reqNoEl.value='';reqNoEl.style.color='rgba(255,255,255,0.6)';}
+  if(window.peekNextIRQ){window.peekNextIRQ().then(function(n){var el=document.getElementById('reqNo');if(el){el.value=n;el.style.color='rgba(255,255,255,0.6)';}});}
+  toggleReqSubmit();
 }
 function printRequest(){
   var d=getRequestData();
@@ -805,7 +1342,7 @@ function printRequest(){
   html+='<h2>QC sign-off</h2><table><tr><th>QC Inspector</th><th>Date attended</th><th>IRN number</th><th>Signature</th></tr>';
   html+='<tr><td style="padding:8px;border:1px solid #ccc;height:40px"></td><td style="padding:8px;border:1px solid #ccc"></td><td style="padding:8px;border:1px solid #ccc"></td><td style="padding:8px;border:1px solid #ccc;width:180px"></td></tr></table>';
   html+='<div style="margin-top:16px;font-size:9px;color:#999;border-top:1px solid #eee;padding-top:6px">FSE eIRN System &middot; '+new Date().toLocaleString('en-ZA')+'</div>';
-  html+='<div class="np" style="margin-top:16px;text-align:center"><button onclick="window.print()" style="padding:8px 24px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">Print / Save as PDF</button></div>';
+  html+='<div class="np" style="margin-top:16px;display:flex;gap:8px;justify-content:center"><button onclick="window.print()" style="padding:8px 24px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">Print / Save as PDF</button><button onclick="window.close()" style="padding:8px 20px;background:#f0f0f0;border:none;border-radius:6px;font-size:13px;cursor:pointer">Close</button></div>';
   html+='</body></html>';
   pw.document.write(html);pw.document.close();
 }
@@ -830,7 +1367,8 @@ function renderItems(){
 }
 function toggleS(sid){openS=openS===sid?null:sid;renderStages();}
 function toggleG(sid,e){e.stopPropagation();ss[sid].gate=!ss[sid].gate;renderStages();}
-function toggleC(sid,ci,e){e.stopPropagation();ss[sid].crit[ci]=!ss[sid].crit[ci];renderStages();}
+function setCrit(sid,ci,val){if(!ss[sid])return;ss[sid].crit[ci]=(ss[sid].crit[ci]===val)?null:val;renderStages();}
+function toggleC(sid,ci,e){if(e)e.stopPropagation();setCrit(sid,ci,true);}
 function toggleNA(sid,e){e.stopPropagation();ss[sid].na=!ss[sid].na;if(ss[sid].na){ss[sid].gate=false;ss[sid].crit=ss[sid].crit.map(function(){return false;});}renderStages();}
 function addTD(sid){ss[sid].tdims.push({id:'td'+(++tdCnt),lbl:'',draw:'',meas:''});renderStages();}
 function upTD(sid,id,f,v){var d=ss[sid].tdims.find(function(x){return x.id===id;});if(d)d[f]=v;}
@@ -877,13 +1415,54 @@ function setStageResult(sid,r){
 }
 function stSt(sid){
   var st=ss[sid];if(st.na)return'na';
-  var cd=st.crit.filter(Boolean).length;
   var s=STAGES.find(function(x){return x.id===sid;});
-  if(st.gate&&cd===s.criteria.length)return'complete';
-  if(st.gate||cd>0)return'partial';return'empty';
+  var checked=st.crit.filter(function(v){return v===true||v===false||v==='na';}).length;
+  var passed=st.crit.filter(function(v){return v===true||v==='na';}).length;
+  var failed=st.crit.filter(function(v){return v===false;}).length;
+  if(st.gate&&checked===s.criteria.length)return'complete';
+  if(st.gate||checked>0)return'partial';return'empty';
 }
 function renderStages(){
   var html='';
+  var stagesToShow=activeStageFilter?STAGES.filter(function(s){return activeStageFilter.indexOf(s.id)!==-1;}):STAGES;
+
+  if(activeStageFilter&&stagesToShow.length>0){
+    var s=stagesToShow[0];
+    var st=ss[s.id];
+    var tickedCount=st.crit.filter(Boolean).length;
+    html+='<div style="background:#1a3a5c;border-radius:8px 8px 0 0;padding:10px 14px;display:flex;align-items:center;justify-content:space-between">';
+    html+='<div style="font-size:13px;font-weight:500;color:#fff"><i class="ti ti-clipboard-check" style="font-size:14px;margin-right:6px"></i>'+s.label+'</div>';
+    html+='<div style="font-size:11px;color:rgba(255,255,255,0.7)">'+tickedCount+'/'+s.criteria.length+' checked</div>';
+    html+='</div>';
+    html+='<div style="border:1.5px solid #1a3a5c;border-top:none;border-radius:0 0 8px 8px;overflow:hidden">';
+    s.criteria.forEach(function(c,ci){
+      var val=st.crit[ci];
+      var isPass=val===true;
+      var isFail=val===false&&val!==null;
+      var isNA=val==='na';
+      var rowBg=isPass?'#f0faf5':isFail?'#fff5f5':isNA?'#f8f8f8':'#fff';
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:11px 14px;background:'+rowBg+';border-bottom:0.5px solid #eee">';
+      html+='<span style="flex:1;font-size:13px;color:'+(isNA?'#aaa':isPass?'#27500A':isFail?'#A32D2D':'#1a1a1a')+';text-decoration:'+(isNA?'line-through':'none')+'">'+c+'</span>';
+      html+='<div style="display:flex;gap:4px">';
+      html+='<div onclick="setCrit(\''+s.id+'\','+ci+',true)" style="width:34px;height:34px;border-radius:6px;border:1.5px solid '+(isPass?'#1D9E75':'#ddd')+';background:'+(isPass?'#1D9E75':'#fff')+';display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700;color:'+(isPass?'#fff':'#bbb')+'">✓</div>';
+      html+='<div onclick="setCrit(\''+s.id+'\','+ci+',false)" style="width:34px;height:34px;border-radius:6px;border:1.5px solid '+(isFail?'#E24B4A':'#ddd')+';background:'+(isFail?'#E24B4A':'#fff')+';display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:700;color:'+(isFail?'#fff':'#bbb')+'">✗</div>';
+      html+='<div onclick="setCrit(\''+s.id+'\','+ci+',\'na\')" style="width:34px;height:34px;border-radius:6px;border:1.5px solid '+(isNA?'#888':'#ddd')+';background:'+(isNA?'#888':'#fff')+';display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:10px;font-weight:700;color:'+(isNA?'#fff':'#bbb')+'">N/A</div>';
+      html+='</div></div>';
+    });
+    html+='</div>';
+    html+='<div style="margin-top:8px;text-align:center"><button onclick="activeStageFilter=null;renderStages()" style="font-size:11px;color:#888;background:none;border:0.5px solid #ddd;border-radius:6px;padding:5px 14px;cursor:pointer"><i class="ti ti-list" style="font-size:12px"></i> Show all stages</button></div>';
+    document.getElementById('stageList').innerHTML=html;
+    document.getElementById('stageSummary').innerHTML='';
+    return;
+  }
+
+  if(!activeStageFilter&&_irqParam){
+    var irqType=_urlP?_urlP.get('type'):'';
+    if(irqType){
+      html+='<div style="margin-bottom:8px;text-align:center"><button onclick="activeStageFilter=null;if(_urlP){var t=_urlP.get(\'type\');if(t&&INSP_TYPE_STAGE_MAP[t])activeStageFilter=INSP_TYPE_STAGE_MAP[t];}renderStages()" style="font-size:11px;color:#185FA5;background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:6px;padding:5px 14px;cursor:pointer"><i class="ti ti-filter" style="font-size:12px"></i> Show relevant stage only</button></div>';
+    }
+  }
+
   STAGES.forEach(function(s){
     var st=ss[s.id],open=openS===s.id;
     var cd=st.crit.filter(Boolean).length,status=stSt(s.id);
@@ -892,124 +1471,65 @@ function renderStages(){
     else if(status==='complete'){ic+=' cd';ico='<i class="ti ti-check" style="font-size:11px"></i>';}
     else if(st.gate){ic+=' gd';}
     var meta=st.na?'N/A':st.gate?(cd+'/'+s.criteria.length+' criteria'):'Gate not confirmed';
-    html+='<div class="sb">';
-    html+='<div class="sh" data-sid="'+s.id+'" onclick="toggleS(this.dataset.sid)">';
-    html+='<div class="'+ic+'">'+ico+'</div>';
-    html+='<div class="sl">'+s.label+(s.isCritical?'<span class="crit-tag">&#9650; Critical</span>':'')+'</div>';
-    html+='<div class="sm">'+meta+'</div>';
-    html+='<i class="ti ti-chevron-'+(open?'up':'down')+'" style="font-size:14px;color:#aaa;flex-shrink:0"></i>';
-    html+='</div>';
+    html+='<div class="sb"><div class="sh" data-sid="'+s.id+'" onclick="toggleS(this.dataset.sid)"><div class="'+ic+'">'+ico+'</div><div class="sl">'+s.label+(s.isCritical?'<span class="crit-tag">&#9650; Critical</span>':'')+'</div><div class="sm">'+meta+'</div><i class="ti ti-chevron-'+(open?'up':'down')+'" style="font-size:14px;color:#aaa;flex-shrink:0"></i></div>';
     if(open){
       html+='<div class="sbdy">';
-      if(s.isCritical&&!st.na){
-        html+='<div class="wb"><i class="ti ti-alert-triangle" style="font-size:15px;flex-shrink:0"></i>';
-        html+='<div><strong>Critical checkpoint:</strong> Every hole must have a bolt during trial assembly. Verify all holes - not every 2nd or 3rd.</div></div>';
-      }
-      html+='<div class="sublbl g"><i class="ti ti-lock-open" style="font-size:11px"></i> Stage gate</div>';
-      html+='<div class="gr'+(st.gate&&!st.na?' on':'')+'" data-sid="'+s.id+'" onclick="toggleG(this.dataset.sid,event)">';
-      html+='<div class="gcb'+(st.gate&&!st.na?' on':'')+'">'+(st.gate&&!st.na?'<i class="ti ti-check" style="font-size:10px;color:#fff"></i>':'')+'</div>';
-      html+='<div class="gt">'+s.gate+'</div></div>';
-      html+='<div class="sublbl c"><i class="ti ti-list-check" style="font-size:11px"></i> Criteria checked and findings</div>';
-      html+='<div class="cg">';
+      if(s.isCritical&&!st.na){html+='<div class="wb"><i class="ti ti-alert-triangle" style="font-size:15px;flex-shrink:0"></i><div><strong>Critical checkpoint:</strong> Every hole must have a bolt during trial assembly.</div></div>';}
+      html+='<div class="sublbl g"><i class="ti ti-lock-open" style="font-size:11px"></i> Stage gate</div><div class="gr'+(st.gate&&!st.na?' on':'')+'" data-sid="'+s.id+'" onclick="toggleG(this.dataset.sid,event)"><div class="gcb'+(st.gate&&!st.na?' on':'')+'">'+(st.gate&&!st.na?'<i class="ti ti-check" style="font-size:10px;color:#fff"></i>':'')+'</div><div class="gt">'+s.gate+'</div></div>';
+      html+='<div class="sublbl c"><i class="ti ti-list-check" style="font-size:11px"></i> Criteria</div><div class="cg">';
       s.criteria.forEach(function(c,ci){
-        html+='<div class="ci'+(st.crit[ci]&&!st.na?' on':'')+'" data-sid="'+s.id+'" data-ci="'+ci+'" onclick="toggleC(this.dataset.sid,parseInt(this.dataset.ci),event)">';
-        html+='<div class="ccb'+(st.crit[ci]&&!st.na?' on':'')+'">'+(st.crit[ci]&&!st.na?'<i class="ti ti-check" style="font-size:8px;color:#fff"></i>':'')+'</div>';
-        html+='<span class="ct2">'+c+'</span></div>';
+        var val=st.crit[ci]; // null=unchecked, true=pass, false=fail, 'na'=N/A
+        var isPass=val===true;
+        var isFail=val===false&&val!==null;
+        var isNA=val==='na';
+        var rowBg=isPass?'#f0faf5':isFail?'#fff5f5':isNA?'#f8f8f8':'#fff';
+        html+='<div style="display:flex;align-items:center;gap:8px;padding:9px 14px;background:'+rowBg+';border-bottom:0.5px solid #eee">';
+        html+='<span style="flex:1;font-size:13px;color:'+(isNA?'#aaa':isPass?'#27500A':isFail?'#A32D2D':'#1a1a1a')+';text-decoration:'+(isNA?'line-through':'none')+'">'+c+'</span>';
+        html+='<div style="display:flex;gap:4px">';
+        html+='<div onclick="setCrit(\''+s.id+'\','+ci+',true)" style="width:30px;height:30px;border-radius:5px;border:1.5px solid '+(isPass?'#1D9E75':'#ddd')+';background:'+(isPass?'#1D9E75':'#fff')+';display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;font-weight:700;color:'+(isPass?'#fff':'#aaa')+'">✓</div>';
+        html+='<div onclick="setCrit(\''+s.id+'\','+ci+',false)" style="width:30px;height:30px;border-radius:5px;border:1.5px solid '+(isFail?'#E24B4A':'#ddd')+';background:'+(isFail?'#E24B4A':'#fff')+';display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;font-weight:700;color:'+(isFail?'#fff':'#aaa')+'">✗</div>';
+        html+='<div onclick="setCrit(\''+s.id+'\','+ci+',\'na\')" style="width:30px;height:30px;border-radius:5px;border:1.5px solid '+(isNA?'#888':'#ddd')+';background:'+(isNA?'#888':'#fff')+';display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:9px;font-weight:700;color:'+(isNA?'#fff':'#aaa')+'">N/A</div>';
+        html+='</div></div>';
       });
       html+='</div>';
-      if(s.id==='s3'&&!st.na){
-        html+='<div class="sublbl d"><i class="ti ti-ruler" style="font-size:11px"></i> Trial assembly dimensions</div>';
-        html+='<table class="dt"><thead><tr><th style="width:20px">#</th><th>Description</th><th>Drawing</th><th>Measured</th><th style="width:30px"></th></tr></thead><tbody>';
-        st.tdims.forEach(function(d){
-          var diff=d.draw&&d.meas?Math.abs(parseFloat(d.draw)-parseFloat(d.meas)).toFixed(1):'';
-          var cls=d.draw&&d.meas?(parseFloat(d.draw)===parseFloat(d.meas)?'dok':'dflag'):'';
-          var val=d.draw&&d.meas?(parseFloat(d.draw)===parseFloat(d.meas)?'&#10003;':'&plusmn;'+diff):'';
-          html+='<tr><td style="font-size:11px;color:#888">'+d.id.replace('td','')+'</td>';
-          html+='<td><input class="di" value="'+d.lbl+'" placeholder="e.g. Hole diam." data-sid="'+s.id+'" data-did="'+d.id+'" data-f="lbl" oninput="upTDEl(this)" style="text-align:left"></td>';
-          html+='<td><input class="di" value="'+d.draw+'" placeholder="--" data-sid="'+s.id+'" data-did="'+d.id+'" data-f="draw" oninput="upTDEl(this)"></td>';
-          html+='<td><input class="di" value="'+d.meas+'" placeholder="--" data-sid="'+s.id+'" data-did="'+d.id+'" data-f="meas" oninput="upTDEl(this)"></td>';
-          html+='<td class="'+cls+'">'+val+'</td></tr>';
-        });
-        html+='</tbody></table>';
-        html+='<button class="add-dim" data-sid="'+s.id+'" onclick="addTD(this.dataset.sid)"><i class="ti ti-plus" style="font-size:11px"></i> Add dimension</button>';
-      }
-      html+='<div class="sublbl p"><i class="ti ti-camera" style="font-size:11px"></i> Stage photos ('+(st.photos?st.photos.length:0)+')</div>';
-      html+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">';
-      if(st.photos&&st.photos.length){
-        st.photos.forEach(function(p,pi){
-          html+='<div style="position:relative">';
-          html+='<img src="'+p+'" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:0.5px solid #ddd;cursor:pointer" data-sid="'+s.id+'" data-pi="'+pi+'" onclick="viewPhoto(this.dataset.sid,parseInt(this.dataset.pi))">';
-          html+='<button style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;color:#fff;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center" data-sid="'+s.id+'" data-pi="'+pi+'" onclick="removePhoto(this.dataset.sid,parseInt(this.dataset.pi))">x</button>';
-          html+='</div>';
-        });
-      }
-      html+='</div>';
-      html+='<label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;border:0.5px solid #185FA5;background:#f0f6ff;color:#185FA5;font-size:12px;font-weight:500;cursor:pointer">';
-      html+='<i class="ti ti-camera" style="font-size:16px"></i> Take photo';
-      html+='<input type="file" accept="image/*" capture="environment" style="display:none" data-sid="'+s.id+'" onchange="capturePhoto(this,this.dataset.sid)">';
-      html+='</label>';
-      html+='<div style="font-size:10px;color:#888;margin-top:4px">Opens camera directly on mobile</div>';
-      // Stage result
+      html+='<div class="sublbl p"><i class="ti ti-camera" style="font-size:11px"></i> Photos ('+(st.photos?st.photos.length:0)+')</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">';
+      if(st.photos&&st.photos.length){st.photos.forEach(function(p,pi){html+='<div style="position:relative"><img src="'+p+'" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:0.5px solid #ddd" data-sid="'+s.id+'" data-pi="'+pi+'" onclick="viewPhoto(this.dataset.sid,parseInt(this.dataset.pi))"><button style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;color:#fff;font-size:10px;cursor:pointer" data-sid="'+s.id+'" data-pi="'+pi+'" onclick="removePhoto(this.dataset.sid,parseInt(this.dataset.pi))">x</button></div>';});}
+      html+='</div><label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;border:0.5px solid #185FA5;background:#f0f6ff;color:#185FA5;font-size:12px;font-weight:500;cursor:pointer"><i class="ti ti-camera" style="font-size:16px"></i> Take photo<input type="file" accept="image/*" capture="environment" style="display:none" data-sid="'+s.id+'" onchange="capturePhoto(this,this.dataset.sid)"></label>';
       if(!st.na){
-        html+='<div style="margin-top:10px;border-top:0.5px solid #ddd;padding-top:10px">';
-        html+='<div style="font-size:10px;font-weight:500;color:#666;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:7px">Stage result</div>';
-        if(st.result==='accept'){
-          html+='<div style="display:flex;align-items:center;gap:6px;padding:8px 10px;background:#EAF3DE;border-radius:8px;font-size:12px;font-weight:500;color:#27500A">';
-          html+='<i class="ti ti-circle-check" style="font-size:16px"></i> Stage accepted';
-          html+='<button style="margin-left:auto;font-size:11px;padding:2px 8px;border-radius:6px;border:0.5px solid #639922;background:transparent;color:#639922;cursor:pointer" data-sid="'+s.id+'" onclick="clearStageResult(this.dataset.sid)">Change</button>';
-          html+='</div>';
-        } else if(st.result==='reject'){
-          html+='<div style="padding:8px 10px;background:#FCEBEB;border-radius:8px">';
-          html+='<div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:#A32D2D;margin-bottom:4px">';
-          html+='<i class="ti ti-circle-x" style="font-size:16px"></i> Stage rejected';
-          html+='<button style="margin-left:auto;font-size:11px;padding:2px 8px;border-radius:6px;border:0.5px solid #E24B4A;background:transparent;color:#E24B4A;cursor:pointer" data-sid="'+s.id+'" onclick="clearStageResult(this.dataset.sid)">Change</button>';
-          html+='</div>';
-          html+='<div style="font-size:11px;color:#A32D2D;margin-bottom:2px"><strong>Reason:</strong> '+st.rejectReason+'</div>';
-          html+='<div style="font-size:11px;color:#A32D2D"><strong>Action:</strong> '+st.rejectAction+'</div>';
-          html+='</div>';
-        } else {
-          // Not yet set - show accept/reject buttons + reject fields
-          html+='<div style="display:flex;gap:8px;margin-bottom:6px">';
-          html+='<button style="flex:1;padding:8px;border-radius:8px;border:1.5px solid #639922;color:#639922;background:transparent;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" data-res="accept" onclick="setStageResult(this.dataset.sid,this.dataset.res)"><i class="ti ti-check"></i> Accept stage</button>';
-          html+='<button style="flex:1;padding:8px;border-radius:8px;border:1.5px solid #E24B4A;color:#E24B4A;background:transparent;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" onclick="showStageReject(this.dataset.sid)"><i class="ti ti-x"></i> Reject stage</button>';
-          html+='</div>';
-          html+='<div id="sr_reject_'+s.id+'" style="display:none;padding:8px;background:#FCEBEB;border-radius:8px;border:0.5px solid #E24B4A">';
-          html+='<div style="font-size:10px;font-weight:500;color:#A32D2D;margin-bottom:4px">Rejection reason *</div>';
-          html+='<textarea id="sr_reason_'+s.id+'" style="width:100%;padding:6px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:50px;background:#fff;outline:none" placeholder="What failed at this stage..."></textarea>';
-          html+='<div style="font-size:10px;font-weight:500;color:#A32D2D;margin:6px 0 4px">Action required *</div>';
-          html+='<textarea id="sr_action_'+s.id+'" style="width:100%;padding:6px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:50px;background:#fff;outline:none" placeholder="What must be corrected..."></textarea>';
-          html+='<button style="width:100%;margin-top:6px;padding:7px;border-radius:6px;border:1.5px solid #E24B4A;color:#fff;background:#E24B4A;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" data-res="reject" onclick="setStageResult(this.dataset.sid,this.dataset.res)">Confirm rejection</button>';
-          html+='</div>';
-        }
+        html+='<div style="margin-top:10px;border-top:0.5px solid #ddd;padding-top:10px"><div style="font-size:10px;font-weight:500;color:#666;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:7px">Stage result</div>';
+        if(st.result==='accept'){html+='<div style="display:flex;align-items:center;gap:6px;padding:8px 10px;background:#EAF3DE;border-radius:8px;font-size:12px;font-weight:500;color:#27500A"><i class="ti ti-circle-check" style="font-size:16px"></i> Stage accepted<button style="margin-left:auto;font-size:11px;padding:2px 8px;border-radius:6px;border:0.5px solid #639922;background:transparent;color:#639922;cursor:pointer" data-sid="'+s.id+'" onclick="clearStageResult(this.dataset.sid)">Change</button></div>';}
+        else if(st.result==='reject'){html+='<div style="padding:8px 10px;background:#FCEBEB;border-radius:8px"><div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:#A32D2D;margin-bottom:4px"><i class="ti ti-circle-x" style="font-size:16px"></i> Stage rejected<button style="margin-left:auto;font-size:11px;padding:2px 8px;border-radius:6px;border:0.5px solid #E24B4A;background:transparent;color:#E24B4A;cursor:pointer" data-sid="'+s.id+'" onclick="clearStageResult(this.dataset.sid)">Change</button></div><div style="font-size:11px;color:#A32D2D"><strong>Reason:</strong> '+st.rejectReason+'</div><div style="font-size:11px;color:#A32D2D"><strong>Action:</strong> '+st.rejectAction+'</div></div>';}
+        else{html+='<div style="display:flex;gap:8px;margin-bottom:6px"><button style="flex:1;padding:8px;border-radius:8px;border:1.5px solid #639922;color:#639922;background:transparent;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" data-res="accept" onclick="setStageResult(this.dataset.sid,this.dataset.res)"><i class="ti ti-check"></i> Accept</button><button style="flex:1;padding:8px;border-radius:8px;border:1.5px solid #E24B4A;color:#E24B4A;background:transparent;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" onclick="showStageReject(this.dataset.sid)"><i class="ti ti-x"></i> Reject</button></div><div id="sr_reject_'+s.id+'" style="display:none;padding:8px;background:#FCEBEB;border-radius:8px;border:0.5px solid #E24B4A"><textarea id="sr_reason_'+s.id+'" style="width:100%;padding:6px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:50px;background:#fff;outline:none" placeholder="What failed..."></textarea><textarea id="sr_action_'+s.id+'" style="width:100%;margin-top:6px;padding:6px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:50px;background:#fff;outline:none" placeholder="What must be corrected..."></textarea><button style="width:100%;margin-top:6px;padding:7px;border-radius:6px;border:1.5px solid #E24B4A;color:#fff;background:#E24B4A;font-size:12px;font-weight:500;cursor:pointer" data-sid="'+s.id+'" data-res="reject" onclick="setStageResult(this.dataset.sid,this.dataset.res)">Confirm rejection</button></div>';}
         html+='</div>';
       }
-      html+='<button class="nab'+(st.na?' on':'')+'" data-sid="'+s.id+'" onclick="toggleNA(this.dataset.sid,event)">'+(st.na?'Undo N/A':'Mark N/A')+'</button>';
-      html+='</div>';
+      html+='<button class="nab'+(st.na?' on':'')+'" data-sid="'+s.id+'" onclick="toggleNA(this.dataset.sid,event)">'+(st.na?'Undo N/A':'Mark N/A')+'</button></div>';
     }
     html+='</div>';
   });
   document.getElementById('stageList').innerHTML=html;
+  var sumEl=document.getElementById('stageSummary');
   var map={complete:'Complete',partial:'Partial',empty:'Not started',na:'N/A'};
   var sumHtml='';
-  STAGES.forEach(function(s){
-    var st=stSt(s.id);
-    sumHtml+='<div class="ssc"><span style="font-size:11px">'+s.label+'</span><span class="pill '+st+'">'+map[st]+'</span></div>';
-  });
-  document.getElementById('stageSummary').innerHTML=sumHtml;
+  STAGES.forEach(function(s){var st=stSt(s.id);sumHtml+='<div class="ssc"><span style="font-size:11px">'+s.label+'</span><span class="pill '+st+'">'+map[st]+'</span></div>';});
+  sumEl.innerHTML=sumHtml;
 }
-function addFab(){fabDims.push({label:String.fromCharCode(65+fabDims.length),draw:'',meas:''});renderFab();}
+function addFab(){fabDims.push({label:String.fromCharCode(65+fabDims.length),lbl:'',draw:'',meas:'',pf:''});renderFab();}
 function upFab(i,f,v){fabDims[i][f]=v;}
 function upFabEl(el){upFab(parseInt(el.dataset.idx),el.getAttribute('data-f'),el.value);}
 function renderFab(){
   var html='';
   fabDims.forEach(function(d,i){
-    var diff=d.draw&&d.meas?Math.abs(parseFloat(d.draw)-parseFloat(d.meas)).toFixed(1):'';
-    var cls=d.draw&&d.meas?(parseFloat(d.draw)===parseFloat(d.meas)?'dok':'dflag'):'';
-    var val=d.draw&&d.meas?(parseFloat(d.draw)===parseFloat(d.meas)?'&#10003;':'&plusmn;'+diff):'';
-    html+='<tr><td style="font-size:11px;font-weight:500;color:#888">'+d.label+'</td>';
-    html+='<td><input class="di" value="'+d.draw+'" placeholder="--" data-idx="'+i+'" data-f="draw" oninput="upFabEl(this)"></td>';
-    html+='<td><input class="di" value="'+d.meas+'" placeholder="--" data-idx="'+i+'" data-f="meas" oninput="upFabEl(this)"></td>';
-    html+='<td class="'+cls+'">'+val+'</td></tr>';
+    var hasData=(d.lbl!=='')||(d.draw!=='')||(d.meas!=='');
+    html+='<tr>';
+    html+='<td style="font-size:11px;font-weight:600;color:#1a3a5c;text-align:center;width:24px">'+d.label+'</td>';
+    html+='<td><input class="di" value="'+(d.lbl||'')+'" placeholder="e.g. Inside Dia" data-idx="'+i+'" data-f="lbl" oninput="upFabEl(this)" style="text-align:left;width:100%"></td>';
+    html+='<td><input class="di" value="'+(d.draw||'')+'" placeholder="--" data-idx="'+i+'" data-f="draw" oninput="upFabEl(this)"></td>';
+    html+='<td><input class="di" value="'+(d.meas||'')+'" placeholder="--" data-idx="'+i+'" data-f="meas" oninput="upFabEl(this)"></td>';
+    html+='<td>';
+    var pf=d.pf||'';
+    var col=pf.toLowerCase()==='pass'?'#27500A':pf.toLowerCase()==='fail'?'#A32D2D':'#888';
+    html+='<input class="di" value="'+pf+'" placeholder="Pass/Fail" data-idx="'+i+'" data-f="pf" oninput="upFabEl(this)" style="text-align:center;font-weight:600;color:'+col+';width:100%">';
+    html+='</td></tr>';
   });
   document.getElementById('fabBody').innerHTML=html;
 }
@@ -1025,25 +1545,26 @@ function getSnags(){
   });
   return s.join(' | ')||'None';
 }
+function gv(id){var el=document.getElementById(id);return el?el.value:'';}
 function getFormBasic(){
   return{
-    reportNo:document.getElementById('reportNo').value||'--',
-    bookRef:document.getElementById('bookRef').value.toUpperCase(),
-    inspector:document.getElementById('inspector').value,
-    po:document.getElementById('po').value,
-    job:document.getElementById('job').value,
-    project:document.getElementById('project').value,
-    drawing:document.getElementById('drawing').value,
-    artisan:document.getElementById('artisan').value,
-    date:document.getElementById('irnDate').value||new Date().toLocaleDateString('en-ZA'),
+    reportNo:gv('reportNo')||'--',
+    bookRef:'',
+    inspector:qcName||'',
+    po:gv('po'),
+    job:gv('job'),
+    project:gv('project'),
+    drawing:gv('drawing'),
+    artisan:gv('artisan'),
+    date:gv('irnDate')||new Date().toLocaleDateString('en-ZA'),
     result:iRes||'not set',
-    rejectionReason:iRes==='reject'?document.getElementById('rejectionReason').value:'',
-    rejectionAction:iRes==='reject'?document.getElementById('rejectionAction').value:'',
-    notes:document.getElementById('notes').value,
-    supervisor:supName,supCode:document.getElementById('supCode').value.toUpperCase(),
-    qc:qcName,qcCode:document.getElementById('qcCode').value.toUpperCase(),
-    client:document.getElementById('clientName').value,
-    clientCo:document.getElementById('clientCo').value
+    rejectionReason:iRes==='reject'?gv('rejectionReason'):'',
+    rejectionAction:iRes==='reject'?gv('rejectionAction'):'',
+    notes:gv('notes'),
+    supervisor:supName,supCode:'',
+    qc:qcName,qcCode:gv('qcCode').toUpperCase(),
+    client:gv('clientName'),
+    clientCo:gv('clientCo')
   };
 }
 function getForm(){
@@ -1054,6 +1575,11 @@ function getForm(){
   b.items=JSON.parse(JSON.stringify(items));
   b.stageStates=JSON.parse(JSON.stringify(ss));
   b.fabDims=JSON.parse(JSON.stringify(fabDims));
+  b.inspPhotoData=inspPhotosArr.slice(0,15);
+  b.irqRef=_irqParam||'';
+  b.reqSupervisor=_urlReq?(_urlReq.supervisor||''):'';
+  b.reqDate=_urlReq?(_urlReq.date||''):'';
+  b.stageName=activeStageFilter&&STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;})?STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;}).label:'';
   return b;
 }
 function buildWAMessage(d){
@@ -1098,14 +1624,31 @@ function buildWAMessage(d){
 }
 function sendWA(){
   var d=getFormBasic();
-  var msg='FSE IRN: '+d.bookRef+'/'+d.reportNo+'\nJob: '+d.job+' | PO: '+d.po+'\nResult: '+d.result.toUpperCase()+'\nDate: '+d.date;
+  var isPass=d.result==='accept';
+  var stageName=activeStageFilter&&STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;})?STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;}).label:'';
+  var msg='*FSE INSPECTION RELEASE NOTE*\n';
+  msg+='================================\n';
+  msg+=(isPass?'✅ *PASSED — Released*':'❌ *REJECTED — Rework required*')+'\n';
+  msg+='================================\n';
+  msg+='IRN: *INS-C '+d.reportNo+'*\n';
+  msg+='Job: *'+d.job+'*\n';
+  msg+='Client: '+(d.project||'--')+'\n';
+  if(stageName)msg+='Stage: '+stageName+'\n';
+  msg+='Drawing: '+(d.drawing||'--')+'\n';
+  msg+='Date: '+d.date+'\n';
+  msg+='QC: '+d.qc+' ('+d.qcCode+')\n';
+  if(!isPass&&d.rejectionReason){
+    msg+='================================\n';
+    msg+='*Reason:* '+d.rejectionReason+'\n';
+    msg+='*Action:* '+d.rejectionAction+'\n';
+  }
+  msg+='================================\n';
+  msg+='Register: https://eric0103360.github.io/fse-irn-system';
   window.open('https://wa.me/?text='+encodeURIComponent(msg));
 }
 async function submitIRN(){
   var d=getForm();
-  if(!d.reportNo||d.reportNo==='--'){toast('Enter a report number','err');return;}
   if(!d.job){toast('Enter a job number','err');return;}
-  if(!d.bookRef){toast('Enter book reference','err');return;}
   if(d.result==='not set'){toast('Set Accept or Reject','err');return;}
   if(d.result==='reject'){
     var reason=document.getElementById('rejectionReason').value.trim();
@@ -1113,28 +1656,62 @@ async function submitIRN(){
     if(!reason){toast('Enter rejection reason before submitting','err');document.getElementById('rejectionReason').focus();return;}
     if(!action){toast('Enter action required before submitting','err');document.getElementById('rejectionAction').focus();return;}
   }
-  if(!supValidated){toast('Supervisor code required','err');return;}
   if(!qcValidated){toast('QC code required','err');return;}
   var btn=document.getElementById('submitBtn');
   btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Submitting...';
   try{
-    await fetch(ENDPOINT,{method:'POST',body:JSON.stringify(d),mode:'no-cors'});
-    var ex=reg.findIndex(function(r){return r.reportNo===d.reportNo&&r.bookRef===d.bookRef;});
+    // Only get new IRN number if not already assigned this session
+    var el=document.getElementById('reportNo');
+    var currentIRN=el?el.value:'';
+    if(!currentIRN||currentIRN==='----'||currentIRN==='--'||window._irnSubmitted===currentIRN){
+      var freshIRN=await window.getNextIRN();
+      d.reportNo=freshIRN;
+      if(el)el.value=freshIRN;
+    } else {
+      d.reportNo=currentIRN;
+    }
+    // Save to Firebase immediately
+    if(window.saveIRNToFirebase)await window.saveIRNToFirebase(d);
+    var ex=reg.findIndex(function(r){return r.reportNo===d.reportNo;});
     if(ex>=0)reg[ex]=d;else reg.unshift(d);
-    lastIRNs[d.bookRef]=(lastIRNs[d.bookRef]||0)+1;
-    if(window.saveIRNToFirebase)window.saveIRNToFirebase(d);
-    toast(d.reportNo+' submitted and saved','ok');
-    setTimeout(function(){
-      var msg=buildWAMessage(d);
-      window.open('https://wa.me/?text='+encodeURIComponent(msg));
-    },800);
+    if(d.result==='reject'&&_irqParam){
+      var linkedReq=reqs.find(function(x){return x.reqNo===_irqParam;});
+      if(linkedReq&&linkedReq.firebaseId&&window.markRequestRework)window.markRequestRework(linkedReq.firebaseId);
+    }
+    toast(d.reportNo+' submitted','ok');
+    window._irnSubmitted=d.reportNo;
+    // Open WhatsApp immediately
+    var isPass=d.result==='accept';
+    var stageName=activeStageFilter&&STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;})?STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;}).label:'';
+    var irqRef=_irqParam?'IRQ-'+_irqParam:'';
+    var msg='*FSE INSPECTION RELEASE NOTE*\n';
+    msg+='================================\n';
+    msg+=(isPass?'✅ *PASSED — Released*':'❌ *REJECTED — Rework required*')+'\n';
+    msg+='================================\n';
+    msg+='IRN: *INS-C '+d.reportNo+'*'+(irqRef?' ('+irqRef+')':'')+'\n';
+    msg+='Job: *'+d.job+'*\n';
+    msg+='Client: '+(d.project||'--')+'\n';
+    if(stageName)msg+='Stage: '+stageName+'\n';
+    msg+='Drawing: '+(d.drawing||'--')+'\n';
+    msg+='Date: '+d.date+'\n';
+    msg+='QC: '+d.qc+' ('+d.qcCode+')\n';
+    msg+='================================\n';
+    if(!isPass){
+      msg+='*Reason:* '+(gv('rejectionReason')||'--')+'\n';
+      msg+='*Action required:* '+(gv('rejectionAction')||'--')+'\n';
+      msg+='================================\n';
+    }
+    msg+='Register: https://eric0103360.github.io/fse-irn-system';
+    window.open('https://wa.me/?text='+encodeURIComponent(msg));
+    // Send to Google endpoint in background — don't wait
+    fetch(ENDPOINT,{method:'POST',body:JSON.stringify(d),mode:'no-cors'}).catch(function(){});
     renderReg();
   }catch(e){
     toast('Saved locally - check connection','err');
     reg.unshift(d);renderReg();
   }finally{
     btn.disabled=false;
-    btn.innerHTML='<i class="ti ti-cloud-upload"></i> Submit and notify FSE QC Releases';
+    btn.innerHTML='<i class="ti ti-cloud-upload"></i> Submit &amp; notify FSE QC Releases';
   }
 }
 function setFilt(f,btn){
@@ -1150,78 +1727,258 @@ function stStFromSaved(st,s){
   if(st.gate||cd>0)return'partial';return'empty';
 }
 function renderReg(){
-  document.getElementById('statT').textContent=reg.length;
-  document.getElementById('statP').textContent=reg.filter(function(r){return r.result==='accept';}).length;
-  document.getElementById('statF').textContent=reg.filter(function(r){return r.result==='reject';}).length;
-  var filtered=reg;
-  if(regFilt==='pass')filtered=reg.filter(function(r){return r.result==='accept';});
-  else if(regFilt==='fail')filtered=reg.filter(function(r){return r.result==='reject';});
-  else if(regFilt==='partial')filtered=reg.filter(function(r){
-    var sc=parseInt(r.stagesComplete);var st=parseInt((r.stagesComplete||'0/7').split('/')[1]);return sc<st;
+  // Merge ALL requests and IRNs by IRQ
+  var irqMap={};
+  reqs.forEach(function(r){
+    var key=r.reqNo||('req_'+r.firebaseId);
+    if(!irqMap[key])irqMap[key]={req:null,irns:[],reqNo:r.reqNo};
+    irqMap[key].req=r;
   });
+  reg.forEach(function(r){
+    var key=r.irqRef||('irn_'+r.reportNo);
+    if(!irqMap[key])irqMap[key]={req:null,irns:[],reqNo:r.irqRef||''};
+    irqMap[key].irns.push(r);
+  });
+
+  var entries=Object.values(irqMap).sort(function(a,b){
+    var aD=(a.req&&a.req.timestamp)||(a.irns[0]&&a.irns[0].date)||'';
+    var bD=(b.req&&b.req.timestamp)||(b.irns[0]&&b.irns[0].date)||'';
+    return bD>aD?1:-1;
+  });
+
+  // Stats
+  var total=entries.length;
+  var released=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept';}).length;
+  var pending=entries.filter(function(e){var l=e.irns[e.irns.length-1];return !l;}).length;
+  var ftp=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&(!l.attempt||l.attempt===1);}).length;
+  var ftpPct=released>0?Math.round(ftp/released*100):0;
+  document.getElementById('statT').textContent=total;
+  document.getElementById('statP').textContent=released;
+  document.getElementById('statF').textContent=pending;
+  document.getElementById('statFTP').textContent=ftpPct+'%';
+
+  // Stage chart
+  var chartEl=document.getElementById('stageChart');
+  if(reg.length>0&&chartEl){
+    chartEl.style.display='block';
+    var ch='<div style="font-size:11px;font-weight:600;color:#1a3a5c;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Pass rate per stage</div>';
+    STAGES.forEach(function(s){
+      var sp=0,st2=0;
+      reg.forEach(function(r){if(r.stageStates&&r.stageStates[s.id]){var x=r.stageStates[s.id];if(!x.na){st2++;var allTicked=x.crit&&x.crit.length>0&&x.crit.every(Boolean);if(x.gate||allTicked)sp++;}}});
+      if(st2===0)return;
+      var pct=Math.round(sp/st2*100);var fp=100-pct;
+      ch+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><div style="width:100px;font-size:11px;color:#666;text-align:right;flex-shrink:0">'+s.label+'</div><div style="flex:1;background:#f0f0f0;border-radius:4px;height:18px;overflow:hidden;display:flex"><div style="width:'+pct+'%;background:#1D9E75;height:100%;display:flex;align-items:center;justify-content:flex-end;padding-right:4px">'+(pct>15?'<span style="font-size:10px;color:#fff;font-weight:600">'+pct+'%</span>':'')+'</div><div style="width:'+fp+'%;background:#E24B4A;height:100%"></div></div><div style="width:40px;font-size:11px;color:#888;text-align:right">'+sp+'/'+st2+'</div></div>';
+    });
+    chartEl.innerHTML=ch;
+  } else if(chartEl){chartEl.style.display='none';}
+
+  // Filter
+  var filtered=entries;
+  if(_regFilt==='pending')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return !l;});
+  else if(_regFilt==='released')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept';});
+  else if(_regFilt==='rework')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='reject';});
+
   if(!filtered.length){
-    document.getElementById('regList').innerHTML='<div style="text-align:center;padding:32px 16px;color:#888;font-size:13px"><i class="ti ti-clipboard-list" style="font-size:32px;display:block;margin-bottom:8px"></i>No records found.</div>';
+    document.getElementById('regList').innerHTML='<div style="text-align:center;padding:32px 16px;color:#888;font-size:14px"><i class="ti ti-clipboard-list" style="font-size:40px;display:block;margin-bottom:8px"></i>No records found.</div>';
     return;
   }
-  var stMap={complete:'ok',partial:'part',empty:'fail',na:'na'};
+
+  // Build clean card list
+  var stageIds=['s0','s1','s2','s3','s4','s5','s6','s7','s8'];
+  var stageShort=['Pre','S1','S2','S3','S4','S5','S6','S7','Fin'];
   var html='';
-  filtered.forEach(function(r){
-    var stagePills='';
-    STAGES.forEach(function(s){
-      var st=r.stageStates?stStFromSaved(r.stageStates[s.id],s):'empty';
-      stagePills+='<span class="sp '+stMap[st]+'">'+s.label+'</span>';
-    });
-    var snags=r.snags&&r.snags!=='None'?r.snags:'';
-    var itemSummary=r.items?r.items.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', '):'--';
-    html+='<div class="reg-card">';
-    // Header - IRN number + result pill
-    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:0.5px solid #eee;background:'+(r.result==='accept'?'#f0fdf4':'#fff8f8')+'">';
-    html+='<div style="font-size:14px;font-weight:600;color:#1a3a5c">'+r.bookRef+'/'+r.reportNo+'</div>';
-    html+='<span class="rp '+(r.result==='accept'?'pass':'fail')+'" style="font-size:12px;padding:4px 12px">'+(r.result==='accept'?'QC RELEASED':'QC REJECTED')+'</span>';
+
+  filtered.forEach(function(entry){
+    var req=entry.req;
+    var irns=entry.irns;
+    var latestIrn=irns[irns.length-1];
+    var status='pending';
+    if(latestIrn){status=latestIrn.result==='accept'?'released':'rework';}
+    var borderColor=status==='released'?'#1D9E75':status==='rework'?'#BA7517':'#E24B4A';
+    var job=(req&&req.job)||(latestIrn&&latestIrn.job)||'--';
+    var client=(req&&req.client)||(latestIrn&&latestIrn.project)||'--';
+    var items_str='--';
+    if(req&&req.items&&Array.isArray(req.items)){items_str=req.items.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', ');}
+    else if(latestIrn&&latestIrn.items&&Array.isArray(latestIrn.items)){items_str=latestIrn.items.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', ');}
+    var supName=(req&&req.supervisor)||(latestIrn&&latestIrn.reqSupervisor)||'--';
+    var qcDisplay=latestIrn?latestIrn.qc+' ('+latestIrn.qcCode+')':'--';
+    var irqNo=entry.reqNo||'--';
+    var stage=(req&&req.inspTypes)||(latestIrn&&latestIrn.stageName)||'--';
+    var sBg=status==='released'?'#EAF3DE':status==='rework'?'#FAEEDA':'#FCEBEB';
+    var sCol=status==='released'?'#27500A':status==='rework'?'#633806':'#A32D2D';
+    var sLbl=status==='released'?'Released':status==='rework'?'Rework':'Pending';
+    var isHighlighted=_irqParam&&String(irqNo)===String(_irqParam);
+
+    html+='<div id="reg-row-'+irqNo+'" style="background:#fff;border-left:5px solid '+borderColor+';border:0.5px solid #ddd;border-left:5px solid '+borderColor+';border-radius:10px;margin-bottom:10px;overflow:hidden'+(isHighlighted?';box-shadow:0 0 0 3px rgba(226,75,74,0.3)':'')+'">';
+
+    // Action required banner
+    if(isHighlighted){
+      html+='<div style="background:#E24B4A;color:#fff;font-size:13px;font-weight:600;text-align:center;padding:7px">&#9889; ACTION REQUIRED — Complete the IRN for this request</div>';
+    }
+
+    // Main row
+    html+='<div style="padding:14px 16px">';
+    html+='<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">';
+    html+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+    html+='<span style="font-size:18px;font-weight:700;color:#1a3a5c">IRQ-'+irqNo+'</span>';
+    html+='<span style="font-size:12px;color:#666;background:#f0f0f0;padding:3px 10px;border-radius:8px">'+stage+'</span>';
     html+='</div>';
+    html+='<span style="font-size:12px;padding:4px 12px;border-radius:10px;font-weight:600;background:'+sBg+';color:'+sCol+'">'+sLbl+'</span>';
+    html+='</div>';
+
     // Job details grid
-    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:0.5px solid #eee">';
-    html+='<div style="padding:7px 12px;border-right:0.5px solid #eee"><div style="font-size:9px;color:#888;font-weight:500;text-transform:uppercase;margin-bottom:2px">Job number</div><div style="font-size:12px;font-weight:500">'+(r.job||'--')+'</div></div>';
-    html+='<div style="padding:7px 12px"><div style="font-size:9px;color:#888;font-weight:500;text-transform:uppercase;margin-bottom:2px">PO number</div><div style="font-size:12px">'+(r.po||'--')+'</div></div>';
-    html+='<div style="padding:7px 12px;border-right:0.5px solid #eee;border-top:0.5px solid #eee"><div style="font-size:9px;color:#888;font-weight:500;text-transform:uppercase;margin-bottom:2px">Project</div><div style="font-size:12px">'+(r.project||'--')+'</div></div>';
-    html+='<div style="padding:7px 12px;border-top:0.5px solid #eee"><div style="font-size:9px;color:#888;font-weight:500;text-transform:uppercase;margin-bottom:2px">Drawing / Rev</div><div style="font-size:12px">'+(r.drawing||'--')+'</div></div>';
-    html+='<div style="padding:7px 12px;border-right:0.5px solid #eee;border-top:0.5px solid #eee"><div style="font-size:9px;color:#888;font-weight:500;text-transform:uppercase;margin-bottom:2px">Date</div><div style="font-size:12px">'+r.date+'</div></div>';
-    html+='<div style="padding:7px 12px;border-top:0.5px solid #eee"><div style="font-size:9px;color:#888;font-weight:500;text-transform:uppercase;margin-bottom:2px">Artisan</div><div style="font-size:12px">'+(r.artisan||'--')+'</div></div>';
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
+    html+='<div><div style="font-size:10px;color:#999;text-transform:uppercase;margin-bottom:2px">Job / Order</div><div style="font-size:15px;font-weight:600;color:#1a1a1a">'+job+'</div></div>';
+    html+='<div><div style="font-size:10px;color:#999;text-transform:uppercase;margin-bottom:2px">Client</div><div style="font-size:14px;color:#333">'+client+'</div></div>';
+    html+='<div><div style="font-size:10px;color:#999;text-transform:uppercase;margin-bottom:2px">Items</div><div style="font-size:13px;color:#333">'+items_str+'</div></div>';
+    html+='<div><div style="font-size:10px;color:#999;text-transform:uppercase;margin-bottom:2px">Date</div><div style="font-size:13px;color:#333">'+(req&&req.date||latestIrn&&latestIrn.date||'--')+'</div></div>';
     html+='</div>';
-    // Inspector + authorisation
-    html+='<div style="padding:8px 12px;border-bottom:0.5px solid #eee;background:#f9f9f7">';
-    html+='<div style="font-size:9px;color:#888;font-weight:500;text-transform:uppercase;margin-bottom:5px">Authorisation</div>';
-    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">';
-    html+='<div style="font-size:11px"><span style="color:#888">Inspector:</span> '+(r.inspector||'--')+' <span style="color:#1a3a5c;font-family:monospace">('+r.bookRef+')</span></div>';
-    html+='<div style="font-size:11px"><span style="color:#888">SUP:</span> <span style="font-family:monospace">'+r.supCode+'</span> '+r.supervisor+'</div>';
-    html+='<div style="font-size:11px"><span style="color:#888">QC:</span> <span style="font-family:monospace">'+r.qcCode+'</span> '+r.qc+'</div>';
-    html+='</div></div>';
-    // Items released
-    html+='<div style="padding:8px 12px;border-bottom:0.5px solid #eee">';
-    html+='<div style="font-size:9px;color:#888;font-weight:500;text-transform:uppercase;margin-bottom:4px">Items released</div>';
-    html+='<div style="font-size:12px">'+itemSummary+'</div></div>';
-    // Stages
-    html+='<div class="rc-stages">';
-    html+='<div style="font-size:9px;color:#888;font-weight:500;text-transform:uppercase;margin-bottom:5px">Inspection stages &mdash; '+(r.stagesComplete||'?')+' complete &middot; Trial assy: <strong>'+(r.trialAssyPass||'?')+'</strong></div>';
-    html+='<div class="stage-pills">'+stagePills+'</div></div>';
-    // Snags
-    if(snags)html+='<div class="rc-snags"><strong>SNAGS:</strong> '+snags+'</div>';
-    // Rejection details if rejected
-    if(r.result==='reject'&&(r.rejectionReason||r.rejectionAction)){
-      html+='<div style="padding:8px 12px;background:#FCEBEB;border-top:0.5px solid #E24B4A">';
-      html+='<div style="font-size:9px;color:#A32D2D;font-weight:500;text-transform:uppercase;margin-bottom:5px">Rejection details</div>';
-      if(r.rejectionReason)html+='<div style="font-size:11px;color:#A32D2D;margin-bottom:3px"><strong>Reason:</strong> '+r.rejectionReason+'</div>';
-      if(r.rejectionAction)html+='<div style="font-size:11px;color:#A32D2D"><strong>Action required:</strong> '+r.rejectionAction+'</div>';
+
+    // Supervisor and QC
+    html+='<div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap">';
+    html+='<div><span style="font-size:11px;color:#999">Supervisor: </span><span style="font-size:13px;font-weight:500">'+supName+'</span></div>';
+    html+='<div><span style="font-size:11px;color:#999">QC: </span><span style="font-size:13px;font-weight:500">'+qcDisplay+'</span></div>';
+    html+='</div>';
+
+    // Stage dots
+    if(latestIrn&&latestIrn.stageStates){
+      html+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;align-items:center">';
+      stageIds.forEach(function(sid,si){
+        var sd=latestIrn.stageStates[sid];
+        var isInspected=sd&&(sd.gate||(sd.crit&&sd.crit.some(function(v){return v!==null&&v!==undefined;})));
+        var allPassed=sd&&sd.crit&&sd.crit.length>0&&sd.crit.every(function(v){return v===true||v==='na';});
+        var anyFailed=sd&&sd.crit&&sd.crit.some(function(v){return v===false;});
+        var dotColor=!isInspected?'#e0e0e0':(sd.gate||allPassed)&&!anyFailed?'#1D9E75':'#E24B4A';
+        var dotTitle=stageShort[si];
+        html+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
+        html+='<div style="width:'+(isInspected?'22px':'16px')+';height:'+(isInspected?'22px':'16px')+';border-radius:50%;background:'+dotColor+'"></div>';
+        html+='<div style="font-size:9px;color:#999">'+dotTitle+'</div>';
+        html+='</div>';
+      });
       html+='</div>';
     }
-    // Actions
-    html+='<div class="rc-acts">';
-    html+='<button class="ra bl" data-book="'+r.bookRef+'" data-no="'+r.reportNo+'" onclick="printRec(this.dataset.book,this.dataset.no)"><i class="ti ti-printer" style="font-size:13px"></i> Print</button>';
-    html+='<button class="ra wa" data-book="'+r.bookRef+'" data-no="'+r.reportNo+'" onclick="waRec(this.dataset.book,this.dataset.no)"><i class="ti ti-brand-whatsapp" style="font-size:13px"></i> Send WA</button>';
+
+    // Action button
+    html+='<div style="display:flex;justify-content:flex-end">';
+    if(status==='pending'){
+      var inspType=(req&&req.inspTypes)||'';
+      var instructions=(req&&req.instructions)||'';
+      html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-reqno="'+irqNo+'" data-job="'+job.replace(/"/g,'&quot;')+'" data-client="'+client.replace(/"/g,'&quot;')+'" data-items="'+items_str.replace(/"/g,'&quot;')+'" data-insptype="'+inspType.replace(/"/g,'&quot;')+'" data-instructions="'+instructions.replace(/"/g,'&quot;')+'" data-by="'+supName.replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:14px;padding:10px 20px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">Complete IRN</button>';
+    } else if(latestIrn){
+      html+='<button data-irn="'+latestIrn.reportNo+'" data-irq="'+irqNo+'" onclick="printFromReg(this)" style="font-size:13px;padding:9px 18px;background:#fff;border:1.5px solid #1a3a5c;color:#1a3a5c;border-radius:8px;cursor:pointer;font-weight:600"><i class="ti ti-printer" style="font-size:14px"></i> View / Print</button>';
+    }
+    html+='</div>';
     html+='</div></div>';
   });
+
   document.getElementById('regList').innerHTML=html;
+  if(_irqParam){
+    setTimeout(function(){
+      var row=document.getElementById('reg-row-'+_irqParam);
+      if(row)row.scrollIntoView({behavior:'smooth',block:'center'});
+    },300);
+  }
 }
+
+function toggleRegRow(id){
+  var el=document.getElementById(id);var chev=document.getElementById('chev_'+id);
+  if(!el)return;
+  var open=el.style.display==='block';
+  el.style.display=open?'none':'block';
+  if(chev)chev.className='ti ti-chevron-'+(open?'down':'up');
+}
+function printFromReg(btn){
+  var irnNo=btn.dataset.irn;var irqNo=btn.dataset.irq;
+  var r=reg.find(function(x){return x.reportNo===irnNo;});
+  if(!r){toast('Report data not found','err');return;}
+  var reqEntry=reqs.find(function(x){return x.reqNo===irqNo;});
+  var logoSrc=getLogoSrc();var isPass=r.result==='accept';
+  var stageName=r.stageName||r.stage||'';
+  var criteriaRows='';
+  if(r.stageStates){
+    STAGES.forEach(function(s){
+      var st3=r.stageStates[s.id];
+      if(st3&&(st3.gate||( st3.crit&&st3.crit.some(Boolean)))){
+        stageName=stageName||s.label;
+        criteriaRows+=s.criteria.map(function(c,ci){
+          var val=st3.crit&&st3.crit[ci];
+          var isPass=val===true;
+          var isNA=val==='na';
+          var isFail=val===false&&val!==null;
+          var result=isPass?'✓ Pass':isNA?'N/A':isFail?'✗ Fail':'—';
+          var color=isPass?'#1D9E75':isNA?'#888':isFail?'#E24B4A':'#aaa';
+          return '<tr><td style="padding:4px 8px;border:0.5px solid #ddd;font-size:10px;color:'+(isNA?'#aaa':'#1a1a1a')+';text-decoration:'+(isNA?'line-through':'none')+'">'+c+'</td><td style="padding:4px 8px;border:0.5px solid #ddd;text-align:center;color:'+color+';font-weight:600;font-size:11px">'+result+'</td></tr>';
+        }).join('');
+      }
+    });
+  }
+  // Fallback — use inspTypes from linked request
+  if(!stageName){
+    var reqEntry2=reqs.find(function(x){return x.reqNo===irqNo;});
+    if(reqEntry2)stageName=reqEntry2.inspTypes||'';
+  }
+  var itemRows=(r.items||[]).filter(function(i){return i.desc;}).map(function(i,idx){return '<tr><td style="padding:5px 8px;border:0.5px solid #ddd;text-align:center">'+(idx+1)+'</td><td style="padding:5px 8px;border:0.5px solid #ddd">'+i.desc+'</td><td style="padding:5px 8px;border:0.5px solid #ddd;text-align:center">'+(i.qty||1)+'</td></tr>';}).join('');
+  var rSup=r.reqSupervisor||(reqEntry&&reqEntry.supervisor)||'';var rDate=r.reqDate||(reqEntry&&reqEntry.date)||'';
+  var reqPh2=(reqEntry&&reqEntry.reqPhotoData)||[];var inspPh2=r.inspPhotoData||[];
+  var win=window.open('','_blank');
+  win.document.write('<!DOCTYPE html><html><head><title>IRN INS-C '+r.reportNo+(irqNo?' | IRQ-'+irqNo:'')+'</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10px;color:#1a1a1a}table{width:100%;border-collapse:collapse;margin-bottom:6px}th{background:#1a3a5c;color:#fff;padding:4px 6px;text-align:left;font-size:9px}td{font-size:10px;padding:3px 6px}.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:6px;margin-bottom:8px}.logo{height:36px}.result-pass{background:#EAF3DE;border:1px solid #1D9E75;padding:4px 8px;border-radius:4px;font-weight:700;color:#27500A;font-size:11px;margin-bottom:6px}.result-fail{background:#FCEBEB;border:1px solid #E24B4A;padding:4px 8px;border-radius:4px;font-weight:700;color:#A32D2D;font-size:11px;margin-bottom:6px}.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px}.cell{background:#f9f9f9;padding:4px 6px;border-radius:3px;border:0.5px solid #eee}.cl{font-size:8px;color:#888;text-transform:uppercase;margin-bottom:1px}.cv{font-size:10px;font-weight:500}.req-banner{background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:4px;padding:4px 8px;margin-bottom:6px;display:flex;gap:12px}.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px}.sign-box{border:0.5px solid #ddd;padding:6px 8px;border-radius:3px}.footer{font-size:8px;color:#aaa;text-align:center;margin-top:8px;border-top:0.5px solid #eee;padding-top:4px}.no-print{margin:8px 0}@media print{.no-print{display:none}body{margin:6mm}html{height:100%}}@page{size:A4 portrait;margin:8mm}</style></head><body>');
+  win.document.write('<div class="no-print" style="text-align:left;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back</button></div>');
+  win.document.write('<div class="hdr"><div><img src="'+logoSrc+'" class="logo"><div style="margin-top:5px"><div style="font-size:16px;font-weight:500">Inspection Release Note</div><div style="font-size:12px;color:#555">FSE-QR-IRN.038 · Rev 02 · ISO9001 / ISO3834-2</div></div></div><div style="text-align:right"><div style="font-size:9px;color:#888;text-transform:uppercase">Report No</div><div style="font-size:24px;font-weight:700;color:#1a3a5c">INS-C '+r.reportNo+'</div>'+(irqNo?'<div style="font-size:11px;color:#185FA5">IRQ-'+irqNo+'</div>':'')+'</div></div>');
+  win.document.write('<div class="'+(isPass?'result-pass':'result-fail')+'">'+(isPass?'✓ ACCEPTED — Released':'✗ REJECTED — Rework required')+'</div>');
+  if(stageName)win.document.write('<div style="background:#1a3a5c;color:#fff;padding:5px 10px;border-radius:4px;font-size:11px;font-weight:600;margin-bottom:6px">Inspection stage: '+stageName+'</div>');
+  if(irqNo||rSup)win.document.write('<div class="req-banner">'+(irqNo?'<div><div class="cl">Request ref</div><div class="cv" style="color:#185FA5">IRQ-'+irqNo+'</div></div>':'')+(rSup?'<div><div class="cl">Requested by</div><div class="cv">'+rSup+'</div></div>':'')+(rDate?'<div><div class="cl">Request date</div><div class="cv">'+rDate+'</div></div>':'')+'</div>');
+  win.document.write('<div class="grid"><div class="cell"><div class="cl">Job / Order</div><div class="cv">'+r.job+'</div></div><div class="cell"><div class="cl">Client</div><div class="cv">'+(r.project||'--')+'</div></div><div class="cell"><div class="cl">PO Number</div><div class="cv">'+(r.po||'--')+'</div></div><div class="cell"><div class="cl">Artisan</div><div class="cv">'+(r.artisan||'--')+'</div></div><div class="cell"><div class="cl">Drawing / Rev</div><div class="cv">'+(r.drawing||'--')+'</div></div><div class="cell"><div class="cl">Inspection stage</div><div class="cv" style="color:#1a3a5c;font-weight:600">'+(stageName||'--')+'</div></div></div>');
+  if(itemRows)win.document.write('<table><thead><tr><th style="width:30px">#</th><th>Item description</th><th style="width:50px;text-align:center">Qty</th></tr></thead><tbody>'+itemRows+'</tbody></table>');
+  if(stageName&&criteriaRows)win.document.write('<table><thead><tr><th colspan="2">Inspection checklist — '+stageName+'</th></tr></thead><tbody>'+criteriaRows+'</tbody></table>');
+  if(r.notes)win.document.write('<div style="margin-bottom:12px;padding:8px;background:#f9f9f9;border-radius:4px;border:0.5px solid #eee"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:3px">Inspection notes</div><div style="font-size:12px">'+r.notes+'</div></div>');
+  if(!isPass&&r.rejectionReason)win.document.write('<div style="padding:10px;background:#FCEBEB;border:1px solid #E24B4A;border-radius:6px;margin-bottom:12px"><div style="font-weight:600;color:#A32D2D;margin-bottom:4px">Rejection details</div><div style="font-size:11px;color:#A32D2D;margin-bottom:3px"><strong>Reason:</strong> '+r.rejectionReason+'</div><div style="font-size:11px;color:#A32D2D"><strong>Action:</strong> '+r.rejectionAction+'</div></div>');
+  var dimRows='';
+  if(r.fabDims&&r.fabDims.length>0){
+    r.fabDims.filter(function(d){return d.draw||d.meas;}).forEach(function(d){
+      var drawVal=parseFloat(d.draw);
+      var measVal=parseFloat(d.meas);
+      var hasData=d.draw!==''&&d.meas!=='';
+      var match=hasData&&!isNaN(drawVal)&&!isNaN(measVal)&&drawVal===measVal;
+      var diff=hasData&&!isNaN(drawVal)&&!isNaN(measVal)?Math.abs(drawVal-measVal).toFixed(1):'';
+      var pf=d.pf||'';
+      var status=pf||'--';
+      var color=pf.toLowerCase()==='pass'?'#27500A':pf.toLowerCase()==='fail'?'#A32D2D':'#888';
+      dimRows+='<tr>';
+      dimRows+='<td style="padding:6px 10px;border:0.5px solid #ddd;font-weight:600;text-align:center;color:#1a3a5c">'+d.label+'</td>';
+      dimRows+='<td style="padding:6px 10px;border:0.5px solid #ddd">'+(d.lbl||'--')+'</td>';
+      dimRows+='<td style="padding:6px 10px;border:0.5px solid #ddd;text-align:center">'+(d.draw||'--')+'</td>';
+      dimRows+='<td style="padding:6px 10px;border:0.5px solid #ddd;text-align:center">'+(d.meas||'--')+'</td>';
+      dimRows+='<td style="padding:6px 10px;border:0.5px solid #ddd;text-align:center;color:'+color+';font-weight:600">'+status+'</td>';
+      dimRows+='</tr>';
+    });
+  }
+  if(dimRows)win.document.write('<table><thead><tr><th style="width:30px;text-align:center">Dim</th><th>Description</th><th style="width:80px;text-align:center">Drawing</th><th style="width:80px;text-align:center">Measured</th><th style="width:80px;text-align:center">Status</th></tr></thead><tbody>'+dimRows+'</tbody></table>');
+  // Photos
+  [{label:'Request photos (supervisor)',arr:reqPh2},{label:'Inspection photos (QC)',arr:inspPh2}].forEach(function(pg){
+    if(pg.arr&&pg.arr.length>0){
+      win.document.write('<div style="margin-bottom:6px"><div style="font-size:8px;color:#888;text-transform:uppercase;margin-bottom:4px">'+pg.label+' ('+pg.arr.length+')</div>');
+      win.document.write('<div style="display:flex;flex-wrap:wrap;gap:4px">');
+      pg.arr.forEach(function(src,idx){
+        win.document.write('<div style="position:relative;width:70px">');
+        win.document.write('<img src="'+src+'" style="width:70px;height:70px;object-fit:cover;border-radius:4px;border:0.5px solid #ddd;display:block">');
+        win.document.write('<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.55);color:#fff;font-size:8px;font-weight:600;text-align:center;padding:1px;border-radius:0 0 4px 4px">Photo '+(idx+1)+'</div>');
+        win.document.write('</div>');
+      });
+      win.document.write('</div></div>');
+    }
+  });
+  // Sign-off — no signature lines, codes only
+  var supCode=(reqEntry&&reqEntry.supCode)||r.supCode||'';
+  win.document.write('<div class="sign-grid">');
+  win.document.write('<div class="sign-box"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:4px">QC Inspector</div><div style="font-size:13px;font-weight:700">'+r.qc+'</div><div style="font-size:12px;color:#185FA5;font-weight:600;margin-top:2px">'+r.qcCode+'</div></div>');
+  win.document.write('<div class="sign-box"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:4px">Supervisor</div><div style="font-size:13px;font-weight:700">'+(rSup||'--')+'</div><div style="font-size:12px;color:#555;font-weight:600;margin-top:2px">'+(supCode||'')+'</div></div>');
+  win.document.write('<div class="sign-box"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:4px">Client <span style="font-weight:400">(optional)</span></div><div style="font-size:13px;font-weight:600">'+(r.client||'—')+'</div></div>');
+  win.document.write('</div>');
+  win.document.write('<div class="footer">FSE-QR-IRN.038 Rev 02 · This document is the property of FSE · If printed, verify against the authorised version on the server</div>');
+  win.document.write('<div class="no-print" style="margin-top:16px;display:flex;gap:8px;justify-content:center"><button onclick="window.print()" style="padding:10px 28px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer">Print / Save as PDF</button><button onclick="window.close()" style="padding:10px 20px;background:#f0f0f0;border:none;border-radius:8px;font-size:13px;cursor:pointer">Close</button></div>');
+  win.document.write('</body></html>');win.document.close();
+}
+
 function waRec(book,no){
   var r=reg.find(function(x){return x.reportNo===no&&x.bookRef===book;});if(!r)return;
   var isPass=r.result==='accept';
@@ -1239,6 +1996,57 @@ function waRec(book,no){
   if(r.snags&&r.snags!=='None')msg+='*SNAGS:* '+r.snags+'\n';
   if(!isPass)msg+='\n*Action required - see snags*';
   window.open('https://wa.me/?text='+encodeURIComponent(msg));
+}
+function renderPendingReqs(){
+  // Cards removed - pending requests shown in Register table
+}
+
+function resubmitRequest(btn){
+  var firebaseId=btn.dataset.fid;
+  var reqNo=btn.dataset.reqno;
+  var attempt=parseInt(btn.dataset.attempt)||2;
+  if(confirm('Re-submit IRQ-'+reqNo+' for inspection?\nThis will be Attempt '+attempt+'.')){
+    if(window.resubmitRequest)window.resubmitRequest(firebaseId,attempt);
+    toast('IRQ-'+reqNo+' re-submitted (Attempt '+attempt+')','ok');
+  }
+}
+function completeRequest(btn){
+  var firebaseId=btn.dataset.fid;
+  var reqNo=btn.dataset.reqno;
+  var job=btn.dataset.job;
+  var client=btn.dataset.client;
+  var itemsStr=btn.dataset.items||'';
+  var inspType=btn.dataset.insptype||'';
+  // Set _irqParam so form shows
+  _irqParam=reqNo;
+  // Find full request from Firebase data to fix Loading...
+  var foundReq=reqs.find(function(x){return String(x.reqNo)===String(reqNo);});
+  if(foundReq)_urlReq=foundReq;
+  // Set stage filter from inspection type
+  activeStageFilter=INSP_TYPE_STAGE_MAP[inspType]||null;
+  // Switch to New IRN tab (index 1 — after Inspect Req)
+  var newIrnBtn=document.querySelectorAll('.nb')[1];
+  window._keepStageFilter=true;
+  showV('form',newIrnBtn);
+  setTimeout(function(){
+    var joEl=document.getElementById('job');if(joEl)joEl.value=job;
+    var prEl=document.getElementById('project');if(prEl)prEl.value=client;
+    var banner=document.getElementById('inheritedBanner');if(banner)banner.style.display='block';
+    if(itemsStr){
+      var newItems=itemsStr.split(' | ').filter(Boolean).map(function(s,i){
+        var p=s.match(/^(.+?)(?:\s+x(\S+))?$/);
+        return{id:'i'+(i+1),desc:p?p[1].trim():s,qty:p&&p[2]?p[2]:'1'};
+      });
+      if(newItems.length){items=newItems;renderItems();}
+    }
+    var instrEl=btn.dataset.instructions||'';
+    renderQuickChecklist(instrEl);
+    renderStages();
+    showFormOrWaiting();
+    renderIrqBanner();
+    toast('Complete IRN for IRQ-'+reqNo+' — '+job,'ok');
+  },150);
+  if(window.markRequestComplete)window.markRequestComplete(firebaseId);
 }
 function printRec(book,no){
   var r=reg.find(function(x){return x.reportNo===no&&x.bookRef===book;});if(!r)return;
@@ -1326,9 +2134,223 @@ var fabRows='';
 function printIRN(){
   var d=getForm();
   if(!d.reportNo||d.reportNo==='--'){toast('Enter a report number','err');return;}
-  var ex=reg.findIndex(function(r){return r.reportNo===d.reportNo&&r.bookRef===d.bookRef;});
-  if(ex<0)reg.unshift(d);
-  printRec(d.bookRef,d.reportNo);
+  var logoSrc=getLogoSrc();
+  var isPass=d.result==='accept';
+  var irqRef=_irqParam?'IRQ-'+_irqParam:'';
+  var supName=_urlReq?(_urlReq.supervisor||''):'';
+  var reqDate=_urlReq?(_urlReq.date||''):'';
+  var inspType=_urlReq?(_urlReq.inspTypes||''):'';
+
+  // Items
+  var itemRows=items.filter(function(i){return i.desc;}).map(function(i,idx){
+    return '<tr><td style="padding:5px 8px;border:0.5px solid #ddd;text-align:center">'+(idx+1)+'</td><td style="padding:5px 8px;border:0.5px solid #ddd">'+i.desc+'</td><td style="padding:5px 8px;border:0.5px solid #ddd;text-align:center">'+(i.qty||1)+'</td></tr>';
+  }).join('');
+
+  // Build per-stage blocks
+  var allStageHtml='';
+  STAGES.forEach(function(s){
+    var st=ss[s.id];
+    var isEmpty=stSt(s.id)==='empty';
+    if(isEmpty&&!st.na)return;
+    if(st.na){
+      allStageHtml+='<div style="border:0.5px solid #ddd;border-radius:6px;margin-bottom:8px;overflow:hidden">';
+      allStageHtml+='<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:#f9f9f9">';
+      allStageHtml+='<span style="font-size:12px;font-weight:600;color:#888">'+s.label+(s.isCritical?'<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#FCEBEB;color:#A32D2D;font-weight:500;margin-left:6px">Critical</span>':'')+'</span>';
+      allStageHtml+='<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#f0f0f0;color:#aaa;font-weight:500">N/A</span>';
+      allStageHtml+='</div>';
+      allStageHtml+='<div style="padding:6px 10px;font-size:10px;color:#aaa;font-style:italic">Not applicable to this inspection</div>';
+      allStageHtml+='</div>';
+      return;
+    }
+    var stResult=st.result;
+    var stPass=stResult==='accept';
+    var stReject=stResult==='reject';
+    var borderCol=stPass?'#1D9E75':stReject?'#E24B4A':'#ddd';
+    var hdrBg=stPass?'#F0FAF0':stReject?'#FEF3F3':'#f9f9f9';
+    allStageHtml+='<div style="border:0.5px solid '+borderCol+';border-radius:6px;margin-bottom:10px;overflow:hidden">';
+    // Stage header
+    allStageHtml+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:'+hdrBg+';border-bottom:0.5px solid '+borderCol+'">';
+    allStageHtml+='<span style="font-size:12px;font-weight:700;color:#1a1a1a">'+s.label+(s.isCritical?'<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#FCEBEB;color:#A32D2D;font-weight:500;margin-left:6px">Critical</span>':'')+'</span>';
+    if(stPass)allStageHtml+='<span style="font-size:10px;font-weight:600;color:#1D9E75">✓ Accepted</span>';
+    else if(stReject)allStageHtml+='<span style="font-size:10px;font-weight:600;color:#E24B4A">✗ Rejected</span>';
+    allStageHtml+='</div>';
+    // Gate confirmation
+    allStageHtml+='<div style="padding:6px 10px;background:'+hdrBg+';border-bottom:0.5px solid #eee;font-size:10px;color:'+(st.gate?'#1D9E75':'#888')+'">';
+    allStageHtml+=(st.gate?'☑':'☐')+' '+s.gate;
+    allStageHtml+='</div>';
+    // Criteria grid
+    allStageHtml+='<div style="padding:8px 10px;display:grid;grid-template-columns:1fr 1fr;gap:4px">';
+    s.criteria.forEach(function(c,ci){
+      var cv=st.crit[ci];
+      var ticked=cv===true;
+      allStageHtml+='<div style="display:flex;align-items:flex-start;gap:5px;padding:4px 6px;border-radius:4px;background:'+(ticked?'#F0FAF0':'#fff')+';border:0.5px solid '+(ticked?'#B7E0C5':'#eee')+'">';
+      allStageHtml+='<span style="font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px;color:'+(ticked?'#1D9E75':'#ccc')+'">'+(ticked?'✓':'✗')+'</span>';
+      allStageHtml+='<span style="font-size:10px;color:'+(ticked?'#1a1a1a':'#aaa');
+      if(!ticked)allStageHtml+=';text-decoration:line-through';
+      allStageHtml+='">'+c+'</span></div>';
+    });
+    allStageHtml+='</div>';
+    // Stage rejection detail
+    if(stReject&&st.rejectReason){
+      allStageHtml+='<div style="margin:0 10px 8px;padding:7px 9px;background:#FCEBEB;border:0.5px solid #E24B4A;border-radius:4px">';
+      allStageHtml+='<div style="font-size:10px;font-weight:600;color:#A32D2D;margin-bottom:3px">Stage rejection</div>';
+      allStageHtml+='<div style="font-size:10px;color:#A32D2D"><strong>Reason:</strong> '+st.rejectReason+'</div>';
+      if(st.rejectAction)allStageHtml+='<div style="font-size:10px;color:#A32D2D;margin-top:2px"><strong>Action:</strong> '+st.rejectAction+'</div>';
+      allStageHtml+='</div>';
+    }
+    // Stage photos
+    if(st.photos&&st.photos.length>0){
+      allStageHtml+='<div style="padding:0 10px 8px"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:4px">Stage photos ('+st.photos.length+')</div><div style="display:flex;flex-wrap:wrap;gap:6px">';
+      st.photos.forEach(function(src){allStageHtml+='<img src="'+src+'" style="width:110px;height:110px;object-fit:cover;border-radius:4px;border:0.5px solid #ddd">';});
+      allStageHtml+='</div></div>';
+    }
+    // Dimensions table for this stage
+    if(st.tdims&&st.tdims.length>0){
+      var dimsWithData=st.tdims.filter(function(r){return r.label||r.drawing||r.measured;});
+      if(dimsWithData.length>0){
+        var flaggedDims=dimsWithData.filter(function(r){return r.flag;});
+        allStageHtml+='<div style="padding:0 10px 8px">';
+        allStageHtml+='<div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:4px">Fabrication dimensions</div>';
+        allStageHtml+='<table style="width:100%;border-collapse:collapse;font-size:10px">';
+        allStageHtml+='<thead><tr>';
+        allStageHtml+='<th style="background:#1a3a5c;color:#fff;padding:4px 6px;text-align:left;font-size:9px">Ref</th>';
+        allStageHtml+='<th style="background:#1a3a5c;color:#fff;padding:4px 6px;text-align:left;font-size:9px">Description</th>';
+        allStageHtml+='<th style="background:#1a3a5c;color:#fff;padding:4px 6px;text-align:center;font-size:9px">Drawing (mm)</th>';
+        allStageHtml+='<th style="background:#1a3a5c;color:#fff;padding:4px 6px;text-align:center;font-size:9px">Measured (mm)</th>';
+        allStageHtml+='<th style="background:#1a3a5c;color:#fff;padding:4px 6px;text-align:center;font-size:9px">Deviation</th>';
+        allStageHtml+='<th style="background:#1a3a5c;color:#fff;padding:4px 6px;text-align:center;font-size:9px">Status</th>';
+        allStageHtml+='</tr></thead><tbody>';
+        dimsWithData.forEach(function(r,ri){
+          var dev='';
+          if(r.drawing!==''&&r.measured!==''){var diff=parseFloat(r.measured)-parseFloat(r.drawing);if(!isNaN(diff))dev=(diff>=0?'+':'')+diff.toFixed(2);}
+          allStageHtml+='<tr style="background:'+(r.flag?'#FEF3F3':'#fff')+'">';
+          allStageHtml+='<td style="padding:4px 6px;border:0.5px solid #ddd;text-align:center">'+(ri+1)+'</td>';
+          allStageHtml+='<td style="padding:4px 6px;border:0.5px solid #ddd">'+(r.desc||'—')+'</td>';
+          allStageHtml+='<td style="padding:4px 6px;border:0.5px solid #ddd;text-align:center">'+(r.drawing||'—')+'</td>';
+          allStageHtml+='<td style="padding:4px 6px;border:0.5px solid #ddd;text-align:center">'+(r.measured||'—')+'</td>';
+          allStageHtml+='<td style="padding:4px 6px;border:0.5px solid #ddd;text-align:center;color:'+(r.flag?'#E24B4A':'#1a1a1a')+';font-weight:'+(r.flag?'600':'400')+'">'+(dev||'—')+'</td>';
+          allStageHtml+='<td style="padding:4px 6px;border:0.5px solid #ddd;text-align:center;font-weight:600;color:'+(r.flag?'#E24B4A':'#1D9E75')+'">'+(r.flag?'⚠ Flag':'✓ OK')+'</td>';
+          allStageHtml+='</tr>';
+        });
+        allStageHtml+='</tbody></table>';
+        if(flaggedDims.length>0){
+          allStageHtml+='<div style="margin-top:6px;padding:6px 8px;background:#FAEEDA;border:0.5px solid #EF9F27;border-radius:4px;font-size:10px;color:#633806">';
+          allStageHtml+='<strong>⚠ Flagged dimensions ('+flaggedDims.length+'):</strong> ';
+          allStageHtml+=flaggedDims.map(function(r,i){return (i+1)+'. '+(r.desc||'Dim '+(i+1))+' — Drawing: '+(r.drawing||'?')+'mm, Measured: '+(r.measured||'?')+'mm';}).join(' | ');
+          allStageHtml+='</div>';
+        }
+        allStageHtml+='</div>';
+      }
+    }
+    allStageHtml+='</div>';
+  });
+
+  var win=window.open('','_blank');
+  win.document.write('<!DOCTYPE html><html><head><title>IRN INS-C '+d.reportNo+(irqRef?' | '+irqRef:'')+'</title>');
+  win.document.write('<style>');
+  win.document.write('*{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#1a1a1a}');
+  win.document.write('h1{font-size:16px;margin:0}h2{font-size:12px;margin:0;color:#555}');
+  win.document.write('table{width:100%;border-collapse:collapse;margin-bottom:12px}');
+  win.document.write('th{background:#1a3a5c;color:#fff;padding:6px 8px;text-align:left;font-size:11px}');
+  win.document.write('.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:10px;margin-bottom:14px}');
+  win.document.write('.logo{height:52px}.irn-no{text-align:right}.irn-label{font-size:9px;color:#888;text-transform:uppercase}.irn-val{font-size:24px;font-weight:700;color:#1a3a5c;line-height:1}');
+  win.document.write('.irq-ref{font-size:11px;color:#185FA5;margin-top:2px}');
+  win.document.write('.result-pass{background:#EAF3DE;border:1.5px solid #1D9E75;padding:8px 12px;border-radius:6px;font-weight:700;color:#27500A;font-size:13px;margin-bottom:12px}');
+  win.document.write('.result-fail{background:#FCEBEB;border:1.5px solid #E24B4A;padding:8px 12px;border-radius:6px;font-weight:700;color:#A32D2D;font-size:13px;margin-bottom:12px}');
+  win.document.write('.grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}');
+  win.document.write('.cell{background:#f9f9f9;padding:6px 8px;border-radius:4px;border:0.5px solid #eee}');
+  win.document.write('.cell-label{font-size:9px;color:#888;text-transform:uppercase;margin-bottom:2px}.cell-val{font-size:12px;font-weight:500}');
+  win.document.write('.req-banner{background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:6px;padding:8px 12px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:16px}');
+  win.document.write('.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}');
+  win.document.write('.sign-box{border:0.5px solid #ddd;padding:8px 10px;border-radius:4px;min-height:60px}');
+  win.document.write('.sign-label{font-size:9px;color:#888;text-transform:uppercase;margin-bottom:3px}.sign-name{font-size:12px;font-weight:600}.sign-code{font-size:11px;color:#185FA5}.sign-line{margin-top:18px;border-top:0.5px solid #ddd;font-size:9px;color:#aaa;padding-top:3px}');
+  win.document.write('.footer{font-size:9px;color:#aaa;text-align:center;margin-top:16px;border-top:0.5px solid #eee;padding-top:8px}');
+  win.document.write('.no-print{text-align:center;margin:16px 0}');
+  win.document.write('@media print{.no-print{display:none}body{margin:10mm}}');
+  win.document.write('.sec-title{font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:0.5px;margin:14px 0 6px;border-bottom:0.5px solid #ddd;padding-bottom:4px}');
+  win.document.write('</style></head><body>');
+
+  // Back button
+  win.document.write('<div class="no-print" style="text-align:left;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back to form</button></div>');
+
+  // Header
+  win.document.write('<div class="hdr"><div><img src="'+logoSrc+'" class="logo"><div style="margin-top:5px"><h1>Inspection Release Note</h1><h2>FSE-QR-IRN.038 · Rev 02 · ISO9001 / ISO3834-2</h2></div></div>');
+  win.document.write('<div class="irn-no"><div class="irn-label">Report No</div><div class="irn-val">INS-C '+d.reportNo+'</div>'+(irqRef?'<div class="irq-ref">'+irqRef+'</div>':'')+'</div></div>');
+
+  // Result banner
+  win.document.write('<div class="'+(isPass?'result-pass':'result-fail')+'">'+(isPass?'✓ ACCEPTED — Released for next stage':'✗ REJECTED — Rework required')+'</div>');
+
+  // Request reference banner
+  if(irqRef||supName||inspType){
+    win.document.write('<div class="req-banner">');
+    if(irqRef)win.document.write('<div><div class="cell-label">Inspection request</div><div style="font-size:12px;font-weight:600;color:#185FA5">'+irqRef+'</div></div>');
+    if(inspType)win.document.write('<div><div class="cell-label">Inspection type</div><div style="font-size:12px;font-weight:500">'+inspType+'</div></div>');
+    if(supName)win.document.write('<div><div class="cell-label">Requested by</div><div style="font-size:12px;font-weight:500">'+supName+'</div></div>');
+    if(reqDate)win.document.write('<div><div class="cell-label">Request date</div><div style="font-size:12px">'+reqDate+'</div></div>');
+    win.document.write('</div>');
+  }
+
+  // Job details grid
+  win.document.write('<div class="grid">');
+  win.document.write('<div class="cell"><div class="cell-label">Job / Order</div><div class="cell-val">'+d.job+'</div></div>');
+  win.document.write('<div class="cell"><div class="cell-label">Client</div><div class="cell-val">'+(d.project||'--')+'</div></div>');
+  win.document.write('<div class="cell"><div class="cell-label">PO Number</div><div class="cell-val">'+(d.po||'--')+'</div></div>');
+  win.document.write('<div class="cell"><div class="cell-label">Artisan</div><div class="cell-val">'+(d.artisan||'--')+'</div></div>');
+  win.document.write('<div class="cell"><div class="cell-label">Drawing / Rev</div><div class="cell-val">'+(d.drawing||'--')+'</div></div>');
+  win.document.write('<div class="cell"><div class="cell-label">Inspection date</div><div class="cell-val">'+d.date+'</div></div>');
+  win.document.write('</div>');
+
+  // Items
+  if(itemRows){
+    win.document.write('<div class="sec-title">Items inspected</div>');
+    win.document.write('<table><thead><tr><th style="width:30px">#</th><th>Item description</th><th style="width:50px;text-align:center">Qty</th></tr></thead><tbody>'+itemRows+'</tbody></table>');
+  }
+
+  // Per-stage checklist blocks
+  if(allStageHtml){
+    win.document.write('<div class="sec-title">Inspection stages & checklists</div>');
+    win.document.write(allStageHtml);
+  }
+
+  // Overall notes
+  if(d.notes){win.document.write('<div style="margin-bottom:12px;padding:8px;background:#f9f9f9;border-radius:4px;border:0.5px solid #eee"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:3px">Inspection notes</div><div style="font-size:12px">'+d.notes+'</div></div>');}
+
+  // Overall rejection summary (if top-level rejection details exist)
+  if(!isPass&&d.rejectionReason){
+    win.document.write('<div style="padding:10px;background:#FCEBEB;border:1px solid #E24B4A;border-radius:6px;margin-bottom:12px">');
+    win.document.write('<div style="font-weight:600;color:#A32D2D;margin-bottom:4px;font-size:12px">Overall rejection summary</div>');
+    win.document.write('<div style="font-size:11px;color:#A32D2D;margin-bottom:3px"><strong>Reason:</strong> '+d.rejectionReason+'</div>');
+    win.document.write('<div style="font-size:11px;color:#A32D2D"><strong>Action required:</strong> '+d.rejectionAction+'</div>');
+    win.document.write('</div>');
+  }
+
+  // General inspection photos (not tied to a specific stage)
+  if(inspPhotosArr&&inspPhotosArr.length>0){
+    win.document.write('<div class="sec-title">General inspection photos</div>');
+    win.document.write('<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">');
+    inspPhotosArr.forEach(function(src){win.document.write('<img src="'+src+'" style="width:130px;height:130px;object-fit:cover;border-radius:6px;border:0.5px solid #ddd">');});
+    win.document.write('</div>');
+  }
+
+  // Authorisation
+  win.document.write('<div class="sec-title">Authorisation</div>');
+  win.document.write('<div class="sign-grid">');
+  win.document.write('<div class="sign-box"><div class="sign-label">QC Inspector</div><div class="sign-name">'+d.qc+'</div><div class="sign-code">'+d.qcCode+'</div><div class="sign-line">Signature</div></div>');
+  win.document.write('<div class="sign-box"><div class="sign-label">Supervisor</div><div class="sign-name">'+(supName||'&nbsp;')+'</div><div class="sign-code">&nbsp;</div><div class="sign-line">Signature</div></div>');
+  win.document.write('<div class="sign-box"><div class="sign-label">Client <span style="font-weight:400;color:#aaa">(optional)</span></div><div class="sign-name">'+(d.client||'&nbsp;')+'</div><div class="sign-code">&nbsp;</div><div class="sign-line">Signature</div></div>');
+  win.document.write('</div>');
+
+  // Footer with timestamp
+  win.document.write('<div class="footer">FSE-QR-IRN.038 Rev 02 · This document is the property of FSE · If printed, verify against the authorised version on the server · Generated '+new Date().toLocaleString('en-ZA')+'</div>');
+
+  // Print / close buttons
+  win.document.write('<div class="no-print" style="margin-top:16px;display:flex;gap:8px;justify-content:center">');
+  win.document.write('<button onclick="window.print()" style="padding:10px 28px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer">🖨 Print / Save as PDF</button>');
+  win.document.write('<button onclick="window.close()" style="padding:10px 20px;background:#f0f0f0;border:none;border-radius:8px;font-size:13px;cursor:pointer">✕ Close</button>');
+  win.document.write('</div>');
+
+  win.document.write('</body></html>');
+  win.document.close();
 }
 
 
@@ -1339,16 +2361,90 @@ function enterApp(){
   sp.style.opacity='0';
   setTimeout(function(){sp.style.display='none';},500);
 }
-// Always show splash for 2.5 seconds then auto-enter
-setTimeout(function(){enterApp();},2500);
-// Auto IRN on load
+// Read URL params immediately
+var _urlP=new URLSearchParams(window.location.search);
+var _irqParam=_urlP.get('irq');
+
+// Create immediate placeholder from URL so inspector sees something right away
+var _urlReq=null;
+if(_irqParam){
+  _urlReq={
+    reqNo:_irqParam,
+    job:'Loading...',
+    client:'',
+    items:[],
+    inspTypes:'',
+    supervisor:'',
+    instructions:'',
+    status:'pending',
+    firebaseId:''
+  };
+  reqs=[_urlReq];
+}
+
+// Load from Firebase — updates the placeholder with real data
+if(window.loadIRNsFromFirebase){window.loadIRNsFromFirebase(function(r){reg=r;renderReg();});}
+if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){
+  reqs=r;
+  if(_irqParam){
+    var found=reqs.find(function(x){return String(x.reqNo)===String(_irqParam);});
+    if(found){_urlReq=found;}
+  }
+  renderReg();
+  renderPendingReqs();
+  showFormOrWaiting();
+});}
+
+var _printParam=_urlP.get('print');
+// If opened with ?print=XXXX — auto load and print that IRN
+if(_printParam&&window.loadIRNsFromFirebase){
+  window.loadIRNsFromFirebase(function(r){
+    reg=r;
+    var target=reg.find(function(x){return x.reportNo===_printParam;});
+    if(target){
+      // Also load requests for supervisor info
+      if(window.loadRequestsFromFirebase){
+        window.loadRequestsFromFirebase(function(reqs2){
+          reqs=reqs2;
+          setTimeout(function(){
+            var fakeBtn={dataset:{irn:target.reportNo,irq:target.irqRef||_urlP.get('irq')||''}};
+            printFromReg(fakeBtn);
+          },500);
+        });
+      } else {
+        setTimeout(function(){
+          var fakeBtn={dataset:{irn:target.reportNo,irq:target.irqRef||''}};
+          printFromReg(fakeBtn);
+        },500);
+      }
+    }
+  });
+}
+setTimeout(function(){
+  enterApp();
+  if(_irqParam){
+    // Inspector opened WhatsApp link — go straight to Register
+    var regBtn=document.querySelectorAll('.nb')[2];
+    if(regBtn)showV('register',regBtn);
+  } else {
+    // Normal open — go to Inspect Req
+    var reqBtn=document.querySelectorAll('.nb')[0];
+    if(reqBtn)showV('request',reqBtn);
+  }
+},2500);
+
+// Auto IRN number on load
 setTimeout(function(){
   if(window.peekNextIRN){window.peekNextIRN().then(function(n){var el=document.getElementById('reportNo');if(el&&!el.value){el.value=n;el.style.color='rgba(255,255,255,0.6)';}});}
 },600);
+
 renderItems();renderStages();renderFab();
+showFormOrWaiting();
+if(window.loadCodesFromFirebase)window.loadCodesFromFirebase();
 document.getElementById('irnDate').value=new Date().toISOString().split('T')[0];
 initRequest();
 setUrgency('normal');
+renderPendingReqs();
 </script>
 </body>
 </html>
