@@ -1400,27 +1400,18 @@ async function submitRequest(){
   // Always get a fresh IRQ number — never reuse
   d.reqNo=await window.getNextIRQ();
   document.getElementById('reqNo').value=d.reqNo;
-  var urgIcon=d.urgency==='urgent'?'URGENT - ':'';
-  var itemList=reqItems.filter(function(i){return i.desc;}).map(function(i,idx){return '  '+(idx+1)+'. '+i.desc+(i.qty?' x'+i.qty:'');}).join('\n');
-  var msg='*FSE INSPECTION REQUEST*\n';
-  msg+=(d.urgency==='urgent'?'*================================*\n*            URGENT REQUEST          *\n':'');
-  msg+='*================================*\n';
-  msg+='Req No: *IRQ-'+d.reqNo+'*\n';
-  msg+='Job/Order: *'+d.job+'*\n';
-  msg+='Client: '+(d.client||'--')+'\n';
-  msg+='Date: '+d.date+'\n';
-  msg+='================================\n';
-  msg+='*Items for inspection:*\n'+itemList+'\n';
-  msg+='*Inspection type:* '+d.inspTypes+'\n';
-  if(d.instructions)msg+='*What to check:* '+d.instructions+'\n';
-  if(d.artisans&&d.artisans.length>0)msg+='*Artisan(s):* '+d.artisans.join(', ')+'\n';
-  msg+='================================\n';
-  if(d.photos>0)msg+='Photos: '+d.photos+' attached (see form)\n';
-  msg+='\n*QC - please attend and complete IRN on release*\n';
-  msg+='================================\n';
-  var itemSummary=reqItems.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(' | ');
+  var urgIcon=d.urgency==='urgent'?'⚡ URGENT — ':'';
+  var itemList=reqItems.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', ');
+  var msg=(d.urgency==='urgent'?'⚡ *URGENT — ':''+'*FSE INSPECTION REQUEST*\n');
+  msg+='IRQ-'+d.reqNo+' | '+d.job+(d.client?' | '+d.client:'')+'\n';
+  msg+='Items: '+itemList+'\n';
+  msg+='Type: '+d.inspTypes+'\n';
+  if(d.instructions)msg+='Check: '+d.instructions+'\n';
+  if(d.artisans&&d.artisans.length>0)msg+='Artisan(s): '+d.artisans.join(', ')+'\n';
+  msg+='SUP: '+d.supervisor+'\n';
+  if(d.photos>0)msg+='Photos: '+d.photos+' attached\n';
   var liveLink='https://eric0103360.github.io/fse-irn-system?irq='+encodeURIComponent(d.reqNo);
-  msg+='*Open IRN System to respond:*\n'+liveLink;
+  msg+='👉 '+liveLink;
   // Save to Firebase FIRST before anything else
   if(window.saveRequestToFirebase){
     await window.saveRequestToFirebase(d);
@@ -1495,18 +1486,11 @@ function checkSubcontractorCard(){
 function raiseConcession(){
   var d=getFormBasic();
   if(!d.job){toast('Enter job number first','err');return;}
-  var msg='*FSE — HOLD / CONCESSION REQUEST*\n';
-  msg+='================================\n';
-  msg+='IRN: INS-C '+d.reportNo+'\n';
-  msg+='Job: '+d.job+'\n';
-  msg+='Client: '+(d.project||'--')+'\n';
-  msg+='QC Inspector: '+d.qc+' ('+d.qcCode+')\n';
-  msg+='Date: '+d.date+'\n';
-  msg+='================================\n';
-  msg+='*Reason for hold / concession request:*\n';
-  msg+='[Inspector to add details]\n';
-  msg+='================================\n';
-  msg+='Register: https://eric0103360.github.io/fse-irn-system';
+  var msg='🔒 *HOLD / CONCESSION — '+d.job+'*\n';
+  msg+='IRN: INS-C '+d.reportNo+' | '+d.date+'\n';
+  msg+='QC: '+d.qc+' ('+d.qcCode+')\n';
+  msg+='Reason: [add details]\n';
+  msg+='Reg: https://eric0103360.github.io/fse-irn-system';
   toast('Opening WhatsApp for concession notification','info');
   window.open('https://wa.me/?text='+encodeURIComponent(msg));
 }
@@ -1847,24 +1831,15 @@ async function submitIRN(){
     var isPass=d.result==='accept';
     var stageName=activeStageFilter&&STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;})?STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;}).label:'';
     var irqRef=_irqParam?'IRQ-'+_irqParam:'';
-    var msg='*FSE INSPECTION RELEASE NOTE*\n';
-    msg+='================================\n';
-    msg+=(isPass?'✅ *PASSED — Released*':'❌ *REJECTED — Rework required*')+'\n';
-    msg+='================================\n';
-    msg+='IRN: *INS-C '+d.reportNo+'*'+(irqRef?' ('+irqRef+')':'')+'\n';
-    msg+='Job: *'+d.job+'*\n';
-    msg+='Client: '+(d.project||'--')+'\n';
+    var msg=(isPass?'✅':'❌')+' *IRN '+( isPass?'RELEASED':'REJECTED')+'* — INS-C '+d.reportNo+(irqRef?' ('+irqRef+')':'')+'\n';
+    msg+=d.job+(d.project?' | '+d.project:'')+'\n';
     if(stageName)msg+='Stage: '+stageName+'\n';
-    msg+='Drawing: '+(d.drawing||'--')+'\n';
-    msg+='Date: '+d.date+'\n';
-    msg+='QC: '+d.qc+' ('+d.qcCode+')\n';
-    msg+='================================\n';
+    msg+='QC: '+d.qc+' ('+d.qcCode+') | '+d.date+'\n';
     if(!isPass){
-      msg+='*Reason:* '+(gv('rejectionReason')||'--')+'\n';
-      msg+='*Action required:* '+(gv('rejectionAction')||'--')+'\n';
-      msg+='================================\n';
+      msg+='Reason: '+(gv('rejectionReason')||'--')+'\n';
+      msg+='Action: '+(gv('rejectionAction')||'--')+'\n';
     }
-    msg+='Register: https://eric0103360.github.io/fse-irn-system';
+    msg+='Reg: https://eric0103360.github.io/fse-irn-system';
     window.open('https://wa.me/?text='+encodeURIComponent(msg));
     // Send to Google endpoint in background — don't wait
     fetch(ENDPOINT,{method:'POST',body:JSON.stringify(d),mode:'no-cors'}).catch(function(){});
