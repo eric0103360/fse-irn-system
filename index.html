@@ -1886,10 +1886,11 @@ function renderReg(){
   });
 
   // Stats
-  var total=entries.length;
-  var released=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept';}).length;
-  var pending=entries.filter(function(e){var l=e.irns[e.irns.length-1];return !l;}).length;
-  var ftp=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&(!l.attempt||l.attempt===1);}).length;
+  var active=entries.filter(function(e){var l=e.irns[e.irns.length-1];return !(e.req&&e.req.status==='cancelled')&&!(l&&l.cancelled);});
+  var total=active.length;
+  var released=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept';}).length;
+  var pending=active.filter(function(e){var l=e.irns[e.irns.length-1];return !l;}).length;
+  var ftp=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&(!l.attempt||l.attempt===1);}).length;
   var ftpPct=released>0?Math.round(ftp/released*100):0;
   document.getElementById('statT').textContent=total;
   document.getElementById('statP').textContent=released;
@@ -2428,12 +2429,13 @@ function renderMgmt(){
   var entries=Object.values(irqMap);
 
   // Stats
-  var total=entries.length;
-  var urgent=entries.filter(function(e){return e.req&&e.req.urgency==='urgent';}).length;
-  var released=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept';}).length;
-  var rework=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='reject';}).length;
-  var pending=entries.filter(function(e){return e.irns.length===0;}).length;
-  var ftp=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&(!l.attempt||l.attempt===1);}).length;
+  var active=entries.filter(function(e){var l=e.irns[e.irns.length-1];return !(e.req&&e.req.status==='cancelled')&&!(l&&l.cancelled);});
+  var total=active.length;
+  var urgent=active.filter(function(e){return e.req&&e.req.urgency==='urgent';}).length;
+  var released=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept';}).length;
+  var rework=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='reject';}).length;
+  var pending=active.filter(function(e){return e.irns.length===0;}).length;
+  var ftp=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&(!l.attempt||l.attempt===1);}).length;
   var ftpPct=released>0?Math.round(ftp/released*100):0;
 
   document.getElementById('mgStatTotal').textContent=total;
@@ -2496,14 +2498,14 @@ function renderMgmt(){
   }
 
   // Outstanding
-  var outstanding=entries.filter(function(e){return e.irns.length===0;});
+  var outstanding=active.filter(function(e){return e.irns.length===0;});
   document.getElementById('mgOutstandingCount').textContent=outstanding.length;
   document.getElementById('mgOutstanding').innerHTML=outstanding.length
     ?outstanding.map(function(e){return mkRow(e,'#E24B4A');}).join('')
     :'<div style="padding:14px;font-size:12px;color:#aaa;text-align:center">No outstanding inspections</div>';
 
   // Rework
-  var reworkList=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='reject';});
+  var reworkList=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='reject';});
   document.getElementById('mgReworkCount').textContent=reworkList.length;
   document.getElementById('mgRework').innerHTML=reworkList.length
     ?reworkList.map(function(e){return mkRow(e,'#BA7517');}).join('')
