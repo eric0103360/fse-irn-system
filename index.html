@@ -235,6 +235,8 @@ window.loadRequestsFromFirebase=function(cb){
 };
 window.markRequestComplete=async function(firebaseId){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'complete'});return true;}catch(e){return false;}};
 window.markRequestRework=async function(firebaseId){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'rework'});return true;}catch(e){return false;}};
+window.markRequestCancelled=async function(firebaseId,reason){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'cancelled',cancelReason:reason,cancelledAt:new Date().toISOString()});return true;}catch(e){return false;}};
+window.markIRNCancelled=async function(firebaseId,reason){try{var r=doc(db,'irns',firebaseId);await updateDoc(r,{cancelled:true,cancelReason:reason,cancelledAt:new Date().toISOString()});return true;}catch(e){return false;}};
 window.loadIRNsFromFirebase=function(cb){try{var q=query(collection(db,'irns'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);});}catch(e){cb([]);}};
 window.addEventListener('DOMContentLoaded',async function(){var n=await window.peekNextIRN();window._nextIRNNum=n;var el=document.getElementById('reportNo');if(el&&!el.value){el.value=n;el.style.color='rgba(255,255,255,0.6)';}});
 </script>
@@ -572,12 +574,14 @@ window.addEventListener('DOMContentLoaded',async function(){var n=await window.p
       <button class="filt-btn" onclick="setRegFilt('pending',this)">Pending</button>
       <button class="filt-btn" onclick="setRegFilt('released',this)">Released</button>
       <button class="filt-btn" onclick="setRegFilt('rework',this)">Rework</button>
+      <button class="filt-btn" onclick="setRegFilt('cancelled',this)">Cancelled</button>
     </div>
     <div id="regList"><div style="text-align:center;padding:32px 16px;color:#888;font-size:13px"><i class="ti ti-clipboard-list" style="font-size:32px;display:block;margin-bottom:8px"></i>No records yet.</div></div>
     <div style="display:flex;gap:16px;margin-top:8px;padding:0 4px;font-size:10px;color:#888;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:4px"><div style="width:3px;height:14px;background:#E24B4A;border-radius:2px"></div>Pending</div>
       <div style="display:flex;align-items:center;gap:4px"><div style="width:3px;height:14px;background:#BA7517;border-radius:2px"></div>Rework</div>
       <div style="display:flex;align-items:center;gap:4px"><div style="width:3px;height:14px;background:#1D9E75;border-radius:2px"></div>Released</div>
+      <div style="display:flex;align-items:center;gap:4px"><div style="width:3px;height:14px;background:#aaa;border-radius:2px"></div>Cancelled</div>
     </div>
   </div>
 
@@ -1909,9 +1913,10 @@ function renderReg(){
 
   // Filter
   var filtered=entries;
-  if(_regFilt==='pending')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return !l;});
-  else if(_regFilt==='released')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept';});
-  else if(_regFilt==='rework')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='reject';});
+  if(_regFilt==='pending')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return !l&&!(e.req&&e.req.status==='cancelled');});
+  else if(_regFilt==='released')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&!l.cancelled;});
+  else if(_regFilt==='rework')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='reject'&&!l.cancelled;});
+  else if(_regFilt==='cancelled')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return (e.req&&e.req.status==='cancelled')||(l&&l.cancelled);});
 
   if(!filtered.length){
     document.getElementById('regList').innerHTML='<div style="text-align:center;padding:32px 16px;color:#888;font-size:14px"><i class="ti ti-clipboard-list" style="font-size:40px;display:block;margin-bottom:8px"></i>No records found.</div>';
@@ -1928,8 +1933,10 @@ function renderReg(){
     var irns=entry.irns;
     var latestIrn=irns[irns.length-1];
     var status='pending';
-    if(latestIrn){status=latestIrn.result==='accept'?'released':'rework';}
-    var borderColor=status==='released'?'#1D9E75':status==='rework'?'#BA7517':'#E24B4A';
+    var isCancelled=(latestIrn&&latestIrn.cancelled)||(req&&req.status==='cancelled');
+    if(isCancelled){status='cancelled';}
+    else if(latestIrn){status=latestIrn.result==='accept'?'released':'rework';}
+    var borderColor=status==='released'?'#1D9E75':status==='rework'?'#BA7517':status==='cancelled'?'#aaa':'#E24B4A';
     var job=(req&&req.job)||(latestIrn&&latestIrn.job)||'--';
     var client=(req&&req.client)||(latestIrn&&latestIrn.project)||'--';
     var items_str='--';
@@ -1939,9 +1946,9 @@ function renderReg(){
     var qcDisplay=latestIrn?latestIrn.qc+' ('+latestIrn.qcCode+')':'--';
     var irqNo=entry.reqNo||'--';
     var stage=(req&&req.inspTypes)||(latestIrn&&latestIrn.stageName)||'--';
-    var sBg=status==='released'?'#EAF3DE':status==='rework'?'#FAEEDA':'#FCEBEB';
-    var sCol=status==='released'?'#27500A':status==='rework'?'#633806':'#A32D2D';
-    var sLbl=status==='released'?'Released':status==='rework'?'Rework':'Pending';
+    var sBg=status==='released'?'#EAF3DE':status==='rework'?'#FAEEDA':status==='cancelled'?'#f0f0f0':'#FCEBEB';
+    var sCol=status==='released'?'#27500A':status==='rework'?'#633806':status==='cancelled'?'#888':'#A32D2D';
+    var sLbl=status==='released'?'Released':status==='rework'?'Rework':status==='cancelled'?'Cancelled':'Pending';
     var isHighlighted=_irqParam&&String(irqNo)===String(_irqParam);
 
     html+='<div id="reg-row-'+irqNo+'" style="background:#fff;border-left:5px solid '+borderColor+';border:0.5px solid #ddd;border-left:5px solid '+borderColor+';border-radius:10px;margin-bottom:10px;overflow:hidden'+(isHighlighted?';box-shadow:0 0 0 3px rgba(226,75,74,0.3)':'')+'">';
@@ -1994,13 +2001,18 @@ function renderReg(){
     }
 
     // Action button
-    html+='<div style="display:flex;justify-content:flex-end">';
-    if(status==='pending'){
+    html+='<div style="display:flex;justify-content:flex-end;gap:6px">';
+    if(isCancelled){
+      var cancelReason=(req&&req.cancelReason)||(latestIrn&&latestIrn.cancelReason)||'No reason given';
+      html+='<div style="font-size:11px;color:#aaa;font-style:italic;align-self:center">Cancelled: '+cancelReason+'</div>';
+    } else if(status==='pending'){
       var inspType=(req&&req.inspTypes)||'';
       var instructions=(req&&req.instructions)||'';
       html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-reqno="'+irqNo+'" data-job="'+job.replace(/"/g,'&quot;')+'" data-client="'+client.replace(/"/g,'&quot;')+'" data-items="'+items_str.replace(/"/g,'&quot;')+'" data-insptype="'+inspType.replace(/"/g,'&quot;')+'" data-instructions="'+instructions.replace(/"/g,'&quot;')+'" data-by="'+supName.replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:14px;padding:10px 20px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">Complete IRN</button>';
-    } else if(latestIrn){
+      html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irqno="'+irqNo+'" onclick="cancelRecord(this)" style="font-size:12px;padding:10px 14px;background:#fff;border:1px solid #aaa;color:#888;border-radius:8px;cursor:pointer"><i class="ti ti-x" style="font-size:13px"></i> Cancel</button>';
+    } else {
       html+='<button data-irn="'+latestIrn.reportNo+'" data-irq="'+irqNo+'" onclick="printFromReg(this)" style="font-size:13px;padding:9px 18px;background:#fff;border:1.5px solid #1a3a5c;color:#1a3a5c;border-radius:8px;cursor:pointer;font-weight:600"><i class="ti ti-printer" style="font-size:14px"></i> View / Print</button>';
+      html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irnfid="'+(latestIrn&&latestIrn.firebaseId||'')+'" data-irqno="'+irqNo+'" onclick="cancelRecord(this)" style="font-size:12px;padding:9px 14px;background:#fff;border:1px solid #aaa;color:#888;border-radius:8px;cursor:pointer"><i class="ti ti-x" style="font-size:13px"></i> Cancel</button>';
     }
     html+='</div>';
     html+='</div></div>';
@@ -2380,6 +2392,26 @@ function printIRN(){
 }
 
 
+function cancelRecord(btn){
+  var irqNo=btn.dataset.irqno;
+  var reqFid=btn.dataset.fid||'';
+  var irnFid=btn.dataset.irnfid||'';
+  var reason=prompt('Reason for cancellation (IRQ-'+irqNo+'):');
+  if(!reason||!reason.trim()){toast('Cancellation reason required','err');return;}
+  reason=reason.trim();
+  var promises=[];
+  if(reqFid&&window.markRequestCancelled)promises.push(window.markRequestCancelled(reqFid,reason));
+  if(irnFid&&window.markIRNCancelled)promises.push(window.markIRNCancelled(irnFid,reason));
+  Promise.all(promises).then(function(){
+    toast('IRQ-'+irqNo+' marked as cancelled','ok');
+    var loaded={irns:false,reqs:false};
+    function check(){if(loaded.irns&&loaded.reqs)renderReg();}
+    if(window.loadIRNsFromFirebase){window.loadIRNsFromFirebase(function(r){reg=r;loaded.irns=true;check();});}
+    else{loaded.irns=true;check();}
+    if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){reqs=r;loaded.reqs=true;check();});}
+    else{loaded.reqs=true;check();}
+  }).catch(function(){toast('Error cancelling — check connection','err');});
+}
 function renderMgmt(){
   // Build merged entries same as renderReg
   var irqMap={};
