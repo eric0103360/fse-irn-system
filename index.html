@@ -1400,10 +1400,8 @@ async function submitRequest(){
   // Always get a fresh IRQ number — never reuse
   d.reqNo=await window.getNextIRQ();
   document.getElementById('reqNo').value=d.reqNo;
-  var urgIcon=d.urgency==='urgent'?'⚡ URGENT — ':'';
   var itemList=reqItems.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', ');
-  var msg=(d.urgency==='urgent'?'⚡ *URGENT — ':''+'*FSE INSPECTION REQUEST*\n');
-  msg+='IRQ-'+d.reqNo+' | '+d.job+(d.client?' | '+d.client:'')+'\n';
+  var msg=(d.urgency==='urgent'?'⚡ ':'🔵 ')+'*IRQ-'+d.reqNo+' | '+d.job+(d.client?' | '+d.client:'')+'*\n';
   msg+='Items: '+itemList+'\n';
   msg+='Type: '+d.inspTypes+'\n';
   if(d.instructions)msg+='Check: '+d.instructions+'\n';
@@ -1486,9 +1484,8 @@ function checkSubcontractorCard(){
 function raiseConcession(){
   var d=getFormBasic();
   if(!d.job){toast('Enter job number first','err');return;}
-  var msg='🔒 *HOLD / CONCESSION — '+d.job+'*\n';
-  msg+='IRN: INS-C '+d.reportNo+' | '+d.date+'\n';
-  msg+='QC: '+d.qc+' ('+d.qcCode+')\n';
+  var msg='🟠 *HOLD | '+d.job+' | INS-C '+d.reportNo+'*\n';
+  msg+='QC: '+d.qc+' ('+d.qcCode+') | '+d.date+'\n';
   msg+='Reason: [add details]\n';
   msg+='Reg: https://eric0103360.github.io/fse-irn-system';
   toast('Opening WhatsApp for concession notification','info');
@@ -1831,7 +1828,7 @@ async function submitIRN(){
     var isPass=d.result==='accept';
     var stageName=activeStageFilter&&STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;})?STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;}).label:'';
     var irqRef=_irqParam?'IRQ-'+_irqParam:'';
-    var msg=(isPass?'✅':'❌')+' *IRN '+( isPass?'RELEASED':'REJECTED')+'* — INS-C '+d.reportNo+(irqRef?' ('+irqRef+')':'')+'\n';
+    var msg=(isPass?'✅':'❌')+' *INS-C '+d.reportNo+(isPass?' RELEASED':' REJECTED')+(irqRef?' | '+irqRef:'')+'*\n';
     msg+=d.job+(d.project?' | '+d.project:'')+'\n';
     if(stageName)msg+='Stage: '+stageName+'\n';
     msg+='QC: '+d.qc+' ('+d.qcCode+') | '+d.date+'\n';
