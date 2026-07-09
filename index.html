@@ -957,17 +957,36 @@ function showV(v,btn){
     else{mgLoaded.reqs=true;checkMgReady();}
   }
 }
+// Compress image before storing — fixes large camera photo issues
+function compressImage(file,callback){
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();
+    img.onload=function(){
+      var canvas=document.createElement('canvas');
+      var maxW=1200;var maxH=1200;
+      var w=img.width;var h=img.height;
+      if(w>maxW){h=Math.round(h*maxW/w);w=maxW;}
+      if(h>maxH){w=Math.round(w*maxH/h);h=maxH;}
+      canvas.width=w;canvas.height=h;
+      var ctx=canvas.getContext('2d');
+      ctx.drawImage(img,0,0,w,h);
+      var compressed=canvas.toDataURL('image/jpeg',0.75);
+      callback(compressed);
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
 function capturePhoto(input,sid){
   if(!input.files||!input.files[0])return;
   var file=input.files[0];
-  var reader=new FileReader();
-  reader.onload=function(e){
+  compressImage(file,function(compressed){
     if(!ss[sid].photos)ss[sid].photos=[];
-    ss[sid].photos.push(e.target.result);
+    ss[sid].photos.push(compressed);
     renderStages();
     toast('Photo added to '+STAGES.find(function(s){return s.id===sid;}).label,'ok');
-  };
-  reader.readAsDataURL(file);
+  });
   input.value='';
 }
 function removePhoto(sid,pi){
@@ -1238,12 +1257,10 @@ function addInspPhotos(input){
   if(inspPhotosArr.length>=40){toast('Maximum 40 photos allowed','err');return;}
   Array.from(input.files).forEach(function(file){
     if(inspPhotosArr.length>=40){toast('Maximum 40 photos','err');return;}
-    var reader=new FileReader();
-    reader.onload=function(e){
-      inspPhotosArr.push(e.target.result);
+    compressImage(file,function(compressed){
+      inspPhotosArr.push(compressed);
       renderInspPhotos();
-    };
-    reader.readAsDataURL(file);
+    });
   });
   input.value='';
 }
@@ -1412,9 +1429,10 @@ function addReqPhoto(input){
   if(reqPhotos.length>=40){toast('Maximum 40 photos allowed','err');return;}
   Array.from(input.files).forEach(function(file){
     if(reqPhotos.length>=40){toast('Maximum 40 photos','err');return;}
-    var reader=new FileReader();
-    reader.onload=function(e){reqPhotos.push(e.target.result);renderReqPhotos();};
-    reader.readAsDataURL(file);
+    compressImage(file,function(compressed){
+      reqPhotos.push(compressed);
+      renderReqPhotos();
+    });
   });
   input.value='';
 }
