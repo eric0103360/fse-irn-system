@@ -310,6 +310,17 @@ window.addEventListener('DOMContentLoaded',function(){
         <div style="font-size:11px;color:#633806;margin-top:1px">Do not refresh or close this page. Tap <strong>Release & Notify</strong> to save.</div>
       </div>
     </div>
+    <!-- Request photos preview — shown when photos exist from supervisor request -->
+    <div id="reqPhotoPreview" style="display:none;margin-bottom:10px">
+      <div class="card">
+        <div class="ct">
+          <svg style="font-size:13px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          Supervisor photos — item for inspection
+          <span id="reqPhotoCount" style="font-size:10px;background:#E6F1FB;color:#185FA5;padding:1px 7px;border-radius:8px;margin-left:4px"></span>
+        </div>
+        <div id="reqPhotoStrip" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px 14px"></div>
+      </div>
+    </div>
     <!-- Waiting screen — shown when no IRQ link -->
     <div id="waitingScreen" style="display:none;text-align:center;padding:48px 24px">
       <div style="width:72px;height:72px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
@@ -1282,6 +1293,40 @@ function setRegFilt(f,btn){
   if(btn)btn.classList.add('on');
   renderReg();
 }
+function renderReqPhotoPreview(){
+  var preview=document.getElementById('reqPhotoPreview');
+  var strip=document.getElementById('reqPhotoStrip');
+  var count=document.getElementById('reqPhotoCount');
+  if(!preview||!strip)return;
+  var photos=_urlReq&&_urlReq.reqPhotoData&&_urlReq.reqPhotoData.length>0?_urlReq.reqPhotoData:[];
+  if(photos.length===0){preview.style.display='none';return;}
+  preview.style.display='block';
+  if(count)count.textContent=photos.length+' photo'+(photos.length>1?'s':'');
+  var html='';
+  photos.forEach(function(src,i){
+    html+='<div style="position:relative;cursor:pointer" onclick="viewReqPhotoPreview('+i+')">';
+    html+='<img src="'+src+'" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:0.5px solid #ddd">';
+    html+='<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.45);color:#fff;font-size:9px;text-align:center;padding:2px;border-radius:0 0 8px 8px">Photo '+(i+1)+'</div>';
+    html+='</div>';
+  });
+  strip.innerHTML=html;
+}
+function viewReqPhotoPreview(i){
+  var photos=_urlReq&&_urlReq.reqPhotoData?_urlReq.reqPhotoData:[];
+  if(!photos[i])return;
+  var overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer';
+  var img=document.createElement('img');
+  img.src=photos[i];
+  img.style.cssText='max-width:95%;max-height:85%;object-fit:contain;border-radius:8px';
+  var label=document.createElement('div');
+  label.style.cssText='color:#fff;font-size:12px;margin-top:10px;opacity:0.7';
+  label.textContent='Photo '+(i+1)+' of '+photos.length+' — tap to close';
+  overlay.appendChild(img);
+  overlay.appendChild(label);
+  overlay.onclick=function(){document.body.removeChild(overlay);};
+  document.body.appendChild(overlay);
+}
 function showFormOrWaiting(){
   var hasReq=!!_irqParam;
   var waiting=document.getElementById('waitingScreen');
@@ -1290,7 +1335,7 @@ function showFormOrWaiting(){
   if(waiting)waiting.style.display=hasReq?'none':'block';
   if(form)form.style.display=hasReq?'block':'none';
   if(actions)actions.style.display=hasReq?'block':'none';
-  if(hasReq)renderIrqBanner();
+  if(hasReq){renderIrqBanner();renderReqPhotoPreview();}
 }
 function renderIrqBanner(){
   var el=document.getElementById('irqNotifBanner');
@@ -2845,7 +2890,7 @@ if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){
   reqs=r;
   if(_irqParam){
     var found=reqs.find(function(x){return String(x.reqNo)===String(_irqParam);});
-    if(found){_urlReq=found;}
+    if(found){_urlReq=found;renderReqPhotoPreview();}
   }
   renderReg();
   renderPendingReqs();
