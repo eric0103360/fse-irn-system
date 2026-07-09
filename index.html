@@ -250,7 +250,10 @@ window.updateIRNInFirebase=async function(firebaseId,data){
   }catch(e){console.error('IRN update error:',e);return false;}
 };
 window.loadIRNsFromFirebase=function(cb){try{var q=query(collection(db,'irns'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);});}catch(e){cb([]);}};
-window.addEventListener('DOMContentLoaded',async function(){var n=await window.peekNextIRN();window._nextIRNNum=n;var el=document.getElementById('reportNo');if(el&&!el.value){el.value=n;el.style.color='rgba(255,255,255,0.6)';}});
+window.addEventListener('DOMContentLoaded',function(){
+  var el=document.getElementById('reportNo');
+  if(el&&!el.value){el.value='----';el.style.color='rgba(255,255,255,0.4)';}
+});
 </script>
 </head>
 <body><script>
@@ -2000,12 +2003,11 @@ async function submitIRN(){
       if(window.updateIRNInFirebase)await window.updateIRNInFirebase(window._amendFirebaseId,d);
       toast('INS-C '+d.reportNo+' amended and saved','ok');
       window._amendMode=false;window._amendFirebaseId=null;window._amendIRNNo=null;
-    } else if(!currentIRN||currentIRN==='----'||currentIRN==='--'||window._irnSubmitted===currentIRN){
+    } else {
+      // Always get a fresh number from Firebase counter
       var freshIRN=await window.getNextIRN();
       d.reportNo=freshIRN;
-      if(el)el.value=freshIRN;
-    } else {
-      d.reportNo=currentIRN;
+      if(el){el.value=freshIRN;el.style.color='rgba(255,255,255,0.6)';}
     }
     // Save to Firebase — skip if already handled by amendment
     if(!window._amendMode&&window.saveIRNToFirebase)await window.saveIRNToFirebase(d);
@@ -2842,10 +2844,7 @@ setTimeout(function(){
   }
 },2500);
 
-// Auto IRN number on load
-setTimeout(function(){
-  if(window.peekNextIRN){window.peekNextIRN().then(function(n){var el=document.getElementById('reportNo');if(el&&!el.value){el.value=n;el.style.color='rgba(255,255,255,0.6)';}});}
-},600);
+// IRN number assigned at submission only
 
 renderItems();renderStages();renderFab();
 showFormOrWaiting();
