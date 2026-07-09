@@ -454,9 +454,10 @@ window.addEventListener('DOMContentLoaded',function(){
       </div>
       <div style="padding:0 14px 10px">
         <div style="font-size:10px;color:#666;margin-bottom:6px;font-weight:500">Overall result</div>
-        <div style="display:flex;gap:8px">
-          <button class="rb acc" id="btnAcc" onclick="setRes('accept')" style="flex:1;padding:10px;font-size:13px"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Accept / Release</button>
-          <button class="rb rej" id="btnRej" onclick="setRes('reject')" style="flex:1;padding:10px;font-size:13px"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</button>
+        <div style="display:flex;gap:6px">
+          <button class="rb acc" id="btnAcc" onclick="setRes('accept')" style="flex:1;padding:10px;font-size:12px"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Accept</button>
+          <button class="rb rej" id="btnRej" onclick="setRes('reject')" style="flex:1;padding:10px;font-size:12px"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</button>
+          <button class="rb" id="btnHold" onclick="setRes('hold')" style="flex:1;padding:10px;font-size:12px;border-color:#BA7517;color:#BA7517"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> Hold</button>
         </div>
         <div id="rejectionPanel" style="display:none;margin-top:8px;padding:12px;background:#FCEBEB;border:1px solid #E24B4A;border-radius:8px">
           <div style="font-size:11px;font-weight:500;color:#A32D2D;margin-bottom:8px"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Rejection details required</div>
@@ -467,6 +468,17 @@ window.addEventListener('DOMContentLoaded',function(){
           <div>
             <div style="font-size:10px;font-weight:500;color:#A32D2D;margin-bottom:4px">Action required <span style="color:#E24B4A">*</span></div>
             <textarea id="rejectionAction" style="width:100%;padding:8px;border:1px solid #E24B4A;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:60px;background:#fff;outline:none" placeholder="What must be done before re-inspection..."></textarea>
+          </div>
+        </div>
+        <div id="holdPanel" style="display:none;margin-top:8px;padding:12px;background:#FAEEDA;border:1px solid #BA7517;border-radius:8px">
+          <div style="font-size:11px;font-weight:500;color:#633806;margin-bottom:8px"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> Hold details required</div>
+          <div style="margin-bottom:8px">
+            <div style="font-size:10px;font-weight:500;color:#633806;margin-bottom:4px">Reason for hold <span style="color:#BA7517">*</span></div>
+            <textarea id="holdReason" style="width:100%;padding:8px;border:1px solid #BA7517;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:60px;background:#fff;outline:none" placeholder="e.g. Material certificate not available, awaiting client approval..."></textarea>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:500;color:#633806;margin-bottom:4px">What is needed to release <span style="color:#BA7517">*</span></div>
+            <textarea id="holdAction" style="width:100%;padding:8px;border:1px solid #BA7517;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:60px;background:#fff;outline:none" placeholder="e.g. Submit material cert to QC before release can be authorised..."></textarea>
           </div>
         </div>
       </div>
@@ -671,12 +683,14 @@ window.addEventListener('DOMContentLoaded',function(){
       <button class="filt-btn" onclick="setRegFilt('pending',this)">Pending</button>
       <button class="filt-btn" onclick="setRegFilt('released',this)">Released</button>
       <button class="filt-btn" onclick="setRegFilt('rework',this)">Rework</button>
+      <button class="filt-btn" onclick="setRegFilt('hold',this)">On Hold</button>
       <button class="filt-btn" onclick="setRegFilt('cancelled',this)">Cancelled</button>
     </div>
     <div id="regList"><div style="text-align:center;padding:32px 16px;color:#888;font-size:13px"><svg style="font-size:32px;display:block;margin-bottom:8px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="15" y2="16"/></svg>No records yet.</div></div>
     <div style="display:flex;gap:16px;margin-top:8px;padding:0 4px;font-size:10px;color:#888;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:4px"><div style="width:3px;height:14px;background:#E24B4A;border-radius:2px"></div>Pending</div>
       <div style="display:flex;align-items:center;gap:4px"><div style="width:3px;height:14px;background:#BA7517;border-radius:2px"></div>Rework</div>
+      <div style="display:flex;align-items:center;gap:4px"><div style="width:3px;height:14px;background:#EF9F27;border-radius:2px"></div>On Hold</div>
       <div style="display:flex;align-items:center;gap:4px"><div style="width:3px;height:14px;background:#1D9E75;border-radius:2px"></div>Released</div>
       <div style="display:flex;align-items:center;gap:4px"><div style="width:3px;height:14px;background:#aaa;border-radius:2px"></div>Cancelled</div>
     </div>
@@ -1039,10 +1053,15 @@ function setRes(r){
   iRes=r;
   document.getElementById('btnAcc').className='rb acc'+(r==='accept'?' on':'');
   document.getElementById('btnRej').className='rb rej'+(r==='reject'?' on':'');
+  var holdBtn=document.getElementById('btnHold');
+  if(holdBtn){holdBtn.style.background=r==='hold'?'#BA7517':'transparent';holdBtn.style.color=r==='hold'?'#fff':'#BA7517';holdBtn.style.borderColor='#BA7517';}
   document.getElementById('rejectionPanel').style.display=r==='reject'?'block':'none';
+  var hp=document.getElementById('holdPanel');if(hp)hp.style.display=r==='hold'?'block':'none';
   if(r==='accept'){
     document.getElementById('rejectionReason').value='';
     document.getElementById('rejectionAction').value='';
+    var hr=document.getElementById('holdReason');if(hr)hr.value='';
+    var ha=document.getElementById('holdAction');if(ha)ha.value='';
   }
   showUnsavedBanner();
 }
@@ -1986,6 +2005,8 @@ function getFormBasic(){
     result:iRes||'not set',
     rejectionReason:iRes==='reject'?gv('rejectionReason'):'',
     rejectionAction:iRes==='reject'?gv('rejectionAction'):'',
+    holdReason:iRes==='hold'?gv('holdReason'):'',
+    holdAction:iRes==='hold'?gv('holdAction'):'',
     notes:gv('notes'),
     supervisor:supName,supCode:'',
     qc:qcName,qcCode:gv('qcCode').toUpperCase(),
@@ -2082,6 +2103,12 @@ async function submitIRN(){
     if(!reason){toast('Enter rejection reason before submitting','err');document.getElementById('rejectionReason').focus();return;}
     if(!action){toast('Enter action required before submitting','err');document.getElementById('rejectionAction').focus();return;}
   }
+  if(d.result==='hold'){
+    var holdReason=document.getElementById('holdReason').value.trim();
+    var holdAction=document.getElementById('holdAction').value.trim();
+    if(!holdReason){toast('Enter hold reason before submitting','err');document.getElementById('holdReason').focus();return;}
+    if(!holdAction){toast('Enter what is needed to release before submitting','err');document.getElementById('holdAction').focus();return;}
+  }
   if(!qcValidated){toast('QC code required','err');return;}
   var btn=document.getElementById('submitBtn');
   btn.disabled=true;btn.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> Submitting...';
@@ -2117,13 +2144,18 @@ async function submitIRN(){
     if(ub)ub.style.display='none';
     // Open WhatsApp immediately
     var isPass=d.result==='accept';
+    var isHold=d.result==='hold';
     var stageName=activeStageFilter&&STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;})?STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;}).label:'';
     var irqRef=_irqParam?'IRQ-'+_irqParam:'';
-    var msg=(isPass?'✅':'❌')+' *INS-C '+d.reportNo+(isPass?' RELEASED':' REJECTED')+(irqRef?' | '+irqRef:'')+'*\n';
+    var msg=(isPass?'✅':isHold?'🟠':'❌')+' *INS-C '+d.reportNo+(isPass?' RELEASED':isHold?' ON HOLD':' REJECTED')+(irqRef?' | '+irqRef:'')+'*\n';
     msg+=d.job+(d.project?' | '+d.project:'')+'\n';
     if(stageName)msg+='Stage: '+stageName+'\n';
     msg+='QC: '+d.qc+' ('+d.qcCode+') | '+d.date+'\n';
-    if(!isPass){
+    if(isHold){
+      msg+='Reason: '+(gv('holdReason')||'--')+'\n';
+      msg+='To release: '+(gv('holdAction')||'--')+'\n';
+    }
+    if(!isPass&&!isHold){
       msg+='Reason: '+(gv('rejectionReason')||'--')+'\n';
       msg+='Action: '+(gv('rejectionAction')||'--')+'\n';
     }
@@ -2205,6 +2237,7 @@ function renderReg(){
   if(_regFilt==='pending')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return !l&&!(e.req&&e.req.status==='cancelled');});
   else if(_regFilt==='released')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&!l.cancelled;});
   else if(_regFilt==='rework')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='reject'&&!l.cancelled;});
+  else if(_regFilt==='hold')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='hold'&&!l.cancelled;});
   else if(_regFilt==='cancelled')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return (e.req&&e.req.status==='cancelled')||(l&&l.cancelled);});
   // All filter shows everything including cancelled
 
@@ -2225,8 +2258,8 @@ function renderReg(){
     var status='pending';
     var isCancelled=(latestIrn&&latestIrn.cancelled)||(req&&req.status==='cancelled');
     if(isCancelled){status='cancelled';}
-    else if(latestIrn){status=latestIrn.result==='accept'?'released':'rework';}
-    var borderColor=status==='released'?'#1D9E75':status==='rework'?'#BA7517':status==='cancelled'?'#aaa':'#E24B4A';
+    else if(latestIrn){status=latestIrn.result==='accept'?'released':latestIrn.result==='hold'?'hold':'rework';}
+    var borderColor=status==='released'?'#1D9E75':status==='rework'?'#BA7517':status==='hold'?'#EF9F27':status==='cancelled'?'#aaa':'#E24B4A';
     var job=(req&&req.job)||(latestIrn&&latestIrn.job)||'--';
     var client=(req&&req.client)||(latestIrn&&latestIrn.project)||'--';
     var items_str='--';
@@ -2236,9 +2269,9 @@ function renderReg(){
     var qcDisplay=latestIrn?latestIrn.qc+' ('+latestIrn.qcCode+')':'--';
     var irqNo=entry.reqNo||'--';
     var stage=(req&&req.inspTypes)||(latestIrn&&latestIrn.stageName)||'--';
-    var sBg=status==='released'?'#EAF3DE':status==='rework'?'#FAEEDA':status==='cancelled'?'#f0f0f0':'#FCEBEB';
-    var sCol=status==='released'?'#27500A':status==='rework'?'#633806':status==='cancelled'?'#888':'#A32D2D';
-    var sLbl=status==='released'?'Released':status==='rework'?'Rework':status==='cancelled'?'Cancelled':'Pending';
+    var sBg=status==='released'?'#EAF3DE':status==='rework'?'#FAEEDA':status==='hold'?'#FFF3CD':status==='cancelled'?'#f0f0f0':'#FCEBEB';
+    var sCol=status==='released'?'#27500A':status==='rework'?'#633806':status==='hold'?'#856404':status==='cancelled'?'#888':'#A32D2D';
+    var sLbl=status==='released'?'Released':status==='rework'?'Rework':status==='hold'?'🟠 On Hold':status==='cancelled'?'Cancelled':'Pending';
     var isHighlighted=_irqParam&&String(irqNo)===String(_irqParam);
 
     html+='<div id="reg-row-'+irqNo+'" style="background:#fff;border-left:5px solid '+borderColor+';border:0.5px solid #ddd;border-left:5px solid '+borderColor+';border-radius:10px;margin-bottom:10px;overflow:hidden'+(isCancelled?';opacity:0.55':'')+''+(isHighlighted?';box-shadow:0 0 0 3px rgba(226,75,74,0.3)':'')+'">';
@@ -2854,6 +2887,7 @@ function renderMgmt(){
   var urgent=active.filter(function(e){return e.req&&e.req.urgency==='urgent';}).length;
   var released=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept';}).length;
   var rework=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='reject';}).length;
+  var onHold=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='hold';}).length;
   var pending=active.filter(function(e){return e.irns.length===0;}).length;
   var ftp=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&(!l.attempt||l.attempt===1);}).length;
   var ftpPct=released>0?Math.round(ftp/released*100):0;
@@ -2861,7 +2895,7 @@ function renderMgmt(){
   document.getElementById('mgStatTotal').textContent=total;
   document.getElementById('mgStatUrgent').textContent=urgent;
   document.getElementById('mgStatReleased').textContent=released;
-  document.getElementById('mgStatOnHold').textContent=rework;
+  document.getElementById('mgStatOnHold').textContent=onHold;
   document.getElementById('mgStatFTP').textContent=ftpPct+'%';
   document.getElementById('mgStatPending').textContent=pending;
 
