@@ -302,6 +302,14 @@ window.addEventListener('DOMContentLoaded',function(){
       </div>
     </div>
 
+    <!-- Unsaved data warning -->
+    <div id="unsavedBanner" style="display:none;background:#FAEEDA;border:1.5px solid #BA7517;border-radius:10px;padding:10px 14px;margin-bottom:10px;align-items:center;gap:10px">
+      <svg style="font-size:20px;color:#BA7517;flex-shrink:0" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:700;color:#633806">Unsaved inspection data</div>
+        <div style="font-size:11px;color:#633806;margin-top:1px">Do not refresh or close this page. Tap <strong>Release & Notify</strong> to save.</div>
+      </div>
+    </div>
     <!-- Waiting screen — shown when no IRQ link -->
     <div id="waitingScreen" style="display:none;text-align:center;padding:48px 24px">
       <div style="width:72px;height:72px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
@@ -989,6 +997,11 @@ function setRes(r){
     document.getElementById('rejectionReason').value='';
     document.getElementById('rejectionAction').value='';
   }
+  showUnsavedBanner();
+}
+function showUnsavedBanner(){
+  var banner=document.getElementById('unsavedBanner');
+  if(banner)banner.style.display=formHasData()?'flex':'none';
 }
 function suggestNext(){
   var book=document.getElementById('bookRef').value.trim().toUpperCase();
@@ -1666,7 +1679,7 @@ function setClientHold(sid,val){
 }
 function toggleS(sid){openS=openS===sid?null:sid;renderStages();}
 function toggleG(sid,e){e.stopPropagation();ss[sid].gate=!ss[sid].gate;renderStages();}
-function setCrit(sid,ci,val){if(!ss[sid])return;ss[sid].crit[ci]=(ss[sid].crit[ci]===val)?null:val;renderStages();}
+function setCrit(sid,ci,val){if(!ss[sid])return;ss[sid].crit[ci]=(ss[sid].crit[ci]===val)?null:val;renderStages();showUnsavedBanner();}
 function toggleC(sid,ci,e){if(e)e.stopPropagation();setCrit(sid,ci,true);}
 function toggleNA(sid,e){e.stopPropagation();ss[sid].na=!ss[sid].na;if(ss[sid].na){ss[sid].gate=false;ss[sid].crit=ss[sid].crit.map(function(){return false;});}renderStages();}
 function addTD(sid){ss[sid].tdims.push({id:'td'+(++tdCnt),lbl:'',draw:'',meas:''});renderStages();}
@@ -2019,6 +2032,9 @@ async function submitIRN(){
     }
     toast(d.reportNo+' submitted','ok');
     window._irnSubmitted=d.reportNo;
+    // Hide unsaved banner
+    var ub=document.getElementById('unsavedBanner');
+    if(ub)ub.style.display='none';
     // Open WhatsApp immediately
     var isPass=d.result==='accept';
     var stageName=activeStageFilter&&STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;})?STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;}).label:'';
@@ -2765,6 +2781,36 @@ function renderMgmt(){
   document.getElementById('mgConcession').innerHTML='<div style="padding:14px;font-size:12px;color:#aaa;text-align:center">No concession holds</div>';
 }
 
+// Warn before leaving page if form has data
+function formHasData(){
+  var job=document.getElementById('job');
+  var hasJob=job&&job.value&&job.value.trim().length>0;
+  var hasStageData=Object.keys(ss).some(function(sid){
+    var st=ss[sid];
+    return st&&!st.na&&(st.gate||st.crit.some(function(v){return v!==null;}));
+  });
+  var hasPhotos=inspPhotosArr.length>0;
+  var hasResult=iRes!==null;
+  return (hasJob||hasStageData||hasPhotos||hasResult)&&!window._irnSubmitted;
+}
+window.addEventListener('beforeunload',function(e){
+  if(formHasData()){
+    var msg='You have unsaved inspection data. If you leave now all your work will be lost.';
+    e.preventDefault();
+    e.returnValue=msg;
+    return msg;
+  }
+});
+// Intercept back button on mobile
+window.addEventListener('popstate',function(e){
+  if(formHasData()){
+    if(!confirm('You have unsaved inspection data.\n\nIf you go back now everything will be lost.\n\nStay on the form and tap "Release & Notify" to save.')){
+      history.pushState(null,null,window.location.href);
+    }
+  }
+});
+// Push a state so popstate fires on back button
+history.pushState(null,null,window.location.href);
 function enterApp(){
   var sp=document.getElementById('splashScreen');
   if(!sp)return;
