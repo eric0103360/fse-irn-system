@@ -218,6 +218,19 @@ window.clearAllData=async function(){
   }catch(e){console.error(e);return false;}
 };
 window.saveCodesToFirebase=async function(){try{await setDoc(doc(db,'settings','codes'),{qc:codes.qc,sup:codes.sup});return true;}catch(e){return false;}};
+window.setMaintenanceMode=async function(enabled){
+  try{
+    await setDoc(doc(db,'settings','maintenance'),{enabled:enabled,updatedAt:new Date().toISOString()});
+    return true;
+  }catch(e){console.error('Maintenance set error:',e);return false;}
+};
+window.getMaintenanceMode=async function(){
+  try{
+    var d=await getDoc(doc(db,'settings','maintenance'));
+    if(d.exists())return d.data().enabled===true;
+    return false;
+  }catch(e){return false;}
+};
 window.loadCodesFromFirebase=async function(){try{var d=await getDoc(doc(db,'settings','codes'));if(d.exists()){var data=d.data();if(data.qc){codes.qc=data.qc.map(function(c){return Object.assign({pin:''},c);});}if(data.sup){codes.sup=data.sup.map(function(c){return Object.assign({pin:''},c);});}}}catch(e){console.log('Codes load error:',e);}};
 window.saveRequestToFirebase=async function(data){
   try{
@@ -825,36 +838,37 @@ window.addEventListener('DOMContentLoaded',function(){
 const ENDPOINT='https://script.google.com/macros/s/AKfycbzh4TjDevXQsH3hNU9H7dsA2vrZlrK2ZpTostfKIVqtlIAd7bItAmsyFafGX5pqXzfI/exec';
 const ADMIN_CODE='min@fse';
 const MAINTENANCE_KEY='fse_maintenance_mode';
-// Check maintenance mode on load
 function checkMaintenanceMode(){
-  var maintenance=localStorage.getItem(MAINTENANCE_KEY)==='true';
-  if(maintenance){
-    var sp=document.getElementById('splashScreen');
-    if(sp){
-      sp.style.display='flex';
-      sp.style.opacity='1';
-      // Replace splash content with maintenance screen
-      var btn=sp.querySelector('button');
-      if(btn){btn.style.display='none';}
-      var mainDiv=document.createElement('div');
-      mainDiv.style.cssText='text-align:center;max-width:320px;width:100%';
-      mainDiv.innerHTML='<div style="width:80px;height:80px;background:rgba(255,255,255,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><div style="font-size:22px;font-weight:600;color:#fff;margin-bottom:10px;font-family:-apple-system,sans-serif">System temporarily unavailable</div><div style="font-size:14px;color:rgba(255,255,255,0.6);line-height:1.6;margin-bottom:30px;font-family:-apple-system,sans-serif">The FSE eIRN system is currently offline for maintenance. Please check back shortly.</div><div style="font-size:12px;color:rgba(255,255,255,0.35);font-family:-apple-system,sans-serif">FSE Field Services & Engineering</div>';
-      sp.insertBefore(mainDiv,sp.firstChild);
+  return window.getMaintenanceMode().then(function(enabled){
+    if(enabled){
+      var sp=document.getElementById('splashScreen');
+      if(sp){
+        sp.style.display='flex';
+        sp.style.opacity='1';
+        var btn=sp.querySelector('button');
+        if(btn)btn.style.display='none';
+        var mainDiv=document.createElement('div');
+        mainDiv.style.cssText='text-align:center;max-width:320px;width:100%';
+        mainDiv.innerHTML='<div style="width:80px;height:80px;background:rgba(255,255,255,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><div style="font-size:22px;font-weight:600;color:#fff;margin-bottom:10px;font-family:-apple-system,sans-serif">System temporarily unavailable</div><div style="font-size:14px;color:rgba(255,255,255,0.6);line-height:1.6;margin-bottom:30px;font-family:-apple-system,sans-serif">The FSE eIRN system is currently offline for maintenance. Please check back shortly.</div><div style="font-size:12px;color:rgba(255,255,255,0.35);font-family:-apple-system,sans-serif">FSE Field Services & Engineering</div>';
+        sp.insertBefore(mainDiv,sp.firstChild);
+      }
+      return true;
     }
-    return true;
-  }
-  return false;
+    return false;
+  }).catch(function(){return false;});
 }
 function toggleMaintenanceMode(){
-  var current=localStorage.getItem(MAINTENANCE_KEY)==='true';
-  var newVal=!current;
-  localStorage.setItem(MAINTENANCE_KEY,newVal.toString());
-  var btn=document.getElementById('maintenanceBtn');
-  if(btn){
-    btn.textContent=newVal?'🔓 Disable maintenance mode':'🔒 Enable maintenance mode';
-    btn.style.background=newVal?'#1D9E75':'#E24B4A';
-  }
-  toast(newVal?'Maintenance mode ON — app is now locked':'Maintenance mode OFF — app is now open',newVal?'info':'ok');
+  window.getMaintenanceMode().then(function(current){
+    var newVal=!current;
+    window.setMaintenanceMode(newVal).then(function(){
+      var btn=document.getElementById('maintenanceBtn');
+      if(btn){
+        btn.textContent=newVal?'🔓 Disable maintenance mode':'🔒 Enable maintenance mode';
+        btn.style.background=newVal?'#1D9E75':'#E24B4A';
+      }
+      toast(newVal?'Maintenance mode ON — app locked for all users':'Maintenance mode OFF — app is live for all users',newVal?'info':'ok');
+    });
+  });
 }
 const WA_GROUP='https://chat.whatsapp.com/DdCdi8Eto8PHEJ8sNsqqi0';
 
@@ -1012,12 +1026,14 @@ function showV(v,btn){
 
   if(v==='admin'){
     document.getElementById('admLogo').src=getLogoSrc();
-    // Update maintenance button state
-    var isMaint=localStorage.getItem(MAINTENANCE_KEY)==='true';
-    var mb=document.getElementById('maintenanceBtn');
-    if(mb){
-      mb.textContent=isMaint?'🔓 Disable maintenance mode':'🔒 Enable maintenance mode';
-      mb.style.background=isMaint?'#1D9E75':'#E24B4A';
+    if(window.getMaintenanceMode){
+      window.getMaintenanceMode().then(function(isMaint){
+        var mb=document.getElementById('maintenanceBtn');
+        if(mb){
+          mb.textContent=isMaint?'🔓 Disable maintenance mode':'🔒 Enable maintenance mode';
+          mb.style.background=isMaint?'#1D9E75':'#E24B4A';
+        }
+      });
     }
   }
   if(v==='mgmt'){
@@ -3109,9 +3125,9 @@ if(_printParam&&window.loadIRNsFromFirebase){
   });
 }
 setTimeout(function(){
-  if(!checkMaintenanceMode()){
-    enterApp();
-  }
+  checkMaintenanceMode().then(function(isMaint){
+    if(!isMaint){enterApp();}
+  });
   if(_irqParam){
     // Inspector opened WhatsApp link — go straight to Register
     var regBtn=document.querySelectorAll('.nb')[2];
