@@ -2268,6 +2268,7 @@ function renderReg(){
       var inspType=(req&&req.inspTypes)||'';
       var instructions=(req&&req.instructions)||'';
       html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-reqno="'+irqNo+'" data-job="'+job.replace(/"/g,'&quot;')+'" data-client="'+client.replace(/"/g,'&quot;')+'" data-items="'+items_str.replace(/"/g,'&quot;')+'" data-insptype="'+inspType.replace(/"/g,'&quot;')+'" data-instructions="'+instructions.replace(/"/g,'&quot;')+'" data-by="'+supName.replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:14px;padding:10px 20px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">Complete IRN</button>';
+      html+='<button data-irqno="'+irqNo+'" onclick="previewRequest(this)" style="font-size:13px;padding:10px 14px;background:#E6F1FB;border:1.5px solid #185FA5;color:#0C447C;border-radius:8px;cursor:pointer;font-weight:600"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> View Request</button>';
       html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irqno="'+irqNo+'" onclick="cancelRecord(this)" style="font-size:12px;padding:10px 14px;background:#fff;border:1px solid #aaa;color:#888;border-radius:8px;cursor:pointer"><svg style="font-size:13px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Cancel</button>';
     }
     html+='</div>';
@@ -2648,6 +2649,80 @@ function printIRN(){
 }
 
 
+function previewRequest(btn){
+  var irqNo=btn.dataset.irqno;
+  var req=reqs.find(function(x){return String(x.reqNo)===String(irqNo);});
+  if(!req){toast('Request data not found','err');return;}
+  var logoSrc=getLogoSrc();
+  var isUrgent=req.urgency==='urgent';
+  var itemRows=(req.items||[]).filter(function(i){return i.desc;}).map(function(i,idx){
+    return '<tr><td style="padding:5px 8px;border:0.5px solid #ddd;text-align:center">'+(idx+1)+'</td><td style="padding:5px 8px;border:0.5px solid #ddd">'+i.desc+'</td><td style="padding:5px 8px;border:0.5px solid #ddd;text-align:center">'+(i.qty||'--')+'</td></tr>';
+  }).join('');
+  var artisanHtml=(req.artisans&&req.artisans.length>0)?req.artisans.join(', '):'--';
+  var photos=req.reqPhotoData||[];
+  var photoHtml='';
+  if(photos.length>0){
+    photoHtml='<div style="margin-bottom:16px"><div style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;border-bottom:0.5px solid #eee;padding-bottom:4px">Photos of item ('+photos.length+')</div>';
+    photoHtml+='<div style="display:flex;flex-wrap:wrap;gap:8px">';
+    photos.forEach(function(src,i){
+      photoHtml+='<div style="text-align:center"><img src="'+src+'" style="width:150px;height:150px;object-fit:cover;border-radius:8px;border:0.5px solid #ddd;display:block"><div style="font-size:9px;color:#aaa;margin-top:3px">Photo '+(i+1)+'</div></div>';
+    });
+    photoHtml+='</div></div>';
+  }
+  var win=window.open('','_blank');
+  win.document.write('<!DOCTYPE html><html><head><title>Inspection Request IRQ-'+irqNo+'</title>');
+  win.document.write('<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:13px;color:#1a1a1a;padding:20px}');
+  win.document.write('.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:12px;margin-bottom:14px}');
+  win.document.write('.logo{height:52px}.irq-no{text-align:right}.irq-label{font-size:9px;color:#888;text-transform:uppercase}.irq-val{font-size:26px;font-weight:700;color:#1a3a5c}');
+  win.document.write('.urgent{background:#E24B4A;color:#fff;border-radius:8px;padding:8px 14px;font-weight:700;font-size:13px;margin-bottom:12px;text-align:center}');
+  win.document.write('.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}');
+  win.document.write('.cell{background:#f9f9f7;padding:8px 10px;border-radius:6px;border:0.5px solid #eee}');
+  win.document.write('.cell-label{font-size:9px;color:#888;text-transform:uppercase;margin-bottom:2px}.cell-val{font-size:13px;font-weight:500}');
+  win.document.write('table{width:100%;border-collapse:collapse;margin-bottom:14px}');
+  win.document.write('th{background:#1a3a5c;color:#fff;padding:6px 8px;text-align:left;font-size:11px}');
+  win.document.write('.instr{background:#FAEEDA;border:0.5px solid #EF9F27;border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#633806}');
+  win.document.write('.type-badge{display:inline-block;background:#E6F1FB;color:#0C447C;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:600;margin-bottom:14px}');
+  win.document.write('.footer{font-size:9px;color:#aaa;text-align:center;margin-top:16px;border-top:0.5px solid #eee;padding-top:8px}');
+  win.document.write('.no-print{margin:12px 0;display:flex;gap:8px;justify-content:center}@media print{.no-print{display:none}body{padding:10mm}}');
+  win.document.write('</style></head><body>');
+  // Back button
+  win.document.write('<div class="no-print" style="justify-content:flex-start;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back</button></div>');
+  // Header
+  win.document.write('<div class="hdr">');
+  win.document.write('<div style="display:flex;align-items:center;gap:12px"><img src="'+logoSrc+'" class="logo"><div><div style="font-size:10px;color:#666;margin-bottom:2px">FIELD SERVICES & ENGINEERING</div><div style="font-size:17px;font-weight:600">Inspection Request</div><div style="font-size:11px;color:#888">Raised by supervisor — QC to attend and release</div></div></div>');
+  win.document.write('<div class="irq-no"><div class="irq-label">Request No</div><div class="irq-val">IRQ-'+irqNo+'</div><div style="font-size:11px;color:#888;margin-top:2px">'+req.date+'</div></div>');
+  win.document.write('</div>');
+  // Urgent banner
+  if(isUrgent)win.document.write('<div class="urgent">⚡ URGENT INSPECTION REQUEST — PLEASE ATTEND IMMEDIATELY</div>');
+  // Inspection type
+  win.document.write('<div class="type-badge">'+req.inspTypes+'</div>');
+  // Job details grid
+  win.document.write('<div class="grid">');
+  win.document.write('<div class="cell"><div class="cell-label">Job / Order</div><div class="cell-val">'+(req.job||'--')+'</div></div>');
+  win.document.write('<div class="cell"><div class="cell-label">Client</div><div class="cell-val">'+(req.client||'--')+'</div></div>');
+  win.document.write('<div class="cell"><div class="cell-label">Supervisor</div><div class="cell-val">'+req.supervisor+' ('+req.supCode+')</div></div>');
+  win.document.write('<div class="cell"><div class="cell-label">Artisan(s)</div><div class="cell-val">'+artisanHtml+'</div></div>');
+  win.document.write('</div>');
+  // Items
+  if(itemRows){
+    win.document.write('<table><thead><tr><th style="width:30px">#</th><th>Item description</th><th style="width:60px;text-align:center">Qty</th></tr></thead><tbody>'+itemRows+'</tbody></table>');
+  }
+  // Instructions
+  if(req.instructions){
+    win.document.write('<div class="instr"><strong>What to check:</strong> '+req.instructions+'</div>');
+  }
+  // Photos
+  if(photoHtml)win.document.write(photoHtml);
+  // Footer
+  win.document.write('<div class="footer">FSE eIRN System · IRQ-'+irqNo+' · Generated '+new Date().toLocaleString('en-ZA')+'</div>');
+  // Buttons
+  win.document.write('<div class="no-print">');
+  win.document.write('<button onclick="window.print()" style="padding:10px 28px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer">🖨 Print / Save as PDF</button>');
+  win.document.write('<button onclick="window.close()" style="padding:10px 20px;background:#f0f0f0;border:none;border-radius:8px;font-size:13px;cursor:pointer">✕ Close</button>');
+  win.document.write('</div>');
+  win.document.write('</body></html>');
+  win.document.close();
+}
 function amendIRN(btn){
   var irnFid=btn.dataset.irnfid;
   var irqNo=btn.dataset.irqno;
