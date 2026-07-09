@@ -267,6 +267,8 @@ window.markRequestComplete=async function(firebaseId){try{var r=doc(db,'requests
 window.markRequestRework=async function(firebaseId){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'rework'});return true;}catch(e){return false;}};
 window.markRequestCancelled=async function(firebaseId,reason){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'cancelled',cancelReason:reason,cancelledAt:new Date().toISOString()});return true;}catch(e){return false;}};
 window.markIRNCancelled=async function(firebaseId,reason){try{var r=doc(db,'irns',firebaseId);await updateDoc(r,{cancelled:true,cancelReason:reason,cancelledAt:new Date().toISOString()});return true;}catch(e){return false;}};
+window.deleteRequest=async function(firebaseId){try{await deleteDoc(doc(db,'requests',firebaseId));return true;}catch(e){return false;}};
+window.deleteIRN=async function(firebaseId){try{await deleteDoc(doc(db,'irns',firebaseId));return true;}catch(e){return false;}};
 window.updateIRNInFirebase=async function(firebaseId,data){
   try{
     var s=Object.assign({},data);
@@ -1209,7 +1211,9 @@ function unlockAdmin(){
   if(entered===ADMIN_CODE){
     document.getElementById('adminLocked').style.display='none';
     document.getElementById('adminPanel').style.display='block';
+    window._adminUnlocked=true;
     renderCodeTables();
+    renderReg();
   }else{
     toast('Incorrect admin code','err');
     document.getElementById('adminCodeIn').value='';
@@ -1220,6 +1224,8 @@ function lockAdmin(){
   document.getElementById('adminLocked').style.display='block';
   document.getElementById('adminPanel').style.display='none';
   document.getElementById('adminCodeIn').value='';
+  window._adminUnlocked=false;
+  renderReg();
 }
 function renderCodeTables(){
   ['qc','sup'].forEach(function(role){
@@ -2385,16 +2391,19 @@ function renderReg(){
     html+='<div style="display:flex;justify-content:flex-end;gap:6px">';
     if(isCancelled){
       var cancelReason=(req&&req.cancelReason)||(latestIrn&&latestIrn.cancelReason)||'No reason given';
-      html+='<div style="font-size:11px;color:#aaa;font-style:italic;align-self:center">Cancelled: '+cancelReason+'</div>';
+      html+='<div style="display:flex;align-items:center;gap:8px;flex:1"><div style="font-size:11px;color:#aaa;font-style:italic">Cancelled: '+cancelReason+'</div></div>';
+      if(window._adminUnlocked){html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irnfid="'+(latestIrn&&latestIrn.firebaseId||'')+'" data-irqno="'+irqNo+'" onclick="deleteRecord(this)" style="font-size:12px;padding:9px 14px;background:#FCEBEB;border:1px solid #E24B4A;color:#A32D2D;border-radius:8px;cursor:pointer;font-weight:600">🗑 Delete</button>';}
     } else if(latestIrn){
       html+='<button data-irn="'+latestIrn.reportNo+'" data-irq="'+irqNo+'" onclick="printFromReg(this)" style="font-size:13px;padding:9px 18px;background:#fff;border:1.5px solid #1a3a5c;color:#1a3a5c;border-radius:8px;cursor:pointer;font-weight:600"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> View / Print</button>';
       html+='<button data-irnfid="'+(latestIrn.firebaseId||'')+'" data-irqno="'+irqNo+'" data-irn="'+latestIrn.reportNo+'" onclick="amendIRN(this)" style="font-size:13px;padding:9px 14px;background:#FAEEDA;border:1.5px solid #BA7517;color:#633806;border-radius:8px;cursor:pointer;font-weight:600"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Amend</button>';
-      html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irnfid="'+(latestIrn&&latestIrn.firebaseId||'')+'" data-irqno="'+irqNo+'" onclick="cancelRecord(this)" style="font-size:12px;padding:9px 14px;background:#fff;border:1px solid #aaa;color:#888;border-radius:8px;cursor:pointer"><svg style="font-size:13px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Cancel</button>';
+      html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irnfid="'+(latestIrn&&latestIrn.firebaseId||'')+'" data-irqno="'+irqNo+'" onclick="cancelRecord(this)" style="font-size:12px;padding:9px 14px;background:#fff;border:1px solid #aaa;color:#888;border-radius:8px;cursor:pointer"> Cancel</button>';
+      if(window._adminUnlocked){html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irnfid="'+(latestIrn&&latestIrn.firebaseId||'')+'" data-irqno="'+irqNo+'" onclick="deleteRecord(this)" style="font-size:12px;padding:9px 14px;background:#FCEBEB;border:1px solid #E24B4A;color:#A32D2D;border-radius:8px;cursor:pointer;font-weight:600">🗑 Delete</button>';}
     } else {
       var inspType=(req&&req.inspTypes)||'';
       var instructions=(req&&req.instructions)||'';
       html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-reqno="'+irqNo+'" data-job="'+job.replace(/"/g,'&quot;')+'" data-client="'+client.replace(/"/g,'&quot;')+'" data-items="'+items_str.replace(/"/g,'&quot;')+'" data-insptype="'+inspType.replace(/"/g,'&quot;')+'" data-instructions="'+instructions.replace(/"/g,'&quot;')+'" data-by="'+supName.replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:14px;padding:10px 20px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">Complete IRN</button>';
       html+='<button data-irqno="'+irqNo+'" onclick="previewRequest(this)" style="font-size:13px;padding:10px 14px;background:#E6F1FB;border:1.5px solid #185FA5;color:#0C447C;border-radius:8px;cursor:pointer;font-weight:600"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> View Request</button>';
+      if(window._adminUnlocked){html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irnfid="" data-irqno="'+irqNo+'" onclick="deleteRecord(this)" style="font-size:12px;padding:10px 14px;background:#FCEBEB;border:1px solid #E24B4A;color:#A32D2D;border-radius:8px;cursor:pointer;font-weight:600">🗑 Delete</button>';}
       html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irqno="'+irqNo+'" onclick="cancelRecord(this)" style="font-size:12px;padding:10px 14px;background:#fff;border:1px solid #aaa;color:#888;border-radius:8px;cursor:pointer"><svg style="font-size:13px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Cancel</button>';
     }
     html+='</div>';
@@ -2903,6 +2912,24 @@ function amendIRN(btn){
     if(banner){banner.style.display='block';banner.innerHTML='<svg style="font-size:13px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> <strong>Amendment mode</strong> — editing INS-C '+irnNo+'. Resubmit to save changes.';}
     toast('IRN INS-C '+irnNo+' reopened for amendment','info');
   },200);
+}
+function deleteRecord(btn){
+  var irqNo=btn.dataset.irqno;
+  var reqFid=btn.dataset.fid||'';
+  var irnFid=btn.dataset.irnfid||'';
+  if(!confirm('Permanently delete IRQ-'+irqNo+'?\n\nThis cannot be undone.')){return;}
+  var promises=[];
+  if(reqFid&&window.deleteRequest)promises.push(window.deleteRequest(reqFid));
+  if(irnFid&&window.deleteIRN)promises.push(window.deleteIRN(irnFid));
+  Promise.all(promises).then(function(){
+    toast('IRQ-'+irqNo+' permanently deleted','ok');
+    var loaded={irns:false,reqs:false};
+    function check(){if(loaded.irns&&loaded.reqs)renderReg();}
+    if(window.loadIRNsFromFirebase){window.loadIRNsFromFirebase(function(r){reg=r;loaded.irns=true;check();});}
+    else{loaded.irns=true;check();}
+    if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){reqs=r;loaded.reqs=true;check();});}
+    else{loaded.reqs=true;check();}
+  }).catch(function(){toast('Error deleting — check connection','err');});
 }
 function cancelRecord(btn){
   var irqNo=btn.dataset.irqno;
