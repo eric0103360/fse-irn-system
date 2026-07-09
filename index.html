@@ -158,8 +158,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
 import{getFirestore,doc,getDoc,getDocs,addDoc,updateDoc,setDoc,deleteDoc,collection,query,orderBy,onSnapshot,runTransaction}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
+import{getStorage,ref,uploadString,getDownloadURL,deleteObject}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js';
 const app=initializeApp({apiKey:"AIzaSyC3sKMm02GnikBdgXPd4RUm7RxnsR90A_I",authDomain:"fse-irn-system.firebaseapp.com",projectId:"fse-irn-system",storageBucket:"fse-irn-system.firebasestorage.app",messagingSenderId:"1097944808267",appId:"1:1097944808267:web:d8f1f3a52e2223253f86ce"});
 const db=getFirestore(app);
+const storage=getStorage(app);
+// Upload photos to Firebase Storage and return URLs
+window.uploadPhotosToStorage=async function(photos,prefix){
+  if(!photos||photos.length===0)return[];
+  var urls=[];
+  for(var i=0;i<photos.length;i++){
+    try{
+      var storageRef=ref(storage,prefix+'/photo_'+Date.now()+'_'+i+'.jpg');
+      await uploadString(storageRef,photos[i],'data_url');
+      var url=await getDownloadURL(storageRef);
+      urls.push(url);
+    }catch(e){console.error('Photo upload error:',e);urls.push(photos[i]);}// fallback to base64
+  }
+  return urls;
+};
 window.peekNextIRN=async function(){try{const r=doc(db,'counters','irn');const d=await getDoc(r);const c=d.exists()?d.data().count:0;return String(c+1).padStart(4,'0');}catch(e){return'----';}};
 window.peekNextIRQ=async function(){try{const r=doc(db,'counters','irq');const d=await getDoc(r);const c=d.exists()?d.data().count:0;return String(c+1).padStart(4,'0');}catch(e){return'----';}};
 window.getNextIRQ=async function(){try{const r=doc(db,'counters','irq');const n=await runTransaction(db,async(t)=>{const d=await t.get(r);const c=d.exists()?d.data().count:0;const x=c+1;t.set(r,{count:x});return x;});return String(n).padStart(4,'0');}catch(e){return String(Date.now()).slice(-4);}};
@@ -167,19 +183,20 @@ window.getNextIRN=async function(){try{const r=doc(db,'counters','irn');const n=
 window.saveIRNToFirebase=async function(data){
   try{
     var s=Object.assign({},data);
-    // Preserve stage states with criteria but strip photo base64
+    // Upload inspector photos to Storage
+    if(s.inspPhotoData&&s.inspPhotoData.length>0){
+      var urls=await window.uploadPhotosToStorage(s.inspPhotoData,'irn_photos/'+Date.now());
+      s.inspPhotoData=urls;
+    }
+    // Strip stage photos from Firestore doc (too large)
     if(s.stageStates){
       var cs={};
       Object.keys(s.stageStates).forEach(function(k){
         var st=Object.assign({},s.stageStates[k]);
-        st.photos=[]; // Strip photos to save space
+        st.photos=[];
         cs[k]=st;
       });
       s.stageStates=cs;
-    }
-    // Keep inspector photos but limit to 15
-    if(s.inspPhotoData&&s.inspPhotoData.length>0){
-      s.inspPhotoData=s.inspPhotoData.slice(0,40);
     }
     s.timestamp=new Date().toISOString();
     await addDoc(collection(db,'irns'),s);
@@ -208,13 +225,13 @@ window.saveRequestToFirebase=async function(data){
     s.timestamp=new Date().toISOString();
     s.status='pending';
     s.attempt=data.attempt||1;
-    // Remove photo data from Firebase save if too large
+    // Upload request photos to Storage
     if(s.reqPhotoData&&s.reqPhotoData.length>0){
-      var totalSize=s.reqPhotoData.join('').length;
-      if(totalSize>500000){s.reqPhotoData=[];} // Skip photos if over 500KB
+      var urls=await window.uploadPhotosToStorage(s.reqPhotoData,'req_photos/'+Date.now());
+      s.reqPhotoData=urls;
     }
-    var ref=await addDoc(collection(db,'requests'),s);
-    console.log('Request saved to Firebase:',ref.id,'IRQ:',data.reqNo);
+    var ref2=await addDoc(collection(db,'requests'),s);
+    console.log('Request saved to Firebase:',ref2.id,'IRQ:',data.reqNo);
     return true;
   }catch(e){
     console.error('Firebase save error:',e);
