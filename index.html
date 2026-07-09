@@ -1214,6 +1214,7 @@ function unlockAdmin(){
     window._adminUnlocked=true;
     renderCodeTables();
     renderReg();
+    toast('Admin unlocked — delete buttons now visible in Register','ok');
   }else{
     toast('Incorrect admin code','err');
     document.getElementById('adminCodeIn').value='';
@@ -1226,6 +1227,7 @@ function lockAdmin(){
   document.getElementById('adminCodeIn').value='';
   window._adminUnlocked=false;
   renderReg();
+  toast('Admin locked — delete buttons hidden','info');
 }
 function renderCodeTables(){
   ['qc','sup'].forEach(function(role){
@@ -1661,8 +1663,8 @@ async function submitRequest(){
   }
   toast('Request submitted to QC group','ok');
   window.open('https://wa.me/?text='+encodeURIComponent(msg));
-  // Reset form
-  var cb=document.getElementById('reqAckCheck');if(cb)cb.checked=false;
+  // Also open the group directly so supervisor can send there
+  setTimeout(function(){window.open('https://chat.whatsapp.com/DdCdi8Eto8PHEJ8sNsqqi0');},1000);if(cb)cb.checked=false;
   // Reset IRQ number for next request
   var reqNoEl=document.getElementById('reqNo');
   if(reqNoEl){reqNoEl.value='';reqNoEl.style.color='rgba(255,255,255,0.6)';}
@@ -2460,7 +2462,7 @@ function printFromReg(btn){
   var rSup=r.reqSupervisor||(reqEntry&&reqEntry.supervisor)||'';var rDate=r.reqDate||(reqEntry&&reqEntry.date)||'';
   var reqPh2=(reqEntry&&reqEntry.reqPhotoData)||[];var inspPh2=r.inspPhotoData||[];
   var win=window.open('','_blank');
-  win.document.write('<!DOCTYPE html><html><head><title>IRN INS-C '+r.reportNo+(irqNo?' | IRQ-'+irqNo:'')+'</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10px;color:#1a1a1a}table{width:100%;border-collapse:collapse;margin-bottom:6px}th{background:#1a3a5c;color:#fff;padding:4px 6px;text-align:left;font-size:9px}td{font-size:10px;padding:3px 6px}.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:6px;margin-bottom:8px}.logo{height:36px}.result-pass{background:#EAF3DE;border:1px solid #1D9E75;padding:4px 8px;border-radius:4px;font-weight:700;color:#27500A;font-size:11px;margin-bottom:6px}.result-fail{background:#FCEBEB;border:1px solid #E24B4A;padding:4px 8px;border-radius:4px;font-weight:700;color:#A32D2D;font-size:11px;margin-bottom:6px}.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px}.cell{background:#f9f9f9;padding:4px 6px;border-radius:3px;border:0.5px solid #eee}.cl{font-size:8px;color:#888;text-transform:uppercase;margin-bottom:1px}.cv{font-size:10px;font-weight:500}.req-banner{background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:4px;padding:4px 8px;margin-bottom:6px;display:flex;gap:12px}.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px}.sign-box{border:0.5px solid #ddd;padding:6px 8px;border-radius:3px}.footer{font-size:8px;color:#aaa;text-align:center;margin-top:8px;border-top:0.5px solid #eee;padding-top:4px}.no-print{margin:8px 0}@media print{.no-print{display:none}body{margin:6mm}html{height:100%}}@page{size:A4 portrait;margin:8mm}</style></head><body>');
+  win.document.write('<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>IRN INS-C '+r.reportNo+(irqNo?' | IRQ-'+irqNo:'')+'</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10px;color:#1a1a1a}table{width:100%;border-collapse:collapse;margin-bottom:6px}th{background:#1a3a5c;color:#fff;padding:4px 6px;text-align:left;font-size:9px}td{font-size:10px;padding:3px 6px}.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:6px;margin-bottom:8px}.logo{height:36px}.result-pass{background:#EAF3DE;border:1px solid #1D9E75;padding:4px 8px;border-radius:4px;font-weight:700;color:#27500A;font-size:11px;margin-bottom:6px}.result-fail{background:#FCEBEB;border:1px solid #E24B4A;padding:4px 8px;border-radius:4px;font-weight:700;color:#A32D2D;font-size:11px;margin-bottom:6px}.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px}.cell{background:#f9f9f9;padding:4px 6px;border-radius:3px;border:0.5px solid #eee}.cl{font-size:8px;color:#888;text-transform:uppercase;margin-bottom:1px}.cv{font-size:10px;font-weight:500}.req-banner{background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:4px;padding:4px 8px;margin-bottom:6px;display:flex;gap:12px}.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px}.sign-box{border:0.5px solid #ddd;padding:6px 8px;border-radius:3px}.footer{font-size:8px;color:#aaa;text-align:center;margin-top:8px;border-top:0.5px solid #eee;padding-top:4px}.no-print{margin:8px 0}@media print{.no-print{display:none}body{margin:6mm}html{height:100%}}@page{size:A4 portrait;margin:8mm}</style></head><body>');
   win.document.write('<div class="no-print" style="text-align:left;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back</button></div>');
   win.document.write('<div class="hdr"><div><img src="'+logoSrc+'" class="logo"><div style="margin-top:5px"><div style="font-size:16px;font-weight:500">Inspection Release Note</div><div style="font-size:12px;color:#555">FSE-QR-IRN.038 · Rev 02 · ISO9001 / ISO3834-2</div></div></div><div style="text-align:right"><div style="font-size:9px;color:#888;text-transform:uppercase">Report No</div><div style="font-size:24px;font-weight:700;color:#1a3a5c">INS-C '+r.reportNo+'</div>'+(irqNo?'<div style="font-size:11px;color:#185FA5">IRQ-'+irqNo+'</div>':'')+'</div></div>');
   win.document.write('<div class="'+(isPass?'result-pass':'result-fail')+'">'+(isPass?'✓ ACCEPTED — Released':'✗ REJECTED — Rework required')+'</div>');
@@ -2692,7 +2694,7 @@ function printIRN(){
   var supName=_urlReq?(_urlReq.supervisor||''):'';
   var reqDate=_urlReq?(_urlReq.date||''):'';
   var win=window.open('','_blank');
-  win.document.write('<!DOCTYPE html><html><head><title>IRN INS-C '+d.reportNo+(irqRef?' | '+irqRef:'')+'</title>');
+  win.document.write('<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>IRN INS-C '+d.reportNo+(irqRef?' | '+irqRef:'')+'</title>');
   win.document.write('<style>');
   win.document.write('*{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#1a1a1a}');
   win.document.write('h1{font-size:16px;margin:0}h2{font-size:12px;margin:0;color:#555}');
@@ -2805,7 +2807,7 @@ function previewRequest(btn){
     photoHtml+='</div></div>';
   }
   var win=window.open('','_blank');
-  win.document.write('<!DOCTYPE html><html><head><title>Inspection Request IRQ-'+irqNo+'</title>');
+  win.document.write('<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Inspection Request IRQ-'+irqNo+'</title>');
   win.document.write('<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:13px;color:#1a1a1a;padding:20px}');
   win.document.write('.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:12px;margin-bottom:14px}');
   win.document.write('.logo{height:52px}.irq-no{text-align:right}.irq-label{font-size:9px;color:#888;text-transform:uppercase}.irq-val{font-size:26px;font-weight:700;color:#1a3a5c}');
