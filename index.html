@@ -3125,9 +3125,13 @@ if(_printParam&&window.loadIRNsFromFirebase){
   });
 }
 setTimeout(function(){
-  checkMaintenanceMode().then(function(isMaint){
-    if(!isMaint){enterApp();}
-  });
+  if(window.getMaintenanceMode){
+    checkMaintenanceMode().then(function(isMaint){
+      if(!isMaint){enterApp();}
+    });
+  } else {
+    enterApp();
+  }
   if(_irqParam){
     // Inspector opened WhatsApp link — go straight to Register
     var regBtn=document.querySelectorAll('.nb')[2];
@@ -3137,7 +3141,7 @@ setTimeout(function(){
     var reqBtn=document.querySelectorAll('.nb')[0];
     if(reqBtn)showV('request',reqBtn);
   }
-},2500);
+},3000);
 
 // IRN number assigned at submission only
 
