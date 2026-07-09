@@ -179,7 +179,7 @@ window.saveIRNToFirebase=async function(data){
     }
     // Keep inspector photos but limit to 15
     if(s.inspPhotoData&&s.inspPhotoData.length>0){
-      s.inspPhotoData=s.inspPhotoData.slice(0,15);
+      s.inspPhotoData=s.inspPhotoData.slice(0,40);
     }
     s.timestamp=new Date().toISOString();
     await addDoc(collection(db,'irns'),s);
@@ -237,6 +237,18 @@ window.markRequestComplete=async function(firebaseId){try{var r=doc(db,'requests
 window.markRequestRework=async function(firebaseId){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'rework'});return true;}catch(e){return false;}};
 window.markRequestCancelled=async function(firebaseId,reason){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'cancelled',cancelReason:reason,cancelledAt:new Date().toISOString()});return true;}catch(e){return false;}};
 window.markIRNCancelled=async function(firebaseId,reason){try{var r=doc(db,'irns',firebaseId);await updateDoc(r,{cancelled:true,cancelReason:reason,cancelledAt:new Date().toISOString()});return true;}catch(e){return false;}};
+window.updateIRNInFirebase=async function(firebaseId,data){
+  try{
+    var s=Object.assign({},data);
+    if(s.stageStates){var cs={};Object.keys(s.stageStates).forEach(function(k){var st=Object.assign({},s.stageStates[k]);st.photos=[];cs[k]=st;});s.stageStates=cs;}
+    if(s.inspPhotoData&&s.inspPhotoData.length>0){s.inspPhotoData=s.inspPhotoData.slice(0,40);}
+    s.amendedAt=new Date().toISOString();
+    s.amended=true;
+    var r=doc(db,'irns',firebaseId);
+    await updateDoc(r,s);
+    return true;
+  }catch(e){console.error('IRN update error:',e);return false;}
+};
 window.loadIRNsFromFirebase=function(cb){try{var q=query(collection(db,'irns'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);});}catch(e){cb([]);}};
 window.addEventListener('DOMContentLoaded',async function(){var n=await window.peekNextIRN();window._nextIRNNum=n;var el=document.getElementById('reportNo');if(el&&!el.value){el.value=n;el.style.color='rgba(255,255,255,0.6)';}});
 </script>
@@ -1196,9 +1208,9 @@ function toggleCheck(i){
 }
 function addInspPhotos(input){
   if(!input.files)return;
-  if(inspPhotosArr.length>=15){toast('Maximum 15 photos allowed','err');return;}
+  if(inspPhotosArr.length>=40){toast('Maximum 40 photos allowed','err');return;}
   Array.from(input.files).forEach(function(file){
-    if(inspPhotosArr.length>=15){toast('Maximum 15 photos','err');return;}
+    if(inspPhotosArr.length>=40){toast('Maximum 40 photos','err');return;}
     var reader=new FileReader();
     reader.onload=function(e){
       inspPhotosArr.push(e.target.result);
@@ -1219,7 +1231,7 @@ function renderInspPhotos(){
     html+='<button onclick="removeInspPhoto('+i+')" style="position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.6);border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">&times;</button>';
     html+='</div>';
   });
-  if(inspPhotosArr.length<15){
+  if(inspPhotosArr.length<40){
     html+='<label style="width:80px;height:80px;border:1.5px dashed #ccc;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:4px;background:#f9f9f7">';
     html+='<svg style="font-size:22px;color:#aaa" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>';
     html+='<span style="font-size:9px;color:#aaa">Camera</span>';
@@ -1336,9 +1348,9 @@ function toggleInspType(t){
 }
 function addReqPhoto(input){
   if(!input.files)return;
-  if(reqPhotos.length>=15){toast('Maximum 15 photos allowed','err');return;}
+  if(reqPhotos.length>=40){toast('Maximum 40 photos allowed','err');return;}
   Array.from(input.files).forEach(function(file){
-    if(reqPhotos.length>=15){toast('Maximum 15 photos','err');return;}
+    if(reqPhotos.length>=40){toast('Maximum 40 photos','err');return;}
     var reader=new FileReader();
     reader.onload=function(e){reqPhotos.push(e.target.result);renderReqPhotos();};
     reader.readAsDataURL(file);
@@ -1355,7 +1367,7 @@ function renderReqPhotos(){
     html+='<button style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;color:#fff;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center" data-pi="'+pi+'" onclick="removeReqPhoto(parseInt(this.dataset.pi))">×</button>';
     html+='</div>';
   });
-  if(reqPhotos.length<15){
+  if(reqPhotos.length<40){
     html+='<label style="width:80px;height:80px;border:1.5px dashed #ccc;border-radius:6px;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:4px;background:var(--color-background-secondary);vertical-align:top">';
     html+='<svg style="font-size:22px;color:#aaa" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>';
     html+='<span style="font-size:9px;color:#aaa">Add photo</span>';
@@ -1442,7 +1454,7 @@ function getRequestData(){
     supervisor:reqSupName,
     artisans:artisans.filter(function(a){return a.name.trim();}).map(function(a){return a.name.trim();}),
     photos:reqPhotos.length,
-    reqPhotoData:reqPhotos.slice(0,15)
+    reqPhotoData:reqPhotos.slice(0,40)
   };
 }
 async function submitRequest(){
@@ -1755,7 +1767,19 @@ function renderStages(){
     else if(status==='complete'){ic+=' cd';ico='<svg style="font-size:11px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';}
     else if(st.gate){ic+=' gd';}
     var meta=st.na?'N/A':st.gate?(cd+'/'+s.criteria.length+' criteria'):'Gate not confirmed';
+    var chp=ss[s.id].clientHold||'na';
+    var chpColor=chp==='accepted'?'#1D9E75':chp==='rejected'?'#E24B4A':chp==='pending'?'#185FA5':'#aaa';
+    var chpLabel=chp==='accepted'?'✓ Client: Accepted':chp==='rejected'?'✗ Client: Rejected':chp==='pending'?'⏳ Client: Pending':'Client HP: N/A';
     html+='<div class="sb"><div class="sh" data-sid="'+s.id+'" onclick="toggleS(this.dataset.sid)"><div class="'+ic+'">'+ico+'</div><div class="sl">'+s.label+(s.isCritical?'<span class="crit-tag">&#9650; Critical</span>':'')+'</div><div class="sm">'+meta+'</div>'+(open?'<svg style="font-size:14px;color:#aaa;flex-shrink:0;width:1em;height:1em" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>':'<svg style="font-size:14px;color:#aaa;flex-shrink:0;width:1em;height:1em" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>')+'</div>';
+    if(!ss[s.id].na){
+      html+='<div style="display:flex;gap:4px;padding:4px 14px 8px;background:#fafafa;border-bottom:0.5px solid #eee">';
+      html+='<div style="font-size:9px;color:#888;font-weight:500;align-self:center;margin-right:4px;white-space:nowrap">Client HP:</div>';
+      html+='<div onclick="event.stopPropagation();setClientHold(\''+s.id+'\',\'na\')" style="flex:1;padding:4px 2px;border-radius:6px;border:1px solid '+(chp==='na'?'#888':'#eee')+';background:'+(chp==='na'?'#f0f0f0':'#fff')+';font-size:10px;font-weight:600;color:'+(chp==='na'?'#555':'#bbb')+';text-align:center;cursor:pointer">N/A</div>';
+      html+='<div onclick="event.stopPropagation();setClientHold(\''+s.id+'\',\'accepted\')" style="flex:1;padding:4px 2px;border-radius:6px;border:1px solid '+(chp==='accepted'?'#1D9E75':'#eee')+';background:'+(chp==='accepted'?'#EAF3DE':'#fff')+';font-size:10px;font-weight:600;color:'+(chp==='accepted'?'#27500A':'#bbb')+';text-align:center;cursor:pointer">✓ Accept</div>';
+      html+='<div onclick="event.stopPropagation();setClientHold(\''+s.id+'\',\'rejected\')" style="flex:1;padding:4px 2px;border-radius:6px;border:1px solid '+(chp==='rejected'?'#E24B4A':'#eee')+';background:'+(chp==='rejected'?'#FCEBEB':'#fff')+';font-size:10px;font-weight:600;color:'+(chp==='rejected'?'#A32D2D':'#bbb')+';text-align:center;cursor:pointer">✗ Reject</div>';
+      html+='<div onclick="event.stopPropagation();setClientHold(\''+s.id+'\',\'pending\')" style="flex:1;padding:4px 2px;border-radius:6px;border:1px solid '+(chp==='pending'?'#185FA5':'#eee')+';background:'+(chp==='pending'?'#E6F1FB':'#fff')+';font-size:10px;font-weight:600;color:'+(chp==='pending'?'#0C447C':'#bbb')+';text-align:center;cursor:pointer">⏳ Pending</div>';
+      html+='</div>';
+    }
     if(open){
       html+='<div class="sbdy">';
       if(s.isCritical&&!st.na){html+='<div class="wb"><svg style="font-size:15px;flex-shrink:0" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><div><strong>Critical checkpoint:</strong> Every hole must have a bolt during trial assembly.</div></div>';}
@@ -1871,7 +1895,7 @@ function getForm(){
   b.items=JSON.parse(JSON.stringify(items));
   b.stageStates=JSON.parse(JSON.stringify(ss));
   b.fabDims=JSON.parse(JSON.stringify(fabDims));
-  b.inspPhotoData=inspPhotosArr.slice(0,15);
+  b.inspPhotoData=inspPhotosArr.slice(0,40);
   b.irqRef=_irqParam||'';
   b.reqSupervisor=_urlReq?(_urlReq.supervisor||''):'';
   b.reqDate=_urlReq?(_urlReq.date||''):'';
@@ -1956,18 +1980,25 @@ async function submitIRN(){
   var btn=document.getElementById('submitBtn');
   btn.disabled=true;btn.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> Submitting...';
   try{
-    // Only get new IRN number if not already assigned this session
+    // Only get new IRN number if not already assigned and not amending
     var el=document.getElementById('reportNo');
     var currentIRN=el?el.value:'';
-    if(!currentIRN||currentIRN==='----'||currentIRN==='--'||window._irnSubmitted===currentIRN){
+    if(window._amendMode&&window._amendFirebaseId){
+      // Amendment — update existing record
+      d.reportNo=window._amendIRNNo||currentIRN;
+      if(el)el.value=d.reportNo;
+      if(window.updateIRNInFirebase)await window.updateIRNInFirebase(window._amendFirebaseId,d);
+      toast('INS-C '+d.reportNo+' amended and saved','ok');
+      window._amendMode=false;window._amendFirebaseId=null;window._amendIRNNo=null;
+    } else if(!currentIRN||currentIRN==='----'||currentIRN==='--'||window._irnSubmitted===currentIRN){
       var freshIRN=await window.getNextIRN();
       d.reportNo=freshIRN;
       if(el)el.value=freshIRN;
     } else {
       d.reportNo=currentIRN;
     }
-    // Save to Firebase immediately
-    if(window.saveIRNToFirebase)await window.saveIRNToFirebase(d);
+    // Save to Firebase — skip if already handled by amendment
+    if(!window._amendMode&&window.saveIRNToFirebase)await window.saveIRNToFirebase(d);
     var ex=reg.findIndex(function(r){return r.reportNo===d.reportNo;});
     if(ex>=0)reg[ex]=d;else reg.unshift(d);
     if(d.result==='reject'&&_irqParam){
@@ -2158,6 +2189,7 @@ function renderReg(){
       html+='<div style="font-size:11px;color:#aaa;font-style:italic;align-self:center">Cancelled: '+cancelReason+'</div>';
     } else if(latestIrn){
       html+='<button data-irn="'+latestIrn.reportNo+'" data-irq="'+irqNo+'" onclick="printFromReg(this)" style="font-size:13px;padding:9px 18px;background:#fff;border:1.5px solid #1a3a5c;color:#1a3a5c;border-radius:8px;cursor:pointer;font-weight:600"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> View / Print</button>';
+      html+='<button data-irnfid="'+(latestIrn.firebaseId||'')+'" data-irqno="'+irqNo+'" data-irn="'+latestIrn.reportNo+'" onclick="amendIRN(this)" style="font-size:13px;padding:9px 14px;background:#FAEEDA;border:1.5px solid #BA7517;color:#633806;border-radius:8px;cursor:pointer;font-weight:600"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Amend</button>';
       html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irnfid="'+(latestIrn&&latestIrn.firebaseId||'')+'" data-irqno="'+irqNo+'" onclick="cancelRecord(this)" style="font-size:12px;padding:9px 14px;background:#fff;border:1px solid #aaa;color:#888;border-radius:8px;cursor:pointer"><svg style="font-size:13px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Cancel</button>';
     } else {
       var inspType=(req&&req.inspTypes)||'';
@@ -2543,6 +2575,61 @@ function printIRN(){
 }
 
 
+function amendIRN(btn){
+  var irnFid=btn.dataset.irnfid;
+  var irqNo=btn.dataset.irqno;
+  var irnNo=btn.dataset.irn;
+  if(!confirm('Amend IRN INS-C '+irnNo+'?\n\nThis will reopen the form so you can correct and resubmit. The original record will be updated.')){return;}
+  // Find the IRN record
+  var r=reg.find(function(x){return x.reportNo===irnNo;});
+  if(!r){toast('IRN data not found','err');return;}
+  // Find linked request
+  var linkedReq=reqs.find(function(x){return String(x.reqNo)===String(irqNo);});
+  // Set amendment mode
+  window._amendMode=true;
+  window._amendFirebaseId=irnFid;
+  window._amendIRNNo=irnNo;
+  _irqParam=irqNo;
+  if(linkedReq)_urlReq=linkedReq;
+  // Switch to IRN form
+  var newIrnBtn=document.querySelectorAll('.nb')[1];
+  window._keepStageFilter=true;
+  showV('form',newIrnBtn);
+  setTimeout(function(){
+    // Pre-fill all fields from saved record
+    var joEl=document.getElementById('job');if(joEl)joEl.value=r.job||'';
+    var prEl=document.getElementById('project');if(prEl)prEl.value=r.project||'';
+    var poEl=document.getElementById('po');if(poEl)poEl.value=r.po||'';
+    var drEl=document.getElementById('drawing');if(drEl)drEl.value=r.drawing||'';
+    var dtEl=document.getElementById('irnDate');if(dtEl)dtEl.value=r.date||'';
+    var ntEl=document.getElementById('notes');if(ntEl)ntEl.value=r.notes||'';
+    var rnEl=document.getElementById('reportNo');if(rnEl){rnEl.value=irnNo;rnEl.style.color='rgba(255,255,255,0.6)';}
+    // Restore result
+    if(r.result)setRes(r.result);
+    if(r.result==='reject'){
+      var rrEl=document.getElementById('rejectionReason');if(rrEl)rrEl.value=r.rejectionReason||'';
+      var raEl=document.getElementById('rejectionAction');if(raEl)raEl.value=r.rejectionAction||'';
+    }
+    // Restore items
+    if(r.items&&r.items.length){items=JSON.parse(JSON.stringify(r.items));renderItems();}
+    // Restore stage states
+    if(r.stageStates){
+      Object.keys(r.stageStates).forEach(function(sid){
+        if(ss[sid])ss[sid]=Object.assign({},r.stageStates[sid],{photos:[]});
+      });
+    }
+    // Restore photos
+    inspPhotosArr=r.inspPhotoData?JSON.parse(JSON.stringify(r.inspPhotoData)):[];
+    renderInspPhotos();
+    renderStages();
+    showFormOrWaiting();
+    renderIrqBanner();
+    // Show amendment banner
+    var banner=document.getElementById('inheritedBanner');
+    if(banner){banner.style.display='block';banner.innerHTML='<svg style="font-size:13px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> <strong>Amendment mode</strong> — editing INS-C '+irnNo+'. Resubmit to save changes.';}
+    toast('IRN INS-C '+irnNo+' reopened for amendment','info');
+  },200);
+}
 function cancelRecord(btn){
   var irqNo=btn.dataset.irqno;
   var reqFid=btn.dataset.fid||'';
