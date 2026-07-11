@@ -157,7 +157,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 <link rel="manifest" href="manifest.json">
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
-import{getFirestore,doc,getDoc,getDocs,addDoc,updateDoc,setDoc,deleteDoc,collection,query,orderBy,onSnapshot,runTransaction}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
+import{getFirestore,doc,getDoc,getDocs,addDoc,updateDoc,setDoc,deleteDoc,collection,query,orderBy,onSnapshot,runTransaction,arrayUnion}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
 import{getStorage,ref,uploadString,getDownloadURL,deleteObject}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js';
 const app=initializeApp({apiKey:"AIzaSyC3sKMm02GnikBdgXPd4RUm7RxnsR90A_I",authDomain:"fse-irn-system.firebaseapp.com",projectId:"fse-irn-system",storageBucket:"fse-irn-system.firebasestorage.app",messagingSenderId:"1097944808267",appId:"1:1097944808267:web:d8f1f3a52e2223253f86ce"});
 const db=getFirestore(app);
@@ -281,6 +281,9 @@ window.updateIRNInFirebase=async function(firebaseId,data){
     return true;
   }catch(e){console.error('IRN update error:',e);return false;}
 };
+window.sendAppMessage=async function(m){try{m.timestamp=new Date().toISOString();if(!m.readBy)m.readBy=m.fromCode?[m.fromCode]:[];await addDoc(collection(db,'messages'),m);return true;}catch(e){console.log('Message send error:',e);return false;}};
+window.loadMessagesFromFirebase=function(cb){try{var q=query(collection(db,'messages'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);});}catch(e){cb([]);return null;}};
+window.markMessageRead=async function(firebaseId,code){try{await updateDoc(doc(db,'messages',firebaseId),{readBy:arrayUnion(code)});return true;}catch(e){return false;}};
 window.loadIRNsFromFirebase=function(cb){try{var q=query(collection(db,'irns'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);});}catch(e){cb([]);}};
 window.addEventListener('DOMContentLoaded',function(){
   var el=document.getElementById('reportNo');
@@ -310,7 +313,8 @@ window.addEventListener('DOMContentLoaded',function(){
 <div class="app">
   <div class="nav no-print">
     <button class="nb on" onclick="showV('request',this)"><svg style="font-size:12px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg> Inspect Req</button>
-    <button class="nb" onclick="handleNewIRNClick(this)" style="opacity:0.6" title="Accessible via WhatsApp inspection link only"><svg style="font-size:12px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg> New IRN <svg style="font-size:9px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></button>
+    <button class="nb" onclick="handleNewIRNClick(this)" style="opacity:0.6" title="Accessible via inspection request link only"><svg style="font-size:12px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg> New IRN <svg style="font-size:9px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></button>
+    <button class="nb" onclick="showV('messages',this)" style="position:relative"><svg style="font-size:12px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg> Messages<span id="msgBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:#E24B4A;color:#fff;font-size:10px;font-weight:700;border-radius:9px;padding:1px 5px;min-width:16px;text-align:center;line-height:14px">0</span></button>
     <button class="nb" onclick="showV('register',this)"><svg style="font-size:12px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> Register</button>
     <button class="nb" onclick="showV('admin',this)"><svg style="font-size:12px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg> Admin</button>
     <button class="nb" onclick="showV('mgmt',this)"><svg style="font-size:12px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="20" x2="21" y2="20"/><rect x="4" y="14" width="4" height="6"/><rect x="10" y="8" width="4" height="12"/><rect x="16" y="4" width="4" height="16"/></svg> Mgmt</button>
@@ -359,11 +363,11 @@ window.addEventListener('DOMContentLoaded',function(){
         <svg style="font-size:32px;color:#185FA5" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       </div>
       <div style="font-size:16px;font-weight:600;color:#1a3a5c;margin-bottom:8px">Waiting for inspection request</div>
-      <div style="font-size:13px;color:#888;margin-bottom:24px;line-height:1.5">When a supervisor raises an inspection request you will receive a WhatsApp notification with a direct link to the job.</div>
+      <div style="font-size:13px;color:#888;margin-bottom:24px;line-height:1.5">When a supervisor raises an inspection request you will receive an in-app message with a direct link to the job &mdash; check the Messages tab.</div>
       <div style="background:#f9f9f7;border-radius:10px;padding:16px;text-align:left;max-width:300px;margin:0 auto">
         <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">How it works</div>
         <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px"><div style="width:20px;height:20px;border-radius:50%;background:#1a3a5c;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</div><div style="font-size:12px;color:#444">Supervisor raises request on Inspect Req tab</div></div>
-        <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px"><div style="width:20px;height:20px;border-radius:50%;background:#1a3a5c;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</div><div style="font-size:12px;color:#444">You receive a WhatsApp with the job details and link</div></div>
+        <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px"><div style="width:20px;height:20px;border-radius:50%;background:#1a3a5c;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</div><div style="font-size:12px;color:#444">You receive an in-app message with the job details and link</div></div>
         <div style="display:flex;align-items:flex-start;gap:8px"><div style="width:20px;height:20px;border-radius:50%;background:#1a3a5c;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</div><div style="font-size:12px;color:#444">Tap the link — form pre-filled and ready to complete</div></div>
       </div>
     </div>
@@ -711,6 +715,71 @@ window.addEventListener('DOMContentLoaded',function(){
     </div>
   </div>
 
+  <div id="v-messages" class="view">
+    <div class="hdr">
+      <div class="hdr-top">
+        <div class="hdr-left">
+          <img id="msgLogo" class="fse-logo" alt="FSE">
+          <div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.55);margin-bottom:1px">FIELD SERVICES &amp; ENGINEERING</div>
+            <h1>Messages</h1>
+            <div class="hdr-meta">In-app notifications &amp; team messaging</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Sign-in card -->
+    <div id="msgSignIn" style="display:none;background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:20px;margin-top:14px;max-width:420px">
+      <div style="font-size:14px;font-weight:700;color:#1a3a5c;margin-bottom:4px">Who are you?</div>
+      <div style="font-size:12px;color:#888;margin-bottom:12px">Enter your QC or SUP code once — messages addressed to you or your role will appear here.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input id="msgUserCode" placeholder="e.g. QC-006" maxlength="7" style="width:120px;padding:9px 10px;border:1.5px solid #ccc;border-radius:8px;font-size:14px;text-transform:uppercase">
+        <input id="msgUserPin" type="password" placeholder="PIN" maxlength="4" style="width:80px;padding:9px 10px;border:1.5px solid #ccc;border-radius:8px;font-size:14px">
+        <button onclick="msgSignIn()" style="padding:9px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Sign in</button>
+      </div>
+      <div id="msgSignInStatus" style="font-size:12px;margin-top:8px"></div>
+    </div>
+    <!-- Inbox -->
+    <div id="msgInbox" style="display:none;margin-top:14px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+        <button id="msgTabAll" onclick="setMsgFilter('all')" style="padding:6px 14px;border-radius:16px;border:1px solid #ccc;background:#1a3a5c;color:#fff;font-size:12px;cursor:pointer">All</button>
+        <button id="msgTabUnread" onclick="setMsgFilter('unread')" style="padding:6px 14px;border-radius:16px;border:1px solid #ccc;background:#fff;color:#555;font-size:12px;cursor:pointer">Unread</button>
+        <div style="flex:1"></div>
+        <span id="msgWhoAmI" style="font-size:12px;color:#888"></span>
+        <button onclick="msgSignOut()" style="padding:5px 10px;border:1px solid #ccc;background:#fff;border-radius:8px;font-size:11px;color:#888;cursor:pointer">Switch user</button>
+        <button onclick="openMsgCompose()" style="padding:8px 16px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">&#9993; New message</button>
+      </div>
+      <div id="msgList" style="background:#fff;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden"></div>
+    </div>
+    <!-- Compose modal -->
+    <div id="msgComposeOverlay" style="display:none;position:fixed;inset:0;background:rgba(20,30,40,0.55);z-index:200;align-items:center;justify-content:center;padding:14px">
+      <div style="background:#fff;border-radius:12px;width:100%;max-width:460px;overflow:hidden">
+        <div style="background:#1a3a5c;color:#fff;padding:12px 16px;font-weight:700;font-size:14px;display:flex;align-items:center">New message
+          <button onclick="closeMsgCompose()" style="margin-left:auto;background:none;border:none;color:#fff;font-size:17px;cursor:pointer">&#10005;</button>
+        </div>
+        <div style="padding:16px">
+          <div style="margin-bottom:10px">
+            <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">To</div>
+            <select id="msgComposeTo" style="width:100%;padding:9px 10px;border:1.5px solid #ccc;border-radius:8px;font-size:13px"></select>
+          </div>
+          <div style="margin-bottom:10px">
+            <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Link to IRQ / job (optional)</div>
+            <input id="msgComposeIrq" placeholder="e.g. 0042" style="width:100%;padding:9px 10px;border:1.5px solid #ccc;border-radius:8px;font-size:13px">
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Message</div>
+            <textarea id="msgComposeText" style="width:100%;min-height:90px;padding:9px 10px;border:1.5px solid #ccc;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical" placeholder="Type your message&hellip;"></textarea>
+          </div>
+        </div>
+        <div style="padding:12px 16px;border-top:1px solid #eee;display:flex;gap:8px;justify-content:flex-end">
+          <button onclick="closeMsgCompose()" style="padding:8px 16px;border:1px solid #ccc;background:#fff;border-radius:8px;font-size:13px;cursor:pointer">Cancel</button>
+          <button onclick="sendComposedMsg()" style="padding:8px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Send message</button>
+        </div>
+      </div>
+    </div>
+    <div style="height:16px"></div>
+  </div>
+
   <div id="v-admin" class="view">
     <div class="hdr">
       <div class="hdr-top">
@@ -872,7 +941,6 @@ function toggleMaintenanceMode(){
     });
   });
 }
-const WA_GROUP='https://chat.whatsapp.com/DdCdi8Eto8PHEJ8sNsqqi0';
 
 // Get logo from hidden img element - avoids JS string issues with base64
 function getLogoSrc(){return document.getElementById('fseLogo').src;}
@@ -1001,6 +1069,10 @@ function showV(v,btn){
       if(qc&&window._savedQC){qc.value=window._savedQC;qcValidated=window._savedQCv||false;qcName=window._savedQCn||'';validateCode('qc');}
       if(sup&&window._savedSUP){sup.value=window._savedSUP;supValidated=window._savedSUPv||false;supName=window._savedSUPn||'';validateCode('sup');}
     },150);
+  }
+  if(v==='messages'){
+    document.getElementById('msgLogo').src=getLogoSrc();
+    initMessagesView();
   }
   if(v==='register'){
     document.getElementById('regLogo').src=getLogoSrc();
@@ -1402,7 +1474,7 @@ function handleNewIRNClick(btn){
     // Has IRQ — show form
     showV('form',btn);
   } else {
-    toast('New IRN is only accessible via an inspection request WhatsApp link','err');
+    toast('New IRN is only accessible via an inspection request link - see Messages','err');
   }
 }
 var _regFilt='all';
@@ -1661,10 +1733,9 @@ async function submitRequest(){
   if(window.saveRequestToFirebase){
     await window.saveRequestToFirebase(d);
   }
-  toast('Request submitted to QC group','ok');
-  window.open('https://wa.me/?text='+encodeURIComponent(msg));
-  // Also open the group directly so supervisor can send there
-  setTimeout(function(){window.open('https://chat.whatsapp.com/DdCdi8Eto8PHEJ8sNsqqi0');},1000);if(cb)cb.checked=false;
+  toast('Request IRQ-'+d.reqNo+' sent to QC','ok');
+  if(window.sendAppMessage)window.sendAppMessage({to:'QC',from:d.supervisor||'Supervisor',fromCode:d.supCode||'',kind:'request',irq:d.reqNo,text:msg});
+  if(cb)cb.checked=false;
   // Reset IRQ number for next request
   var reqNoEl=document.getElementById('reqNo');
   if(reqNoEl){reqNoEl.value='';reqNoEl.style.color='rgba(255,255,255,0.6)';}
@@ -1735,8 +1806,8 @@ function raiseConcession(){
   msg+='QC: '+d.qc+' ('+d.qcCode+') | '+d.date+'\n';
   msg+='Reason: [add details]\n';
   msg+='Reg: https://eric0103360.github.io/fse-irn-system';
-  toast('Opening WhatsApp for concession notification','info');
-  window.open('https://wa.me/?text='+encodeURIComponent(msg));
+  if(window.sendAppMessage)window.sendAppMessage({to:'ALL',from:d.qc||'QC',fromCode:d.qcCode||'',kind:'hold',irn:d.reportNo||'',text:msg});
+  toast('Concession hold notice sent','ok');
 }
 function addItem(){items.push({id:'i'+iCnt++,desc:'',qty:''});renderItems();}
 function removeItem(id){if(items.length<=1)return;items=items.filter(function(i){return i.id!==id;});renderItems();}
@@ -1827,8 +1898,8 @@ async function submitQuickRequest(){
   msg+='Type: '+qrSelectedType+'\n';
   msg+='SUP: '+qrSupName+'\n';
   msg+='👉 https://eric0103360.github.io/fse-irn-system?irq='+encodeURIComponent(reqNo);
-  toast('Quick request IRQ-'+reqNo+' sent','ok');
-  window.open('https://wa.me/?text='+encodeURIComponent(msg));
+  toast('Quick request IRQ-'+reqNo+' sent to QC','ok');
+  if(window.sendAppMessage)window.sendAppMessage({to:'QC',from:qrSupName||'Supervisor',fromCode:document.getElementById('qrSupCode').value.toUpperCase(),kind:'request',irq:reqNo,text:msg});
   // Reset
   document.getElementById('qrJob').value='';
   document.getElementById('qrClient').value='';
@@ -1853,8 +1924,9 @@ function upTDEl(el){upTD(el.getAttribute('data-sid'),el.getAttribute('data-did')
 function sendStagePhoto(stageLabel){
   var d=getFormBasic();
   var irn=(d.bookRef&&d.reportNo)?d.bookRef+'/'+d.reportNo:'(IRN pending)';
-  var msg='*FSE IRN PHOTO*\nIRN: '+irn+'\nJob: '+(d.job||'pending')+'\nStage: '+stageLabel+'\nInspector: '+(d.inspector||'--')+'\nDate: '+d.date+'\n\n[Attach photo here]';
-  window.open('https://wa.me/?text='+encodeURIComponent(msg));
+  var msg='*FSE IRN PHOTO*\nIRN: '+irn+'\nJob: '+(d.job||'pending')+'\nStage: '+stageLabel+'\nInspector: '+(d.inspector||'--')+'\nDate: '+d.date+'\n\nPhotos attached in the app - open the job to view.';
+  if(window.sendAppMessage)window.sendAppMessage({to:'ALL',from:d.inspector||'QC',fromCode:d.qcCode||'',kind:'photo',irn:d.reportNo||'',text:msg});
+  toast('Photo notification sent','ok');
 }
 function setStageResult(sid,r){
   if(r==='reject'){
@@ -2157,7 +2229,8 @@ function sendWA(){
   }
   msg+='================================\n';
   msg+='Register: https://eric0103360.github.io/fse-irn-system';
-  window.open('https://wa.me/?text='+encodeURIComponent(msg));
+  if(window.sendAppMessage)window.sendAppMessage({to:'ALL',from:d.qc||'QC',fromCode:d.qcCode||'',kind:isPass?'release':'reject',irn:d.reportNo||'',text:msg});
+  toast('Result notification sent','ok');
 }
 async function submitIRN(){
   var d=getForm();
@@ -2208,7 +2281,7 @@ async function submitIRN(){
     // Hide unsaved banner
     var ub=document.getElementById('unsavedBanner');
     if(ub)ub.style.display='none';
-    // Open WhatsApp immediately
+    // Send in-app release notification
     var isPass=d.result==='accept';
     var isHold=d.result==='hold';
     var stageName=activeStageFilter&&STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;})?STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;}).label:'';
@@ -2226,7 +2299,7 @@ async function submitIRN(){
       msg+='Action: '+(gv('rejectionAction')||'--')+'\n';
     }
     msg+='Reg: https://eric0103360.github.io/fse-irn-system';
-    window.open('https://wa.me/?text='+encodeURIComponent(msg));
+    if(window.sendAppMessage)window.sendAppMessage({to:'SUP',from:d.qc||'QC',fromCode:d.qcCode||'',kind:isPass?'release':isHold?'hold':'reject',irq:_irqParam||'',irn:d.reportNo||'',text:msg});
     // Send to Google endpoint in background — don't wait
     fetch(ENDPOINT,{method:'POST',body:JSON.stringify(d),mode:'no-cors'}).catch(function(){});
     renderReg();
@@ -2536,7 +2609,8 @@ function waRec(book,no){
   msg+='SUP: '+r.supCode+' ('+r.supervisor+') | QC: '+r.qcCode+' ('+r.qc+')\n';
   if(r.snags&&r.snags!=='None')msg+='*SNAGS:* '+r.snags+'\n';
   if(!isPass)msg+='\n*Action required - see snags*';
-  window.open('https://wa.me/?text='+encodeURIComponent(msg));
+  if(window.sendAppMessage)window.sendAppMessage({to:'ALL',from:r.qc||'QC',fromCode:r.qcCode||'',kind:isPass?'release':'reject',irn:r.reportNo||'',text:msg});
+  toast('Notification sent','ok');
 }
 function renderPendingReqs(){
   // Cards removed - pending requests shown in Register table
@@ -3052,7 +3126,7 @@ function renderMgmt(){
     ?reworkList.map(function(e){return mkRow(e,'#BA7517');}).join('')
     :'<div style="padding:14px;font-size:12px;color:#aaa;text-align:center">No rework items</div>';
 
-  // Concessions — flagged via concession WA message (no dedicated field yet, show placeholder)
+  // Concessions — flagged via concession in-app message (no dedicated field yet, show placeholder)
   document.getElementById('mgConcessionCount').textContent='0';
   document.getElementById('mgConcession').innerHTML='<div style="padding:14px;font-size:12px;color:#aaa;text-align:center">No concession holds</div>';
 }
@@ -3153,6 +3227,27 @@ if(_printParam&&window.loadIRNsFromFirebase){
     }
   });
 }
+// ===== In-app messaging (replaces WhatsApp) =====
+var msgs=[],msgUser=null,msgUnsub=null,msgFilter='all',msgOpenId=null;
+try{msgUser=JSON.parse(localStorage.getItem('fseMsgUser')||'null');}catch(e){msgUser=null;}
+function msgAudienceMatch(m){if(!msgUser)return false;var t=(m.to||'ALL').toUpperCase();return t==='ALL'||(t==='QC'&&msgUser.role==='qc')||(t==='SUP'&&msgUser.role==='sup')||t===msgUser.code;}
+function msgIsUnread(m){return msgUser&&msgAudienceMatch(m)&&m.fromCode!==msgUser.code&&(!m.readBy||m.readBy.indexOf(msgUser.code)<0);}
+function startMsgListener(){if(msgUnsub||!window.loadMessagesFromFirebase)return;msgUnsub=window.loadMessagesFromFirebase(function(r){var prevUnread=msgs.filter(msgIsUnread).length;msgs=r;updateMsgBadge();var el=document.getElementById('v-messages');if(el&&el.classList.contains('on'))renderMsgs();var nowUnread=msgs.filter(msgIsUnread).length;if(msgUser&&nowUnread>prevUnread&&prevUnread>=0&&msgs.length&&window._msgListenerWarm){toast('New message received','info');}window._msgListenerWarm=true;});}
+function updateMsgBadge(){var b=document.getElementById('msgBadge');if(!b)return;var n=msgUser?msgs.filter(msgIsUnread).length:0;b.textContent=n>99?'99+':n;b.style.display=n>0?'inline-block':'none';}
+function initMessagesView(){var si=document.getElementById('msgSignIn'),ib=document.getElementById('msgInbox');if(!msgUser){si.style.display='block';ib.style.display='none';return;}si.style.display='none';ib.style.display='block';document.getElementById('msgWhoAmI').textContent=msgUser.name+' ('+msgUser.code+')';startMsgListener();renderMsgs();}
+function msgSignIn(){var code=document.getElementById('msgUserCode').value.trim().toUpperCase();var pin=document.getElementById('msgUserPin').value.trim();var st=document.getElementById('msgSignInStatus');var list=code.indexOf('QC')===0?codes.qc:code.indexOf('SUP')===0?codes.sup:null;if(!list){st.innerHTML='<span style="color:#A32D2D">Enter a valid QC-xxx or SUP-xxx code</span>';return;}var match=null;for(var i=0;i<list.length;i++){if(list[i].code===code&&list[i].active&&list[i].name){match=list[i];break;}}if(!match){st.innerHTML='<span style="color:#A32D2D">Code not recognised</span>';return;}if(match.pin&&match.pin.length===4&&match.pin!==pin){st.innerHTML='<span style="color:#A32D2D">Incorrect PIN</span>';return;}msgUser={code:match.code,name:match.name,role:code.indexOf('QC')===0?'qc':'sup'};try{localStorage.setItem('fseMsgUser',JSON.stringify(msgUser));}catch(e){}st.innerHTML='';document.getElementById('msgUserPin').value='';initMessagesView();updateMsgBadge();toast('Signed in as '+msgUser.name,'ok');}
+function msgSignOut(){msgUser=null;try{localStorage.removeItem('fseMsgUser');}catch(e){}updateMsgBadge();initMessagesView();}
+function setMsgFilter(f){msgFilter=f;var a=document.getElementById('msgTabAll'),u=document.getElementById('msgTabUnread');if(a&&u){a.style.background=f==='all'?'#1a3a5c':'#fff';a.style.color=f==='all'?'#fff':'#555';u.style.background=f==='unread'?'#1a3a5c':'#fff';u.style.color=f==='unread'?'#fff':'#555';}renderMsgs();}
+function escMsg(t){return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function fmtMsgText(t){var h=escMsg(t);h=h.replace(/\*([^*\n]+)\*/g,'<b>$1</b>');h=h.replace(/(https?:\/\/[^\s]+)/g,function(u){return '<a href="'+u+'" style="color:#185FA5;word-break:break-all">'+u+'</a>';});return h.replace(/\n/g,'<br>');}
+function msgTimeLabel(ts){try{var d=new Date(ts);var now=new Date();var opts={hour:'2-digit',minute:'2-digit'};if(d.toDateString()===now.toDateString())return 'Today '+d.toLocaleTimeString('en-ZA',opts);return d.toLocaleDateString('en-ZA')+' '+d.toLocaleTimeString('en-ZA',opts);}catch(e){return '';}}
+function msgKindChip(m){var k=(m.kind||'').toLowerCase();var map={request:['#E6F1FB','#185FA5','REQUEST'],release:['#E7F4EC','#1F7A45','RELEASED'],hold:['#FAEEDA','#8A5A10','HOLD'],reject:['#FCEBEB','#A32D2D','REJECTED'],photo:['#F0F0F0','#555','PHOTOS']};if(!map[k])return '';var c=map[k];return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:'+c[0]+';color:'+c[1]+';letter-spacing:0.5px">'+c[2]+'</span>';}
+function renderMsgs(){var el=document.getElementById('msgList');if(!el||!msgUser)return;var mine=msgs.filter(function(m){return msgAudienceMatch(m)||m.fromCode===msgUser.code;});if(msgFilter==='unread')mine=mine.filter(msgIsUnread);if(mine.length===0){el.innerHTML='<div style="padding:32px;text-align:center;color:#999;font-size:13px">'+(msgFilter==='unread'?'No unread messages':'No messages yet - raise a request or send one with New message')+'</div>';return;}var html='';mine.slice(0,150).forEach(function(m){var unread=msgIsUnread(m);var open=msgOpenId===m.firebaseId;var toLbl=(m.to||'ALL').toUpperCase();toLbl=toLbl==='ALL'?'Everyone':toLbl==='QC'?'All QC':toLbl==='SUP'?'All Supervisors':toLbl;html+='<div onclick="openMsg(\''+m.firebaseId+'\')" style="padding:12px 14px;border-bottom:1px solid #eee;cursor:pointer;position:relative;'+(unread?'background:#FDF8EC;':'')+'">';if(unread)html+='<div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:#185FA5"></div>';html+='<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><span style="font-weight:700;font-size:13px;color:#1a3a5c">'+escMsg(m.from||'--')+(m.fromCode?' ('+escMsg(m.fromCode)+')':'')+'</span><span style="font-size:11px;color:#999">&rarr; '+escMsg(toLbl)+'</span><span style="margin-left:auto;font-size:11px;color:#999">'+msgTimeLabel(m.timestamp)+'</span></div>';html+='<div style="font-size:13px;color:#333;margin-top:4px;'+(open?'':'max-height:38px;overflow:hidden;')+(unread?'font-weight:600;':'')+'">'+fmtMsgText(m.text)+'</div>';var chips='';if(m.irq)chips+='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:#EEF3F8;color:#1a3a5c">IRQ-'+escMsg(m.irq)+'</span> ';if(m.irn)chips+='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:#EEF3F8;color:#1a3a5c">INS-C '+escMsg(m.irn)+'</span> ';chips+=msgKindChip(m);if(chips)html+='<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+chips+'</div>';if(open&&m.irq)html+='<div style="margin-top:8px"><a href="'+location.pathname+'?irq='+encodeURIComponent(m.irq)+'" onclick="event.stopPropagation()" style="display:inline-block;padding:7px 14px;background:#1a3a5c;color:#fff;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none">Open job &rarr;</a></div>';html+='</div>';});el.innerHTML=html;}
+function openMsg(fid){msgOpenId=msgOpenId===fid?null:fid;var m=msgs.find(function(x){return x.firebaseId===fid;});if(m&&msgUser&&msgIsUnread(m)&&window.markMessageRead){window.markMessageRead(fid,msgUser.code);if(!m.readBy)m.readBy=[];m.readBy.push(msgUser.code);updateMsgBadge();}renderMsgs();}
+function openMsgCompose(){var sel=document.getElementById('msgComposeTo');var opts='<option value="ALL">Everyone</option><option value="QC">All QC</option><option value="SUP">All Supervisors</option>';codes.qc.forEach(function(c){if(c.active&&c.name)opts+='<option value="'+c.code+'">'+escMsg(c.name)+' ('+c.code+')</option>';});codes.sup.forEach(function(c){if(c.active&&c.name)opts+='<option value="'+c.code+'">'+escMsg(c.name)+' ('+c.code+')</option>';});sel.innerHTML=opts;document.getElementById('msgComposeOverlay').style.display='flex';}
+function closeMsgCompose(){document.getElementById('msgComposeOverlay').style.display='none';}
+async function sendComposedMsg(){if(!msgUser){toast('Sign in first','err');return;}var to=document.getElementById('msgComposeTo').value;var irq=document.getElementById('msgComposeIrq').value.trim();var text=document.getElementById('msgComposeText').value.trim();if(!text){toast('Type a message','err');return;}var ok=await window.sendAppMessage({to:to,from:msgUser.name,fromCode:msgUser.code,text:text,irq:irq||'',kind:'general'});if(ok){toast('Message sent','ok');document.getElementById('msgComposeText').value='';document.getElementById('msgComposeIrq').value='';closeMsgCompose();}else{toast('Send failed - check connection','err');}}
+// ===== end in-app messaging =====
 setTimeout(function(){
   if(window.getMaintenanceMode){
     checkMaintenanceMode().then(function(isMaint){
@@ -3162,14 +3257,15 @@ setTimeout(function(){
     enterApp();
   }
   if(_irqParam){
-    // Inspector opened WhatsApp link — go straight to Register
-    var regBtn=document.querySelectorAll('.nb')[2];
+    // Inspector opened inspection request link — go straight to Register
+    var regBtn=document.querySelectorAll('.nb')[3];
     if(regBtn)showV('register',regBtn);
   } else {
     // Normal open — go to Inspect Req
     var reqBtn=document.querySelectorAll('.nb')[0];
     if(reqBtn)showV('request',reqBtn);
   }
+  startMsgListener();
 },3000);
 
 // IRN number assigned at submission only
