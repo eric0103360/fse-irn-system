@@ -225,7 +225,7 @@ window.clearAllData=async function(){
     return true;
   }catch(e){console.error(e);return false;}
 };
-window.saveCodesToFirebase=async function(){try{await setDoc(doc(db,'settings','codes'),{qc:codes.qc,sup:codes.sup});return true;}catch(e){return false;}};
+window.saveCodesToFirebase=async function(){try{await setDoc(doc(db,'settings','codes'),{qc:codes.qc,sup:codes.sup,mgt:codes.mgt||[]});return true;}catch(e){return false;}};
 window.setMaintenanceMode=async function(enabled){
   try{
     await setDoc(doc(db,'settings','maintenance'),{enabled:enabled,updatedAt:new Date().toISOString()});
@@ -239,7 +239,7 @@ window.getMaintenanceMode=async function(){
     return false;
   }catch(e){return false;}
 };
-window.loadCodesFromFirebase=async function(){try{var d=await getDoc(doc(db,'settings','codes'));if(d.exists()){var data=d.data();if(data.qc){codes.qc=data.qc.map(function(c){return Object.assign({pin:''},c);});}if(data.sup){codes.sup=data.sup.map(function(c){return Object.assign({pin:''},c);});}}}catch(e){console.log('Codes load error:',e);}};
+window.loadCodesFromFirebase=async function(){try{var d=await getDoc(doc(db,'settings','codes'));if(d.exists()){var data=d.data();if(data.qc){codes.qc=data.qc.map(function(c){return Object.assign({pin:''},c);});}if(data.sup){codes.sup=data.sup.map(function(c){return Object.assign({pin:''},c);});}if(data.mgt){codes.mgt=data.mgt.map(function(c){return Object.assign({pin:''},c);});}}}catch(e){console.log('Codes load error:',e);}};
 window.saveRequestToFirebase=async function(data){
   try{
     var s=Object.assign({},data);
@@ -316,8 +316,8 @@ window.sendPushToRole=async function(role,title,body,url){
   try{
     if(!window.pushConfigured())return;
     var snap=await getDocs(collection(db,'deviceTokens'));
-    var tokens=[];
-    snap.forEach(function(d){var t=d.data();if(role==='ALL'||t.role===role)tokens.push(d.id);});
+    var tokens=[];var roles=String(role).split(',');
+    snap.forEach(function(d){var t=d.data();if(role==='ALL'||roles.indexOf(t.role)>=0)tokens.push(d.id);});
     if(tokens.length===0)return;
     fetch(PUSH_ENDPOINT,{method:'POST',mode:'no-cors',body:JSON.stringify({tokens:tokens,title:title,body:body,url:url||''})}).catch(function(){});
   }catch(e){console.log('Push send error:',e);}
@@ -770,9 +770,9 @@ window.addEventListener('DOMContentLoaded',function(){
     <!-- Sign-in card -->
     <div id="msgSignIn" style="display:none;background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:20px;margin-top:14px;max-width:420px">
       <div style="font-size:14px;font-weight:700;color:#1a3a5c;margin-bottom:4px">Who are you?</div>
-      <div style="font-size:12px;color:#888;margin-bottom:12px">Enter your QC or SUP code once — messages addressed to you or your role will appear here.</div>
+      <div style="font-size:12px;color:#888;margin-bottom:12px">Enter your QC, SUP or MGT code once — messages addressed to you or your role will appear here.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <input id="msgUserCode" placeholder="e.g. QC-006" maxlength="7" style="width:120px;padding:9px 10px;border:1.5px solid #ccc;border-radius:8px;font-size:14px;text-transform:uppercase">
+        <input id="msgUserCode" placeholder="e.g. QC-006" maxlength="8" style="width:120px;padding:9px 10px;border:1.5px solid #ccc;border-radius:8px;font-size:14px;text-transform:uppercase">
         <input id="msgUserPin" type="password" placeholder="PIN" maxlength="4" style="width:80px;padding:9px 10px;border:1.5px solid #ccc;border-radius:8px;font-size:14px">
         <button onclick="msgSignIn()" style="padding:9px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Sign in</button>
       </div>
@@ -864,6 +864,11 @@ window.addEventListener('DOMContentLoaded',function(){
         <div class="ct"><svg style="font-size:13px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18a1 1 0 001 1h18a1 1 0 001-1v-2a1 1 0 00-1-1H3a1 1 0 00-1 1v2z"/><path d="M10 10V5a2 2 0 114 0v5"/><path d="M4 15v-3a8 8 0 0116 0v3"/></svg> Supervisor codes</div>
         <div style="overflow-x:auto"><table class="code-table" id="supTable"></table></div>
         <div style="padding:8px 14px"><button class="add-btn" onclick="addSlot('sup')"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add SUP slot</button></div>
+      </div>
+      <div class="card">
+        <div class="ct"><svg style="font-size:13px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg> Management codes <span style="font-size:10px;font-weight:400;color:#888">— Messages access &amp; oversight (no sign-off rights)</span></div>
+        <div style="overflow-x:auto"><table class="code-table" id="mgtTable"></table></div>
+        <div style="padding:8px 14px"><button class="add-btn" onclick="addSlot('mgt')"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add MGT slot</button></div>
       </div>
       <div style="padding:8px 0 16px;font-size:11px;color:#888;text-align:center">Deactivated codes cannot sign off new IRNs.</div>
       <button onclick="if(window.saveCodesToFirebase)window.saveCodesToFirebase().then(function(){toast('Codes saved','ok');})" style="width:100%;padding:10px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:8px"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save all names &amp; codes</button>
@@ -1003,6 +1008,12 @@ window.addEventListener('DOMContentLoaded',function(){
 });
 
 var codes={
+  mgt:[
+    {code:'MGT-001',name:'',active:false,pin:''},
+    {code:'MGT-002',name:'',active:false,pin:''},
+    {code:'MGT-003',name:'',active:false,pin:''},
+    {code:'MGT-004',name:'',active:false,pin:''}
+  ],
   qc:[
     {code:'QC-001',name:'Teboho Molete',active:true,pin:''},
     {code:'QC-002',name:'Bongani Sithole',active:true,pin:''},
@@ -1350,8 +1361,10 @@ function lockAdmin(){
   toast('Admin locked — delete buttons hidden','info');
 }
 function renderCodeTables(){
-  ['qc','sup'].forEach(function(role){
-    var list=role==='qc'?codes.qc:codes.sup;
+  ['qc','sup','mgt'].forEach(function(role){
+    if(!codes[role])codes[role]=[];
+    var list=codes[role];
+    if(role==='mgt'&&!document.getElementById('mgtTable'))return;
     var rows='<tr><th>Code</th><th>Name assigned</th><th>PIN (4 digits)</th><th>Status</th><th>Action</th></tr>';
     list.forEach(function(c,i){
       rows+='<tr><td><span class="cbadge '+(c.active&&c.name?'active':'avail')+'">'+c.code+'</span></td>';
@@ -1367,16 +1380,16 @@ function updatePin(el,i){
   var val=el.value.replace(/\D/g,'').slice(0,4);
   el.value=val;
   var role=el.closest('table').id.replace('Table','');
-  if(role==='qc')codes.qc[i].pin=val;else codes.sup[i].pin=val;
+  codes[role][i].pin=val;
 }
 function updateName(el,i){
   var val=el.value;
   var role=el.closest('table').id.replace('Table','');
-  if(role==='qc')codes.qc[i].name=val;else codes.sup[i].name=val;
+  codes[role][i].name=val;
   var row=el.closest('tr');
   var badge=row.querySelector('.cbadge');
   var statusBadge=row.querySelectorAll('.cbadge')[1];
-  var list=role==='qc'?codes.qc:codes.sup;
+  var list=codes[role];
   var c=list[i];
   if(badge){badge.className='cbadge '+(c.active&&val?'active':'avail');}
   if(statusBadge){
@@ -1403,7 +1416,7 @@ function clearAllTestData(){
 function toggleCode(el){
   var role=el.dataset.role;
   var i=parseInt(el.dataset.idx);
-  var list=role==='qc'?codes.qc:codes.sup;
+  var list=codes[role];
   if(!list[i].name){toast('Assign a name first','err');return;}
   list[i].active=!list[i].active;
   renderCodeTables();
@@ -1411,8 +1424,8 @@ function toggleCode(el){
   if(window.saveCodesToFirebase)window.saveCodesToFirebase();
 }
 function addSlot(role){
-  var prefix=role==='qc'?'QC-':'SUP-';
-  var list=role==='qc'?codes.qc:codes.sup;
+  var prefix=role==='qc'?'QC-':role==='mgt'?'MGT-':'SUP-';
+  var list=codes[role];
   list.push({code:prefix+String(list.length+1).padStart(3,'0'),name:'',active:false});
   renderCodeTables();
   if(window.saveCodesToFirebase)window.saveCodesToFirebase();
@@ -2350,7 +2363,7 @@ async function submitIRN(){
     }
     msg+='Reg: https://eric0103360.github.io/fse-irn-system';
     if(window.sendAppMessage)window.sendAppMessage({to:'SUP',from:d.qc||'QC',fromCode:d.qcCode||'',kind:isPass?'release':isHold?'hold':'reject',irq:_irqParam||'',irn:d.reportNo||'',text:msg});
-    if(window.sendPushToRole)window.sendPushToRole('sup',(isPass?'\u2705 RELEASED':isHold?'\uD83D\uDFE0 ON HOLD':'\u274C REJECTED')+' - INS-C '+d.reportNo,d.job+(stageName?' | '+stageName:'')+' | QC: '+(d.qc||''),'');
+    if(window.sendPushToRole)window.sendPushToRole('sup,mgt',(isPass?'\u2705 RELEASED':isHold?'\uD83D\uDFE0 ON HOLD':'\u274C REJECTED')+' - INS-C '+d.reportNo,d.job+(stageName?' | '+stageName:'')+' | QC: '+(d.qc||''),'');
     // Send to Google endpoint in background — don't wait
     fetch(ENDPOINT,{method:'POST',body:JSON.stringify(d),mode:'no-cors'}).catch(function(){});
     renderReg();
@@ -3286,12 +3299,12 @@ if(_printParam&&window.loadIRNsFromFirebase){
 // ===== In-app messaging (replaces WhatsApp) =====
 var msgs=[],msgUser=null,msgUnsub=null,msgFilter='all',msgOpenId=null;
 try{msgUser=JSON.parse(localStorage.getItem('fseMsgUser')||'null');}catch(e){msgUser=null;}
-function msgAudienceMatch(m){if(!msgUser)return false;var t=(m.to||'ALL').toUpperCase();return t==='ALL'||(t==='QC'&&msgUser.role==='qc')||(t==='SUP'&&msgUser.role==='sup')||t===msgUser.code;}
+function msgAudienceMatch(m){if(!msgUser)return false;if(msgUser.role==='mgt')return true;var t=(m.to||'ALL').toUpperCase();return t==='ALL'||(t==='QC'&&msgUser.role==='qc')||(t==='SUP'&&msgUser.role==='sup')||(t==='MGT'&&msgUser.role==='mgt')||t===msgUser.code;}
 function msgIsUnread(m){return msgUser&&msgAudienceMatch(m)&&m.fromCode!==msgUser.code&&(!m.readBy||m.readBy.indexOf(msgUser.code)<0);}
 function startMsgListener(){if(msgUnsub||!window.loadMessagesFromFirebase)return;msgUnsub=window.loadMessagesFromFirebase(function(r){var prevUnread=msgs.filter(msgIsUnread).length;msgs=r;updateMsgBadge();var el=document.getElementById('v-messages');if(el&&el.classList.contains('on'))renderMsgs();var nowUnread=msgs.filter(msgIsUnread).length;if(msgUser&&nowUnread>prevUnread&&prevUnread>=0&&msgs.length&&window._msgListenerWarm){toast('New message received','info');}window._msgListenerWarm=true;});}
 function updateMsgBadge(){var b=document.getElementById('msgBadge');if(!b)return;var n=msgUser?msgs.filter(msgIsUnread).length:0;b.textContent=n>99?'99+':n;b.style.display=n>0?'inline-block':'none';try{if(navigator.setAppBadge){if(n>0)navigator.setAppBadge(n);else if(navigator.clearAppBadge)navigator.clearAppBadge();}}catch(e){}}
 function initMessagesView(){var si=document.getElementById('msgSignIn'),ib=document.getElementById('msgInbox');if(!msgUser){si.style.display='block';ib.style.display='none';return;}si.style.display='none';ib.style.display='block';document.getElementById('msgWhoAmI').textContent=msgUser.name+' ('+msgUser.code+')';var pb=document.getElementById('msgPushBtn');if(pb){var en=false;try{en=localStorage.getItem('fsePushEnabled')==='1'&&Notification.permission==='granted';}catch(e){}if(en)pb.innerHTML='\u2713 Notifications on';}startMsgListener();renderMsgs();}
-function msgSignIn(){var code=document.getElementById('msgUserCode').value.trim().toUpperCase();var pin=document.getElementById('msgUserPin').value.trim();var st=document.getElementById('msgSignInStatus');var list=code.indexOf('QC')===0?codes.qc:code.indexOf('SUP')===0?codes.sup:null;if(!list){st.innerHTML='<span style="color:#A32D2D">Enter a valid QC-xxx or SUP-xxx code</span>';return;}var match=null;for(var i=0;i<list.length;i++){if(list[i].code===code&&list[i].active&&list[i].name){match=list[i];break;}}if(!match){st.innerHTML='<span style="color:#A32D2D">Code not recognised</span>';return;}if(match.pin&&match.pin.length===4&&match.pin!==pin){st.innerHTML='<span style="color:#A32D2D">Incorrect PIN</span>';return;}msgUser={code:match.code,name:match.name,role:code.indexOf('QC')===0?'qc':'sup'};try{localStorage.setItem('fseMsgUser',JSON.stringify(msgUser));}catch(e){}st.innerHTML='';document.getElementById('msgUserPin').value='';initMessagesView();updateMsgBadge();toast('Signed in as '+msgUser.name,'ok');}
+function msgSignIn(){var code=document.getElementById('msgUserCode').value.trim().toUpperCase();var pin=document.getElementById('msgUserPin').value.trim();var st=document.getElementById('msgSignInStatus');var list=code.indexOf('QC')===0?codes.qc:code.indexOf('SUP')===0?codes.sup:code.indexOf('MGT')===0?codes.mgt:null;if(!list){st.innerHTML='<span style="color:#A32D2D">Enter a valid QC-xxx, SUP-xxx or MGT-xxx code</span>';return;}var match=null;for(var i=0;i<list.length;i++){if(list[i].code===code&&list[i].active&&list[i].name){match=list[i];break;}}if(!match){st.innerHTML='<span style="color:#A32D2D">Code not recognised</span>';return;}if(match.pin&&match.pin.length===4&&match.pin!==pin){st.innerHTML='<span style="color:#A32D2D">Incorrect PIN</span>';return;}msgUser={code:match.code,name:match.name,role:code.indexOf('QC')===0?'qc':code.indexOf('MGT')===0?'mgt':'sup'};try{localStorage.setItem('fseMsgUser',JSON.stringify(msgUser));}catch(e){}st.innerHTML='';document.getElementById('msgUserPin').value='';initMessagesView();updateMsgBadge();toast('Signed in as '+msgUser.name,'ok');}
 async function enablePushClicked(){
   if(!msgUser){toast('Sign in first','err');return;}
   var btn=document.getElementById('msgPushBtn');
@@ -3307,12 +3320,12 @@ function escMsg(t){return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;
 function fmtMsgText(t){var h=escMsg(t);h=h.replace(/\*([^*\n]+)\*/g,'<b>$1</b>');h=h.replace(/(https?:\/\/[^\s]+)/g,function(u){return '<a href="'+u+'" style="color:#185FA5;word-break:break-all">'+u+'</a>';});return h.replace(/\n/g,'<br>');}
 function msgTimeLabel(ts){try{var d=new Date(ts);var now=new Date();var opts={hour:'2-digit',minute:'2-digit'};if(d.toDateString()===now.toDateString())return 'Today '+d.toLocaleTimeString('en-ZA',opts);return d.toLocaleDateString('en-ZA')+' '+d.toLocaleTimeString('en-ZA',opts);}catch(e){return '';}}
 function msgKindChip(m){var k=(m.kind||'').toLowerCase();var map={request:['#E6F1FB','#185FA5','REQUEST'],release:['#E7F4EC','#1F7A45','RELEASED'],hold:['#FAEEDA','#8A5A10','HOLD'],reject:['#FCEBEB','#A32D2D','REJECTED'],photo:['#F0F0F0','#555','PHOTOS']};if(!map[k])return '';var c=map[k];return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:'+c[0]+';color:'+c[1]+';letter-spacing:0.5px">'+c[2]+'</span>';}
-function renderMsgs(){var el=document.getElementById('msgList');if(!el||!msgUser)return;var mine=msgs.filter(function(m){return msgAudienceMatch(m)||m.fromCode===msgUser.code;});if(msgFilter==='unread')mine=mine.filter(msgIsUnread);if(mine.length===0){el.innerHTML='<div style="padding:32px;text-align:center;color:#999;font-size:13px">'+(msgFilter==='unread'?'No unread messages':'No messages yet - raise a request or send one with New message')+'</div>';return;}var html='';mine.slice(0,150).forEach(function(m){var unread=msgIsUnread(m);var open=msgOpenId===m.firebaseId;var toLbl=(m.to||'ALL').toUpperCase();toLbl=toLbl==='ALL'?'Everyone':toLbl==='QC'?'All QC':toLbl==='SUP'?'All Supervisors':toLbl;html+='<div onclick="openMsg(\''+m.firebaseId+'\')" style="padding:12px 14px;border-bottom:1px solid #eee;cursor:pointer;position:relative;'+(unread?'background:#FDF8EC;':'')+'">';if(unread)html+='<div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:#185FA5"></div>';html+='<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><span style="font-weight:700;font-size:13px;color:#1a3a5c">'+escMsg(m.from||'--')+(m.fromCode?' ('+escMsg(m.fromCode)+')':'')+'</span><span style="font-size:11px;color:#999">&rarr; '+escMsg(toLbl)+'</span><span style="margin-left:auto;font-size:11px;color:#999">'+msgTimeLabel(m.timestamp)+'</span></div>';html+='<div style="font-size:13px;color:#333;margin-top:4px;'+(open?'':'max-height:38px;overflow:hidden;')+(unread?'font-weight:600;':'')+'">'+fmtMsgText(m.text)+'</div>';if(m.photoUrl){html+='<div style="margin-top:6px"><img src="'+escMsg(m.photoUrl)+'" onclick="event.stopPropagation();window.open(this.src)" style="'+(open?'max-width:100%;max-height:280px;':'width:96px;height:72px;object-fit:cover;')+'border-radius:8px;border:1px solid #ddd;cursor:pointer"></div>';}var chips='';if(m.irq)chips+='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:#EEF3F8;color:#1a3a5c">IRQ-'+escMsg(m.irq)+'</span> ';if(m.irn)chips+='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:#EEF3F8;color:#1a3a5c">INS-C '+escMsg(m.irn)+'</span> ';chips+=msgKindChip(m);if(chips)html+='<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+chips+'</div>';if(open&&m.irq)html+='<div style="margin-top:8px"><a href="'+location.pathname+'?irq='+encodeURIComponent(m.irq)+'" onclick="event.stopPropagation()" style="display:inline-block;padding:7px 14px;background:#1a3a5c;color:#fff;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none">Open job &rarr;</a></div>';html+='</div>';});el.innerHTML=html;}
+function renderMsgs(){var el=document.getElementById('msgList');if(!el||!msgUser)return;var mine=msgs.filter(function(m){return msgAudienceMatch(m)||m.fromCode===msgUser.code;});if(msgFilter==='unread')mine=mine.filter(msgIsUnread);if(mine.length===0){el.innerHTML='<div style="padding:32px;text-align:center;color:#999;font-size:13px">'+(msgFilter==='unread'?'No unread messages':'No messages yet - raise a request or send one with New message')+'</div>';return;}var html='';mine.slice(0,150).forEach(function(m){var unread=msgIsUnread(m);var open=msgOpenId===m.firebaseId;var toLbl=(m.to||'ALL').toUpperCase();toLbl=toLbl==='ALL'?'Everyone':toLbl==='QC'?'All QC':toLbl==='SUP'?'All Supervisors':toLbl==='MGT'?'All Management':toLbl;html+='<div onclick="openMsg(\''+m.firebaseId+'\')" style="padding:12px 14px;border-bottom:1px solid #eee;cursor:pointer;position:relative;'+(unread?'background:#FDF8EC;':'')+'">';if(unread)html+='<div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:#185FA5"></div>';html+='<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><span style="font-weight:700;font-size:13px;color:#1a3a5c">'+escMsg(m.from||'--')+(m.fromCode?' ('+escMsg(m.fromCode)+')':'')+'</span><span style="font-size:11px;color:#999">&rarr; '+escMsg(toLbl)+'</span><span style="margin-left:auto;font-size:11px;color:#999">'+msgTimeLabel(m.timestamp)+'</span></div>';html+='<div style="font-size:13px;color:#333;margin-top:4px;'+(open?'':'max-height:38px;overflow:hidden;')+(unread?'font-weight:600;':'')+'">'+fmtMsgText(m.text)+'</div>';if(m.photoUrl){html+='<div style="margin-top:6px"><img src="'+escMsg(m.photoUrl)+'" onclick="event.stopPropagation();window.open(this.src)" style="'+(open?'max-width:100%;max-height:280px;':'width:96px;height:72px;object-fit:cover;')+'border-radius:8px;border:1px solid #ddd;cursor:pointer"></div>';}var chips='';if(m.irq)chips+='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:#EEF3F8;color:#1a3a5c">IRQ-'+escMsg(m.irq)+'</span> ';if(m.irn)chips+='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:#EEF3F8;color:#1a3a5c">INS-C '+escMsg(m.irn)+'</span> ';chips+=msgKindChip(m);if(chips)html+='<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+chips+'</div>';if(open&&m.irq)html+='<div style="margin-top:8px"><a href="'+location.pathname+'?irq='+encodeURIComponent(m.irq)+'" onclick="event.stopPropagation()" style="display:inline-block;padding:7px 14px;background:#1a3a5c;color:#fff;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none">Open job &rarr;</a></div>';html+='</div>';});el.innerHTML=html;}
 function openMsg(fid){msgOpenId=msgOpenId===fid?null:fid;var m=msgs.find(function(x){return x.firebaseId===fid;});if(m&&msgUser&&msgIsUnread(m)&&window.markMessageRead){window.markMessageRead(fid,msgUser.code);if(!m.readBy)m.readBy=[];m.readBy.push(msgUser.code);updateMsgBadge();}renderMsgs();}
 var msgPhotoData=null;
 function msgPhotoPicked(inp){var f=inp.files&&inp.files[0];if(!f)return;compressImage(f,function(dataUrl){msgPhotoData=dataUrl;document.getElementById('msgPhotoThumb').src=dataUrl;document.getElementById('msgPhotoPreview').style.display='block';});inp.value='';}
 function msgPhotoClear(){msgPhotoData=null;document.getElementById('msgPhotoPreview').style.display='none';}
-function openMsgCompose(){var sel=document.getElementById('msgComposeTo');var opts='<option value="ALL">Everyone</option><option value="QC">All QC</option><option value="SUP">All Supervisors</option>';codes.qc.forEach(function(c){if(c.active&&c.name)opts+='<option value="'+c.code+'">'+escMsg(c.name)+' ('+c.code+')</option>';});codes.sup.forEach(function(c){if(c.active&&c.name)opts+='<option value="'+c.code+'">'+escMsg(c.name)+' ('+c.code+')</option>';});sel.innerHTML=opts;document.getElementById('msgComposeOverlay').style.display='flex';}
+function openMsgCompose(){var sel=document.getElementById('msgComposeTo');var opts='<option value="ALL">Everyone</option><option value="QC">All QC</option><option value="SUP">All Supervisors</option><option value="MGT">All Management</option>';[codes.qc,codes.sup,codes.mgt||[]].forEach(function(lst){lst.forEach(function(c){if(c.active&&c.name)opts+='<option value="'+c.code+'">'+escMsg(c.name)+' ('+c.code+')</option>';});});sel.innerHTML=opts;document.getElementById('msgComposeOverlay').style.display='flex';}
 function closeMsgCompose(){document.getElementById('msgComposeOverlay').style.display='none';}
 async function sendComposedMsg(){if(!msgUser){toast('Sign in first','err');return;}var to=document.getElementById('msgComposeTo').value;var irq=document.getElementById('msgComposeIrq').value.trim();var text=document.getElementById('msgComposeText').value.trim();if(!text&&!msgPhotoData){toast('Type a message or attach a photo','err');return;}var photoUrl='';if(msgPhotoData){toast('Uploading photo\u2026','info');try{var urls=await window.uploadPhotosToStorage([msgPhotoData],'msg_photos/'+Date.now());if(urls&&urls[0])photoUrl=urls[0];}catch(e){toast('Photo upload failed - sending without it','err');}}var ok=await window.sendAppMessage({to:to,from:msgUser.name,fromCode:msgUser.code,text:text,irq:irq||'',kind:'general',photoUrl:photoUrl});if(ok){toast('Message sent','ok');document.getElementById('msgComposeText').value='';document.getElementById('msgComposeIrq').value='';msgPhotoClear();closeMsgCompose();}else{toast('Send failed - check connection','err');}}
 // ===== end in-app messaging =====
