@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>FSE Inspection Release Note</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#1a3a5c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="FSE eIRN">
+<link rel="apple-touch-icon" href="./icon-192.png">
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -159,6 +166,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 import{initializeApp}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
 import{getFirestore,doc,getDoc,getDocs,addDoc,updateDoc,setDoc,deleteDoc,collection,query,orderBy,onSnapshot,runTransaction,arrayUnion}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
 import{getStorage,ref,uploadString,getDownloadURL,deleteObject}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js';
+import{getMessaging,getToken,isSupported}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-messaging.js';
 const app=initializeApp({apiKey:"AIzaSyC3sKMm02GnikBdgXPd4RUm7RxnsR90A_I",authDomain:"fse-irn-system.firebaseapp.com",projectId:"fse-irn-system",storageBucket:"fse-irn-system.firebasestorage.app",messagingSenderId:"1097944808267",appId:"1:1097944808267:web:d8f1f3a52e2223253f86ce"});
 const db=getFirestore(app);
 const storage=getStorage(app);
@@ -284,6 +292,37 @@ window.updateIRNInFirebase=async function(firebaseId,data){
 window.sendAppMessage=async function(m){try{m.timestamp=new Date().toISOString();if(!m.readBy)m.readBy=m.fromCode?[m.fromCode]:[];await addDoc(collection(db,'messages'),m);return true;}catch(e){console.log('Message send error:',e);return false;}};
 window.loadMessagesFromFirebase=function(cb){try{var q=query(collection(db,'messages'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);});}catch(e){cb([]);return null;}};
 window.markMessageRead=async function(firebaseId,code){try{await updateDoc(doc(db,'messages',firebaseId),{readBy:arrayUnion(code)});return true;}catch(e){return false;}};
+// ===== Push notifications (FCM) =====
+// STEP 1: paste your Web Push certificate key (Firebase Console > Project settings > Cloud Messaging > Web Push certificates > Generate key pair)
+const PUSH_VAPID_KEY='BJnCAV8S4387AlAVAEuVfG-bIYW_UMqtxTtNxcfS0mEO0U9fklAYpaZ_HRb-SNvnTDVNY84Rc_G_XgrX1FBOqOU';
+// STEP 2: paste your Apps Script push sender URL (deploy the Code.gs I supplied as a Web App, access: Anyone)
+const PUSH_ENDPOINT='https://script.google.com/macros/s/AKfycbw-IWRJbqLq9ID-1SUL1frbW34tsG4aWCOtuTtPtg_rUjKwSsTOZKbNMnAT2DMYQBM/exec';
+window.pushConfigured=function(){return PUSH_VAPID_KEY.indexOf('PASTE_')!==0&&PUSH_ENDPOINT.indexOf('PASTE_')!==0;};
+window.enablePushNotifications=async function(code,role){
+  try{
+    if(!window.pushConfigured()){return{ok:false,msg:'Push not configured yet'};}
+    if(!(await isSupported())){return{ok:false,msg:'Notifications not supported on this browser'};}
+    var perm=await Notification.requestPermission();
+    if(perm!=='granted'){return{ok:false,msg:'Permission not granted - allow notifications in browser settings'};}
+    var swReg=await navigator.serviceWorker.register('./firebase-messaging-sw.js',{scope:'./'});
+    var messaging=getMessaging(app);
+    var token=await getToken(messaging,{vapidKey:PUSH_VAPID_KEY,serviceWorkerRegistration:swReg});
+    if(!token){return{ok:false,msg:'Could not get a device token'};}
+    await setDoc(doc(db,'deviceTokens',token),{code:code,role:role,updated:new Date().toISOString()});
+    return{ok:true,msg:'Notifications enabled on this device'};
+  }catch(e){console.log('Push enable error:',e);return{ok:false,msg:'Error: '+(e&&e.message||e)};}
+};
+window.sendPushToRole=async function(role,title,body,url){
+  try{
+    if(!window.pushConfigured())return;
+    var snap=await getDocs(collection(db,'deviceTokens'));
+    var tokens=[];
+    snap.forEach(function(d){var t=d.data();if(role==='ALL'||t.role===role)tokens.push(d.id);});
+    if(tokens.length===0)return;
+    fetch(PUSH_ENDPOINT,{method:'POST',mode:'no-cors',body:JSON.stringify({tokens:tokens,title:title,body:body,url:url||''})}).catch(function(){});
+  }catch(e){console.log('Push send error:',e);}
+};
+// ===== end push =====
 window.loadIRNsFromFirebase=function(cb){try{var q=query(collection(db,'irns'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);});}catch(e){cb([]);}};
 window.addEventListener('DOMContentLoaded',function(){
   var el=document.getElementById('reportNo');
@@ -747,6 +786,7 @@ window.addEventListener('DOMContentLoaded',function(){
         <div style="flex:1"></div>
         <span id="msgWhoAmI" style="font-size:12px;color:#888"></span>
         <button onclick="msgSignOut()" style="padding:5px 10px;border:1px solid #ccc;background:#fff;border-radius:8px;font-size:11px;color:#888;cursor:pointer">Switch user</button>
+        <button id="msgPushBtn" onclick="enablePushClicked()" style="padding:8px 12px;border:1px solid #185FA5;background:#E6F1FB;color:#185FA5;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">&#128276; Enable notifications</button>
         <button onclick="openMsgCompose()" style="padding:8px 16px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">&#9993; New message</button>
       </div>
       <div id="msgList" style="background:#fff;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden"></div>
@@ -1735,6 +1775,7 @@ async function submitRequest(){
   }
   toast('Request IRQ-'+d.reqNo+' sent to QC','ok');
   if(window.sendAppMessage)window.sendAppMessage({to:'QC',from:d.supervisor||'Supervisor',fromCode:d.supCode||'',kind:'request',irq:d.reqNo,text:msg});
+  if(window.sendPushToRole)window.sendPushToRole('qc',(d.urgency==='urgent'?'\u26A1 URGENT - ':'')+'New inspection request IRQ-'+d.reqNo,d.job+(d.client?' | '+d.client:'')+' - '+(d.inspTypes||''),liveLink);
   if(cb)cb.checked=false;
   // Reset IRQ number for next request
   var reqNoEl=document.getElementById('reqNo');
@@ -1900,6 +1941,7 @@ async function submitQuickRequest(){
   msg+='👉 https://eric0103360.github.io/fse-irn-system?irq='+encodeURIComponent(reqNo);
   toast('Quick request IRQ-'+reqNo+' sent to QC','ok');
   if(window.sendAppMessage)window.sendAppMessage({to:'QC',from:qrSupName||'Supervisor',fromCode:document.getElementById('qrSupCode').value.toUpperCase(),kind:'request',irq:reqNo,text:msg});
+  if(window.sendPushToRole)window.sendPushToRole('qc',(qrUrgency==='urgent'?'\u26A1 URGENT - ':'')+'New inspection request IRQ-'+reqNo,job+(client?' | '+client:''),'https://eric0103360.github.io/fse-irn-system?irq='+encodeURIComponent(reqNo));
   // Reset
   document.getElementById('qrJob').value='';
   document.getElementById('qrClient').value='';
@@ -2300,6 +2342,7 @@ async function submitIRN(){
     }
     msg+='Reg: https://eric0103360.github.io/fse-irn-system';
     if(window.sendAppMessage)window.sendAppMessage({to:'SUP',from:d.qc||'QC',fromCode:d.qcCode||'',kind:isPass?'release':isHold?'hold':'reject',irq:_irqParam||'',irn:d.reportNo||'',text:msg});
+    if(window.sendPushToRole)window.sendPushToRole('sup',(isPass?'\u2705 RELEASED':isHold?'\uD83D\uDFE0 ON HOLD':'\u274C REJECTED')+' - INS-C '+d.reportNo,d.job+(stageName?' | '+stageName:'')+' | QC: '+(d.qc||''),'');
     // Send to Google endpoint in background — don't wait
     fetch(ENDPOINT,{method:'POST',body:JSON.stringify(d),mode:'no-cors'}).catch(function(){});
     renderReg();
@@ -3233,9 +3276,18 @@ try{msgUser=JSON.parse(localStorage.getItem('fseMsgUser')||'null');}catch(e){msg
 function msgAudienceMatch(m){if(!msgUser)return false;var t=(m.to||'ALL').toUpperCase();return t==='ALL'||(t==='QC'&&msgUser.role==='qc')||(t==='SUP'&&msgUser.role==='sup')||t===msgUser.code;}
 function msgIsUnread(m){return msgUser&&msgAudienceMatch(m)&&m.fromCode!==msgUser.code&&(!m.readBy||m.readBy.indexOf(msgUser.code)<0);}
 function startMsgListener(){if(msgUnsub||!window.loadMessagesFromFirebase)return;msgUnsub=window.loadMessagesFromFirebase(function(r){var prevUnread=msgs.filter(msgIsUnread).length;msgs=r;updateMsgBadge();var el=document.getElementById('v-messages');if(el&&el.classList.contains('on'))renderMsgs();var nowUnread=msgs.filter(msgIsUnread).length;if(msgUser&&nowUnread>prevUnread&&prevUnread>=0&&msgs.length&&window._msgListenerWarm){toast('New message received','info');}window._msgListenerWarm=true;});}
-function updateMsgBadge(){var b=document.getElementById('msgBadge');if(!b)return;var n=msgUser?msgs.filter(msgIsUnread).length:0;b.textContent=n>99?'99+':n;b.style.display=n>0?'inline-block':'none';}
-function initMessagesView(){var si=document.getElementById('msgSignIn'),ib=document.getElementById('msgInbox');if(!msgUser){si.style.display='block';ib.style.display='none';return;}si.style.display='none';ib.style.display='block';document.getElementById('msgWhoAmI').textContent=msgUser.name+' ('+msgUser.code+')';startMsgListener();renderMsgs();}
+function updateMsgBadge(){var b=document.getElementById('msgBadge');if(!b)return;var n=msgUser?msgs.filter(msgIsUnread).length:0;b.textContent=n>99?'99+':n;b.style.display=n>0?'inline-block':'none';try{if(navigator.setAppBadge){if(n>0)navigator.setAppBadge(n);else if(navigator.clearAppBadge)navigator.clearAppBadge();}}catch(e){}}
+function initMessagesView(){var si=document.getElementById('msgSignIn'),ib=document.getElementById('msgInbox');if(!msgUser){si.style.display='block';ib.style.display='none';return;}si.style.display='none';ib.style.display='block';document.getElementById('msgWhoAmI').textContent=msgUser.name+' ('+msgUser.code+')';var pb=document.getElementById('msgPushBtn');if(pb){var en=false;try{en=localStorage.getItem('fsePushEnabled')==='1'&&Notification.permission==='granted';}catch(e){}if(en)pb.innerHTML='\u2713 Notifications on';}startMsgListener();renderMsgs();}
 function msgSignIn(){var code=document.getElementById('msgUserCode').value.trim().toUpperCase();var pin=document.getElementById('msgUserPin').value.trim();var st=document.getElementById('msgSignInStatus');var list=code.indexOf('QC')===0?codes.qc:code.indexOf('SUP')===0?codes.sup:null;if(!list){st.innerHTML='<span style="color:#A32D2D">Enter a valid QC-xxx or SUP-xxx code</span>';return;}var match=null;for(var i=0;i<list.length;i++){if(list[i].code===code&&list[i].active&&list[i].name){match=list[i];break;}}if(!match){st.innerHTML='<span style="color:#A32D2D">Code not recognised</span>';return;}if(match.pin&&match.pin.length===4&&match.pin!==pin){st.innerHTML='<span style="color:#A32D2D">Incorrect PIN</span>';return;}msgUser={code:match.code,name:match.name,role:code.indexOf('QC')===0?'qc':'sup'};try{localStorage.setItem('fseMsgUser',JSON.stringify(msgUser));}catch(e){}st.innerHTML='';document.getElementById('msgUserPin').value='';initMessagesView();updateMsgBadge();toast('Signed in as '+msgUser.name,'ok');}
+async function enablePushClicked(){
+  if(!msgUser){toast('Sign in first','err');return;}
+  var btn=document.getElementById('msgPushBtn');
+  if(btn){btn.disabled=true;btn.textContent='Enabling\u2026';}
+  var r=await window.enablePushNotifications(msgUser.code,msgUser.role);
+  toast(r.msg,r.ok?'ok':'err');
+  if(btn){btn.disabled=false;btn.innerHTML=r.ok?'\u2713 Notifications on':'\uD83D\uDD14 Enable notifications';}
+  if(r.ok){try{localStorage.setItem('fsePushEnabled','1');}catch(e){}}
+}
 function msgSignOut(){msgUser=null;try{localStorage.removeItem('fseMsgUser');}catch(e){}updateMsgBadge();initMessagesView();}
 function setMsgFilter(f){msgFilter=f;var a=document.getElementById('msgTabAll'),u=document.getElementById('msgTabUnread');if(a&&u){a.style.background=f==='all'?'#1a3a5c':'#fff';a.style.color=f==='all'?'#fff':'#555';u.style.background=f==='unread'?'#1a3a5c':'#fff';u.style.color=f==='unread'?'#fff':'#555';}renderMsgs();}
 function escMsg(t){return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
