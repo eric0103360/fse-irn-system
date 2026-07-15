@@ -785,7 +785,7 @@ window.addEventListener('DOMContentLoaded',function(){
         <button id="msgTabUnread" onclick="setMsgFilter('unread')" style="padding:6px 14px;border-radius:16px;border:1px solid #ccc;background:#fff;color:#555;font-size:12px;cursor:pointer">Unread</button>
         <div style="flex:1"></div>
         <span id="msgWhoAmI" style="font-size:12px;color:#888"></span>
-        <button onclick="msgSignOut()" style="padding:5px 10px;border:1px solid #ccc;background:#fff;border-radius:8px;font-size:11px;color:#888;cursor:pointer">Switch user</button>
+        <button onclick="msgSignOut();toast('Logged out of Messages','ok')" style="padding:5px 10px;border:1px solid #A32D2D;background:#fff;border-radius:8px;font-size:11px;color:#A32D2D;font-weight:600;cursor:pointer">Log out</button>
         <button id="msgPushBtn" onclick="enablePushClicked()" style="padding:8px 12px;border:1px solid #185FA5;background:#E6F1FB;color:#185FA5;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">&#128276; Enable notifications</button>
         <button onclick="openMsgCompose()" style="padding:8px 16px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">&#9993; New message</button>
       </div>
@@ -1781,11 +1781,14 @@ function getRequestData(){
   };
 }
 async function submitRequest(){
+  var _b=document.getElementById('reqSubmitBtn');
+  if(_b&&_b.dataset.busy==='1')return;
   var d=getRequestData();
   if(!d.job){toast('Enter order/job number','err');return;}
   if(reqItems.filter(function(i){return i.desc;}).length===0){toast('Add at least one item','err');return;}
   if(selectedInspTypes.length===0){toast('Select at least one inspection type','err');return;}
   if(!reqSupValidated){toast('Supervisor code required','err');return;}
+  if(_b){_b.dataset.busy='1';_b.disabled=true;var _t=_b.innerHTML;_b.innerHTML='Sending request&hellip;';}
   // Always get a fresh IRQ number — never reuse
   d.reqNo=await window.getNextIRQ();
   document.getElementById('reqNo').value=d.reqNo;
@@ -1807,6 +1810,7 @@ async function submitRequest(){
   var _mp=window.sendAppMessage?window.sendAppMessage({to:'QC',from:d.supervisor||'Supervisor',fromCode:d.supCode||'',kind:'request',irq:d.reqNo,text:msg}):Promise.resolve('');
   if(window.sendPushToRole)Promise.resolve(_mp).then(function(mid){window.sendPushToRole('qc',(d.urgency==='urgent'?'\u26A1 URGENT - ':'')+'New inspection request IRQ-'+d.reqNo,d.job+(d.client?' | '+d.client:'')+' - '+(d.inspTypes||''),liveLink,d.urgency==='urgent'?{repeat:3,intervalSec:25,msgId:(typeof mid==='string'?mid:''),senderCode:d.supCode||''}:null);});
   if(cb)cb.checked=false;
+  if(_b){_b.innerHTML='\u2713 Request sent';_b.style.background='#1F7A45';setTimeout(function(){_b.dataset.busy='';_b.disabled=false;_b.style.background='';_b.innerHTML=_t;},2500);}
   // Reset IRQ number for next request
   var reqNoEl=document.getElementById('reqNo');
   if(reqNoEl){reqNoEl.value='';reqNoEl.style.color='rgba(255,255,255,0.6)';}
@@ -1950,11 +1954,14 @@ function validateQRSup(){
   }
 }
 async function submitQuickRequest(){
+  var _qb=document.getElementById('qrSubmitBtn');
+  if(_qb&&_qb.dataset.busy==='1')return;
   var job=document.getElementById('qrJob').value.trim();
   var client=document.getElementById('qrClient').value.trim();
   if(!job){toast('Enter job number','err');return;}
   if(!qrSelectedType){toast('Select inspection type','err');return;}
   if(!qrSupValidated){toast('SUP code required','err');return;}
+  if(_qb){_qb.dataset.busy='1';_qb.disabled=true;var _qt=_qb.innerHTML;_qb.innerHTML='Sending request&hellip;';}
   var reqNo=await window.getNextIRQ();
   var d={
     reqNo:reqNo,job:job,client:client,
@@ -1972,6 +1979,7 @@ async function submitQuickRequest(){
   msg+='SUP: '+qrSupName+'\n';
   msg+='👉 https://eric0103360.github.io/fse-irn-system?irq='+encodeURIComponent(reqNo);
   toast('Quick request IRQ-'+reqNo+' sent to QC','ok');
+  if(_qb){_qb.innerHTML='\u2713 Request sent';setTimeout(function(){_qb.dataset.busy='';_qb.disabled=false;_qb.innerHTML=_qt;},2500);}
   var _qc=document.getElementById('qrSupCode').value.toUpperCase();
   var _mp=window.sendAppMessage?window.sendAppMessage({to:'QC',from:qrSupName||'Supervisor',fromCode:_qc,kind:'request',irq:reqNo,text:msg}):Promise.resolve('');
   if(window.sendPushToRole)Promise.resolve(_mp).then(function(mid){window.sendPushToRole('qc',(qrUrgency==='urgent'?'\u26A1 URGENT - ':'')+'New inspection request IRQ-'+reqNo,job+(client?' | '+client:''),'https://eric0103360.github.io/fse-irn-system?irq='+encodeURIComponent(reqNo),qrUrgency==='urgent'?{repeat:3,intervalSec:25,msgId:(typeof mid==='string'?mid:''),senderCode:_qc}:null);});
