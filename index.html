@@ -289,7 +289,7 @@ window.updateIRNInFirebase=async function(firebaseId,data){
     return true;
   }catch(e){console.error('IRN update error:',e);return false;}
 };
-window.sendAppMessage=async function(m){try{m.timestamp=new Date().toISOString();if(!m.readBy)m.readBy=m.fromCode?[m.fromCode]:[];await addDoc(collection(db,'messages'),m);return true;}catch(e){console.log('Message send error:',e);return false;}};
+window.sendAppMessage=async function(m){try{m.timestamp=new Date().toISOString();if(!m.readBy)m.readBy=m.fromCode?[m.fromCode]:[];var ref=await addDoc(collection(db,'messages'),m);return ref.id;}catch(e){console.log('Message send error:',e);return false;}};
 window.loadMessagesFromFirebase=function(cb){try{var q=query(collection(db,'messages'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);});}catch(e){cb([]);return null;}};
 window.markMessageRead=async function(firebaseId,code){try{await updateDoc(doc(db,'messages',firebaseId),{readBy:arrayUnion(code)});return true;}catch(e){return false;}};
 // ===== Push notifications (FCM) =====
@@ -312,14 +312,14 @@ window.enablePushNotifications=async function(code,role){
     return{ok:true,msg:'Notifications enabled on this device'};
   }catch(e){console.log('Push enable error:',e);return{ok:false,msg:'Error: '+(e&&e.message||e)};}
 };
-window.sendPushToRole=async function(role,title,body,url){
+window.sendPushToRole=async function(role,title,body,url,opts){
   try{
     if(!window.pushConfigured())return;
     var snap=await getDocs(collection(db,'deviceTokens'));
     var tokens=[];var roles=String(role).split(',');
     snap.forEach(function(d){var t=d.data();if(role==='ALL'||roles.indexOf(t.role)>=0)tokens.push(d.id);});
     if(tokens.length===0)return;
-    fetch(PUSH_ENDPOINT,{method:'POST',mode:'no-cors',body:JSON.stringify({tokens:tokens,title:title,body:body,url:url||''})}).catch(function(){});
+    fetch(PUSH_ENDPOINT,{method:'POST',mode:'no-cors',body:JSON.stringify({tokens:tokens,title:title,body:body,url:url||'',repeat:(opts&&opts.repeat)||1,intervalSec:(opts&&opts.intervalSec)||25,msgId:(opts&&opts.msgId)||'',senderCode:(opts&&opts.senderCode)||''})}).catch(function(){});
   }catch(e){console.log('Push send error:',e);}
 };
 // ===== end push =====
@@ -1795,8 +1795,8 @@ async function submitRequest(){
     await window.saveRequestToFirebase(d);
   }
   toast('Request IRQ-'+d.reqNo+' sent to QC','ok');
-  if(window.sendAppMessage)window.sendAppMessage({to:'QC',from:d.supervisor||'Supervisor',fromCode:d.supCode||'',kind:'request',irq:d.reqNo,text:msg});
-  if(window.sendPushToRole)window.sendPushToRole('qc',(d.urgency==='urgent'?'\u26A1 URGENT - ':'')+'New inspection request IRQ-'+d.reqNo,d.job+(d.client?' | '+d.client:'')+' - '+(d.inspTypes||''),liveLink);
+  var _mp=window.sendAppMessage?window.sendAppMessage({to:'QC',from:d.supervisor||'Supervisor',fromCode:d.supCode||'',kind:'request',irq:d.reqNo,text:msg}):Promise.resolve('');
+  if(window.sendPushToRole)Promise.resolve(_mp).then(function(mid){window.sendPushToRole('qc',(d.urgency==='urgent'?'\u26A1 URGENT - ':'')+'New inspection request IRQ-'+d.reqNo,d.job+(d.client?' | '+d.client:'')+' - '+(d.inspTypes||''),liveLink,d.urgency==='urgent'?{repeat:3,intervalSec:25,msgId:(typeof mid==='string'?mid:''),senderCode:d.supCode||''}:null);});
   if(cb)cb.checked=false;
   // Reset IRQ number for next request
   var reqNoEl=document.getElementById('reqNo');
@@ -1963,8 +1963,9 @@ async function submitQuickRequest(){
   msg+='SUP: '+qrSupName+'\n';
   msg+='👉 https://eric0103360.github.io/fse-irn-system?irq='+encodeURIComponent(reqNo);
   toast('Quick request IRQ-'+reqNo+' sent to QC','ok');
-  if(window.sendAppMessage)window.sendAppMessage({to:'QC',from:qrSupName||'Supervisor',fromCode:document.getElementById('qrSupCode').value.toUpperCase(),kind:'request',irq:reqNo,text:msg});
-  if(window.sendPushToRole)window.sendPushToRole('qc',(qrUrgency==='urgent'?'\u26A1 URGENT - ':'')+'New inspection request IRQ-'+reqNo,job+(client?' | '+client:''),'https://eric0103360.github.io/fse-irn-system?irq='+encodeURIComponent(reqNo));
+  var _qc=document.getElementById('qrSupCode').value.toUpperCase();
+  var _mp=window.sendAppMessage?window.sendAppMessage({to:'QC',from:qrSupName||'Supervisor',fromCode:_qc,kind:'request',irq:reqNo,text:msg}):Promise.resolve('');
+  if(window.sendPushToRole)Promise.resolve(_mp).then(function(mid){window.sendPushToRole('qc',(qrUrgency==='urgent'?'\u26A1 URGENT - ':'')+'New inspection request IRQ-'+reqNo,job+(client?' | '+client:''),'https://eric0103360.github.io/fse-irn-system?irq='+encodeURIComponent(reqNo),qrUrgency==='urgent'?{repeat:3,intervalSec:25,msgId:(typeof mid==='string'?mid:''),senderCode:_qc}:null);});
   // Reset
   document.getElementById('qrJob').value='';
   document.getElementById('qrClient').value='';
