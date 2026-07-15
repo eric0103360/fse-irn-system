@@ -27,7 +27,7 @@ messaging.onBackgroundMessage(function(payload) {
     tag: 'fse-eirn-' + (d.tag || Date.now()),
     silent: false,
     renotify: true,
-    vibrate: [300, 100, 300, 100, 300]
+    vibrate: [600, 150, 600, 150, 800]
   });
 });
 
