@@ -24,7 +24,7 @@ messaging.onBackgroundMessage(function(payload) {
     icon: './icon-192.png',
     badge: './icon-192.png',
     data: { url: d.url || './' },
-    tag: 'fse-eirn-' + (d.tag || Date.now()),
+    tag: 'fse-eirn-' + (d.url || d.tag || Date.now()),
     silent: false,
     renotify: true,
     vibrate: [600, 150, 600, 150, 800]
