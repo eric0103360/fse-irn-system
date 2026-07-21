@@ -3135,7 +3135,7 @@ function computeAnalytics(entries){
   var art={},reasons={},stagesHit={},months={};
   entries.forEach(function(e){
     if(e.req&&e.req.status==='cancelled')return;
-    var irns=e.irns||[];if(irns.length===0)return;
+    var irns=(e.irns||[]).filter(function(r){return !r.cancelled;});if(irns.length===0)return;
     var last=irns[irns.length-1];if(last&&last.cancelled)return;
     var rejects=irns.filter(function(r){return r.result==='reject';});
     var names=[];(e.req&&e.req.artisans||[]).forEach(function(n){if(n)names.push(n);});
