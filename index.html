@@ -2440,7 +2440,7 @@ function renderReg(){
   var total=active.length;
   var released=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept';}).length;
   var pending=active.filter(function(e){var l=e.irns[e.irns.length-1];return !l;}).length;
-  var ftp=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&(!l.attempt||l.attempt===1);}).length;
+  var ftp=active.filter(function(e){var l=e.irns[e.irns.length-1];return e.irns.length===1&&l&&l.result==='accept';}).length;
   var ftpPct=released>0?Math.round(ftp/released*100):0;
   document.getElementById('statT').textContent=total;
   document.getElementById('statP').textContent=released;
@@ -3256,7 +3256,7 @@ function renderMgmt(){
   var rework=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='reject';}).length;
   var onHold=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='hold';}).length;
   var pending=active.filter(function(e){return e.irns.length===0;}).length;
-  var ftp=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&(!l.attempt||l.attempt===1);}).length;
+  var ftp=active.filter(function(e){var l=e.irns[e.irns.length-1];return e.irns.length===1&&l&&l.result==='accept';}).length;
   var ftpPct=released>0?Math.round(ftp/released*100):0;
 
   document.getElementById('mgStatTotal').textContent=total;
