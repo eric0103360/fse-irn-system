@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>FSE Inspection Release Note</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#1a3a5c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="FSE eIRN">
+<link rel="apple-touch-icon" href="./icon-192.png">
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -157,8 +164,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 <link rel="manifest" href="manifest.json">
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
-import{getFirestore,doc,getDoc,getDocs,addDoc,updateDoc,setDoc,deleteDoc,collection,query,orderBy,onSnapshot,runTransaction}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
+import{getFirestore,doc,getDoc,getDocs,addDoc,updateDoc,setDoc,deleteDoc,collection,query,orderBy,onSnapshot,runTransaction,arrayUnion}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
 import{getStorage,ref,uploadString,getDownloadURL,deleteObject}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js';
+import{getMessaging,getToken,isSupported}from'https://www.gstatic.com/firebasejs/12.14.0/firebase-messaging.js';
 const app=initializeApp({apiKey:"AIzaSyC3sKMm02GnikBdgXPd4RUm7RxnsR90A_I",authDomain:"fse-irn-system.firebaseapp.com",projectId:"fse-irn-system",storageBucket:"fse-irn-system.firebasestorage.app",messagingSenderId:"1097944808267",appId:"1:1097944808267:web:d8f1f3a52e2223253f86ce"});
 const db=getFirestore(app);
 const storage=getStorage(app);
@@ -217,8 +225,21 @@ window.clearAllData=async function(){
     return true;
   }catch(e){console.error(e);return false;}
 };
-window.saveCodesToFirebase=async function(){try{await setDoc(doc(db,'settings','codes'),{qc:codes.qc,sup:codes.sup});return true;}catch(e){return false;}};
-window.loadCodesFromFirebase=async function(){try{var d=await getDoc(doc(db,'settings','codes'));if(d.exists()){var data=d.data();if(data.qc){codes.qc=data.qc.map(function(c){return Object.assign({pin:''},c);});}if(data.sup){codes.sup=data.sup.map(function(c){return Object.assign({pin:''},c);});}}}catch(e){console.log('Codes load error:',e);}};
+window.saveCodesToFirebase=async function(){try{await setDoc(doc(db,'settings','codes'),{qc:codes.qc,sup:codes.sup,mgt:codes.mgt||[]});return true;}catch(e){return false;}};
+window.setMaintenanceMode=async function(enabled){
+  try{
+    await setDoc(doc(db,'settings','maintenance'),{enabled:enabled,updatedAt:new Date().toISOString()});
+    return true;
+  }catch(e){console.error('Maintenance set error:',e);return false;}
+};
+window.getMaintenanceMode=async function(){
+  try{
+    var d=await getDoc(doc(db,'settings','maintenance'));
+    if(d.exists())return d.data().enabled===true;
+    return false;
+  }catch(e){return false;}
+};
+window.loadCodesFromFirebase=async function(){try{var d=await getDoc(doc(db,'settings','codes'));if(d.exists()){var data=d.data();if(data.qc){codes.qc=data.qc.map(function(c){return Object.assign({pin:''},c);});}if(data.sup){codes.sup=data.sup.map(function(c){return Object.assign({pin:''},c);});}if(data.mgt){codes.mgt=data.mgt.map(function(c){return Object.assign({pin:''},c);});}}}catch(e){console.log('Codes load error:',e);}};
 window.saveRequestToFirebase=async function(data){
   try{
     var s=Object.assign({},data);
@@ -254,6 +275,8 @@ window.markRequestComplete=async function(firebaseId){try{var r=doc(db,'requests
 window.markRequestRework=async function(firebaseId){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'rework'});return true;}catch(e){return false;}};
 window.markRequestCancelled=async function(firebaseId,reason){try{var r=doc(db,'requests',firebaseId);await updateDoc(r,{status:'cancelled',cancelReason:reason,cancelledAt:new Date().toISOString()});return true;}catch(e){return false;}};
 window.markIRNCancelled=async function(firebaseId,reason){try{var r=doc(db,'irns',firebaseId);await updateDoc(r,{cancelled:true,cancelReason:reason,cancelledAt:new Date().toISOString()});return true;}catch(e){return false;}};
+window.deleteRequest=async function(firebaseId){try{await deleteDoc(doc(db,'requests',firebaseId));return true;}catch(e){return false;}};
+window.deleteIRN=async function(firebaseId){try{await deleteDoc(doc(db,'irns',firebaseId));return true;}catch(e){return false;}};
 window.updateIRNInFirebase=async function(firebaseId,data){
   try{
     var s=Object.assign({},data);
@@ -266,6 +289,40 @@ window.updateIRNInFirebase=async function(firebaseId,data){
     return true;
   }catch(e){console.error('IRN update error:',e);return false;}
 };
+window.sendAppMessage=async function(m){try{m.timestamp=new Date().toISOString();if(!m.readBy)m.readBy=m.fromCode?[m.fromCode]:[];var ref=await addDoc(collection(db,'messages'),m);return ref.id;}catch(e){console.log('Message send error:',e);return false;}};
+window.loadMessagesFromFirebase=function(cb){try{var q=query(collection(db,'messages'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);});}catch(e){cb([]);return null;}};
+window.markMessageRead=async function(firebaseId,code){try{await updateDoc(doc(db,'messages',firebaseId),{readBy:arrayUnion(code)});return true;}catch(e){return false;}};
+// ===== Push notifications (FCM) =====
+// STEP 1: paste your Web Push certificate key (Firebase Console > Project settings > Cloud Messaging > Web Push certificates > Generate key pair)
+const PUSH_VAPID_KEY='BJnCAV8S4387AlAVAEuVfG-bIYW_UMqtxTtNxcfS0mEO0U9fklAYpaZ_HRb-SNvnTDVNY84Rc_G_XgrX1FBOqOU';
+// STEP 2: paste your Apps Script push sender URL (deploy the Code.gs I supplied as a Web App, access: Anyone)
+const PUSH_ENDPOINT='https://script.google.com/macros/s/AKfycbw-IWRJbqLq9ID-1SUL1frbW34tsG4aWCOtuTtPtg_rUjKwSsTOZKbNMnAT2DMYQBM/exec';
+window.pushConfigured=function(){return PUSH_VAPID_KEY.indexOf('PASTE_')!==0&&PUSH_ENDPOINT.indexOf('PASTE_')!==0;};
+window.enablePushNotifications=async function(code,role){
+  try{
+    if(!window.pushConfigured()){return{ok:false,msg:'Push not configured yet'};}
+    if(!(await isSupported())){return{ok:false,msg:'Notifications not supported on this browser'};}
+    var perm=await Notification.requestPermission();
+    if(perm!=='granted'){return{ok:false,msg:'Permission not granted - allow notifications in browser settings'};}
+    var swReg=await navigator.serviceWorker.register('./firebase-messaging-sw.js',{scope:'./'});
+    var messaging=getMessaging(app);
+    var token=await getToken(messaging,{vapidKey:PUSH_VAPID_KEY,serviceWorkerRegistration:swReg});
+    if(!token){return{ok:false,msg:'Could not get a device token'};}
+    await setDoc(doc(db,'deviceTokens',token),{code:code,role:role,updated:new Date().toISOString()});
+    return{ok:true,msg:'Notifications enabled on this device'};
+  }catch(e){console.log('Push enable error:',e);return{ok:false,msg:'Error: '+(e&&e.message||e)};}
+};
+window.sendPushToRole=async function(role,title,body,url,opts){
+  try{
+    if(!window.pushConfigured())return;
+    var snap=await getDocs(collection(db,'deviceTokens'));
+    var tokens=[];var roles=String(role).split(',');
+    snap.forEach(function(d){var t=d.data();if(role==='ALL'||roles.indexOf(t.role)>=0)tokens.push(d.id);});
+    if(tokens.length===0)return;
+    fetch(PUSH_ENDPOINT,{method:'POST',mode:'no-cors',body:JSON.stringify({tokens:tokens,title:title,body:body,url:url||'',repeat:(opts&&opts.repeat)||1,intervalSec:(opts&&opts.intervalSec)||25,msgId:(opts&&opts.msgId)||'',senderCode:(opts&&opts.senderCode)||''})}).catch(function(){});
+  }catch(e){console.log('Push send error:',e);}
+};
+// ===== end push =====
 window.loadIRNsFromFirebase=function(cb){try{var q=query(collection(db,'irns'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);});}catch(e){cb([]);}};
 window.addEventListener('DOMContentLoaded',function(){
   var el=document.getElementById('reportNo');
@@ -295,7 +352,8 @@ window.addEventListener('DOMContentLoaded',function(){
 <div class="app">
   <div class="nav no-print">
     <button class="nb on" onclick="showV('request',this)"><svg style="font-size:12px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg> Inspect Req</button>
-    <button class="nb" onclick="handleNewIRNClick(this)" style="opacity:0.6" title="Accessible via WhatsApp inspection link only"><svg style="font-size:12px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg> New IRN <svg style="font-size:9px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></button>
+    <button class="nb" onclick="handleNewIRNClick(this)" style="opacity:0.6" title="Accessible via inspection request link only"><svg style="font-size:12px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg> New IRN <svg style="font-size:9px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></button>
+    <button class="nb" onclick="showV('messages',this)" style="position:relative"><svg style="font-size:12px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg> Messages<span id="msgBadge" style="display:none;position:absolute;top:2px;right:2px;background:#E24B4A;color:#fff;font-size:9px;font-weight:700;border-radius:8px;padding:1px 4px;min-width:15px;text-align:center;line-height:12px;box-shadow:0 0 0 1.5px #fff">0</span></button>
     <button class="nb" onclick="showV('register',this)"><svg style="font-size:12px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> Register</button>
     <button class="nb" onclick="showV('admin',this)"><svg style="font-size:12px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg> Admin</button>
     <button class="nb" onclick="showV('mgmt',this)"><svg style="font-size:12px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="20" x2="21" y2="20"/><rect x="4" y="14" width="4" height="6"/><rect x="10" y="8" width="4" height="12"/><rect x="16" y="4" width="4" height="16"/></svg> Mgmt</button>
@@ -344,11 +402,11 @@ window.addEventListener('DOMContentLoaded',function(){
         <svg style="font-size:32px;color:#185FA5" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       </div>
       <div style="font-size:16px;font-weight:600;color:#1a3a5c;margin-bottom:8px">Waiting for inspection request</div>
-      <div style="font-size:13px;color:#888;margin-bottom:24px;line-height:1.5">When a supervisor raises an inspection request you will receive a WhatsApp notification with a direct link to the job.</div>
+      <div style="font-size:13px;color:#888;margin-bottom:24px;line-height:1.5">When a supervisor raises an inspection request you will receive an in-app message with a direct link to the job &mdash; check the Messages tab.</div>
       <div style="background:#f9f9f7;border-radius:10px;padding:16px;text-align:left;max-width:300px;margin:0 auto">
         <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">How it works</div>
         <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px"><div style="width:20px;height:20px;border-radius:50%;background:#1a3a5c;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</div><div style="font-size:12px;color:#444">Supervisor raises request on Inspect Req tab</div></div>
-        <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px"><div style="width:20px;height:20px;border-radius:50%;background:#1a3a5c;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</div><div style="font-size:12px;color:#444">You receive a WhatsApp with the job details and link</div></div>
+        <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px"><div style="width:20px;height:20px;border-radius:50%;background:#1a3a5c;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</div><div style="font-size:12px;color:#444">You receive an in-app message with the job details and link</div></div>
         <div style="display:flex;align-items:flex-start;gap:8px"><div style="width:20px;height:20px;border-radius:50%;background:#1a3a5c;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</div><div style="font-size:12px;color:#444">Tap the link — form pre-filled and ready to complete</div></div>
       </div>
     </div>
@@ -696,6 +754,80 @@ window.addEventListener('DOMContentLoaded',function(){
     </div>
   </div>
 
+  <div id="v-messages" class="view">
+    <div class="hdr">
+      <div class="hdr-top">
+        <div class="hdr-left">
+          <img id="msgLogo" class="fse-logo" alt="FSE">
+          <div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.55);margin-bottom:1px">FIELD SERVICES &amp; ENGINEERING</div>
+            <h1>Messages</h1>
+            <div class="hdr-meta">In-app notifications &amp; team messaging</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Sign-in card -->
+    <div id="msgSignIn" style="display:none;background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:20px;margin-top:14px;max-width:420px">
+      <div style="font-size:14px;font-weight:700;color:#1a3a5c;margin-bottom:4px">Who are you?</div>
+      <div style="font-size:12px;color:#888;margin-bottom:12px">Enter your QC, SUP or MGT code once — messages addressed to you or your role will appear here.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input id="msgUserCode" placeholder="e.g. QC-006" maxlength="8" style="width:120px;padding:9px 10px;border:1.5px solid #ccc;border-radius:8px;font-size:14px;text-transform:uppercase">
+        <input id="msgUserPin" type="password" placeholder="PIN" maxlength="4" style="width:80px;padding:9px 10px;border:1.5px solid #ccc;border-radius:8px;font-size:14px">
+        <button onclick="msgSignIn()" style="padding:9px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Sign in</button>
+      </div>
+      <div id="msgSignInStatus" style="font-size:12px;margin-top:8px"></div>
+    </div>
+    <!-- Inbox -->
+    <div id="msgInbox" style="display:none;margin-top:14px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+        <button id="msgTabAll" onclick="setMsgFilter('all')" style="padding:6px 14px;border-radius:16px;border:1px solid #ccc;background:#1a3a5c;color:#fff;font-size:12px;cursor:pointer">All</button>
+        <button id="msgTabUnread" onclick="setMsgFilter('unread')" style="padding:6px 14px;border-radius:16px;border:1px solid #ccc;background:#fff;color:#555;font-size:12px;cursor:pointer">Unread</button>
+        <div style="flex:1"></div>
+        <span id="msgWhoAmI" style="font-size:12px;color:#888"></span>
+        <button onclick="msgSignOut();toast('Logged out of Messages','ok')" style="padding:5px 10px;border:1px solid #A32D2D;background:#fff;border-radius:8px;font-size:11px;color:#A32D2D;font-weight:600;cursor:pointer">Log out</button>
+        <button id="msgPushBtn" onclick="enablePushClicked()" style="padding:8px 12px;border:1px solid #185FA5;background:#E6F1FB;color:#185FA5;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">&#128276; Enable notifications</button>
+        <button onclick="openMsgCompose()" style="padding:8px 16px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">&#9993; New message</button>
+      </div>
+      <div id="msgList" style="background:#fff;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden"></div>
+    </div>
+    <!-- Compose modal -->
+    <div id="msgComposeOverlay" style="display:none;position:fixed;inset:0;background:rgba(20,30,40,0.55);z-index:200;align-items:center;justify-content:center;padding:14px">
+      <div style="background:#fff;border-radius:12px;width:100%;max-width:460px;overflow:hidden">
+        <div style="background:#1a3a5c;color:#fff;padding:12px 16px;font-weight:700;font-size:14px;display:flex;align-items:center">New message
+          <button onclick="closeMsgCompose()" style="margin-left:auto;background:none;border:none;color:#fff;font-size:17px;cursor:pointer">&#10005;</button>
+        </div>
+        <div style="padding:16px">
+          <div style="margin-bottom:10px">
+            <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">To</div>
+            <select id="msgComposeTo" style="width:100%;padding:9px 10px;border:1.5px solid #ccc;border-radius:8px;font-size:13px"></select>
+          </div>
+          <div style="margin-bottom:10px">
+            <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Link to IRQ / job (optional)</div>
+            <input id="msgComposeIrq" placeholder="e.g. 0042" style="width:100%;padding:9px 10px;border:1.5px solid #ccc;border-radius:8px;font-size:13px">
+          </div>
+          <div style="margin-bottom:10px">
+            <input type="file" id="msgPhotoInput" accept="image/*" capture="environment" style="display:none" onchange="msgPhotoPicked(this)">
+            <button onclick="document.getElementById('msgPhotoInput').click()" style="padding:8px 12px;border:1px dashed #999;background:#fafafa;border-radius:8px;font-size:12px;color:#555;cursor:pointer">&#128247; Attach photo</button>
+            <div id="msgPhotoPreview" style="display:none;margin-top:8px;position:relative;width:110px">
+              <img id="msgPhotoThumb" style="width:110px;height:82px;object-fit:cover;border-radius:8px;border:1px solid #ddd">
+              <button onclick="msgPhotoClear()" style="position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;border:none;background:#A32D2D;color:#fff;font-size:12px;cursor:pointer;line-height:1">&#10005;</button>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Message</div>
+            <textarea id="msgComposeText" style="width:100%;min-height:90px;padding:9px 10px;border:1.5px solid #ccc;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical" placeholder="Type your message&hellip;"></textarea>
+          </div>
+        </div>
+        <div style="padding:12px 16px;border-top:1px solid #eee;display:flex;gap:8px;justify-content:flex-end">
+          <button onclick="closeMsgCompose()" style="padding:8px 16px;border:1px solid #ccc;background:#fff;border-radius:8px;font-size:13px;cursor:pointer">Cancel</button>
+          <button onclick="sendComposedMsg()" style="padding:8px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Send message</button>
+        </div>
+      </div>
+    </div>
+    <div style="height:16px"></div>
+  </div>
+
   <div id="v-admin" class="view">
     <div class="hdr">
       <div class="hdr-top">
@@ -732,6 +864,11 @@ window.addEventListener('DOMContentLoaded',function(){
         <div class="ct"><svg style="font-size:13px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18a1 1 0 001 1h18a1 1 0 001-1v-2a1 1 0 00-1-1H3a1 1 0 00-1 1v2z"/><path d="M10 10V5a2 2 0 114 0v5"/><path d="M4 15v-3a8 8 0 0116 0v3"/></svg> Supervisor codes</div>
         <div style="overflow-x:auto"><table class="code-table" id="supTable"></table></div>
         <div style="padding:8px 14px"><button class="add-btn" onclick="addSlot('sup')"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add SUP slot</button></div>
+      </div>
+      <div class="card">
+        <div class="ct"><svg style="font-size:13px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg> Management codes <span style="font-size:10px;font-weight:400;color:#888">— Messages access &amp; oversight (no sign-off rights)</span></div>
+        <div style="overflow-x:auto"><table class="code-table" id="mgtTable"></table></div>
+        <div style="padding:8px 14px"><button class="add-btn" onclick="addSlot('mgt')"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add MGT slot</button></div>
       </div>
       <div style="padding:8px 0 16px;font-size:11px;color:#888;text-align:center">Deactivated codes cannot sign off new IRNs.</div>
       <button onclick="if(window.saveCodesToFirebase)window.saveCodesToFirebase().then(function(){toast('Codes saved','ok');})" style="width:100%;padding:10px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:8px"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save all names &amp; codes</button>
@@ -791,6 +928,15 @@ window.addEventListener('DOMContentLoaded',function(){
       <div id="mgStageChart"><div style="font-size:12px;color:#aaa;text-align:center;padding:12px">No data yet</div></div>
     </div>
 
+    <!-- Artisan & failure analytics -->
+    <div style="background:#fff;border:0.5px solid #eee;border-radius:10px;padding:12px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:1px;flex:1">Artisan &amp; failure analytics</div>
+        <button onclick="printAnalytics()" style="background:#1a3a5c;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer">&#128424; Print report</button>
+      </div>
+      <div id="mgAnalytics"><div style="font-size:12px;color:#aaa;text-align:center;padding:12px">No data yet</div></div>
+    </div>
+
     <!-- Outstanding for inspection -->
     <div style="border-radius:10px;overflow:hidden;margin-bottom:8px;border:0.5px solid #E24B4A">
       <div style="background:#E24B4A;color:#fff;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;justify-content:space-between">
@@ -825,38 +971,38 @@ window.addEventListener('DOMContentLoaded',function(){
 const ENDPOINT='https://script.google.com/macros/s/AKfycbzh4TjDevXQsH3hNU9H7dsA2vrZlrK2ZpTostfKIVqtlIAd7bItAmsyFafGX5pqXzfI/exec';
 const ADMIN_CODE='min@fse';
 const MAINTENANCE_KEY='fse_maintenance_mode';
-// Check maintenance mode on load
 function checkMaintenanceMode(){
-  var maintenance=localStorage.getItem(MAINTENANCE_KEY)==='true';
-  if(maintenance){
-    var sp=document.getElementById('splashScreen');
-    if(sp){
-      sp.style.display='flex';
-      sp.style.opacity='1';
-      // Replace splash content with maintenance screen
-      var btn=sp.querySelector('button');
-      if(btn){btn.style.display='none';}
-      var mainDiv=document.createElement('div');
-      mainDiv.style.cssText='text-align:center;max-width:320px;width:100%';
-      mainDiv.innerHTML='<div style="width:80px;height:80px;background:rgba(255,255,255,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><div style="font-size:22px;font-weight:600;color:#fff;margin-bottom:10px;font-family:-apple-system,sans-serif">System temporarily unavailable</div><div style="font-size:14px;color:rgba(255,255,255,0.6);line-height:1.6;margin-bottom:30px;font-family:-apple-system,sans-serif">The FSE eIRN system is currently offline for maintenance. Please check back shortly.</div><div style="font-size:12px;color:rgba(255,255,255,0.35);font-family:-apple-system,sans-serif">FSE Field Services & Engineering</div>';
-      sp.insertBefore(mainDiv,sp.firstChild);
+  return window.getMaintenanceMode().then(function(enabled){
+    if(enabled){
+      var sp=document.getElementById('splashScreen');
+      if(sp){
+        sp.style.display='flex';
+        sp.style.opacity='1';
+        var btn=sp.querySelector('button');
+        if(btn)btn.style.display='none';
+        var mainDiv=document.createElement('div');
+        mainDiv.style.cssText='text-align:center;max-width:320px;width:100%';
+        mainDiv.innerHTML='<div style="width:80px;height:80px;background:rgba(255,255,255,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><div style="font-size:22px;font-weight:600;color:#fff;margin-bottom:10px;font-family:-apple-system,sans-serif">System temporarily unavailable</div><div style="font-size:14px;color:rgba(255,255,255,0.6);line-height:1.6;margin-bottom:30px;font-family:-apple-system,sans-serif">The FSE eIRN system is currently offline for maintenance. Please check back shortly.</div><div style="font-size:12px;color:rgba(255,255,255,0.35);font-family:-apple-system,sans-serif">FSE Field Services & Engineering</div>';
+        sp.insertBefore(mainDiv,sp.firstChild);
+      }
+      return true;
     }
-    return true;
-  }
-  return false;
+    return false;
+  }).catch(function(){return false;});
 }
 function toggleMaintenanceMode(){
-  var current=localStorage.getItem(MAINTENANCE_KEY)==='true';
-  var newVal=!current;
-  localStorage.setItem(MAINTENANCE_KEY,newVal.toString());
-  var btn=document.getElementById('maintenanceBtn');
-  if(btn){
-    btn.textContent=newVal?'🔓 Disable maintenance mode':'🔒 Enable maintenance mode';
-    btn.style.background=newVal?'#1D9E75':'#E24B4A';
-  }
-  toast(newVal?'Maintenance mode ON — app is now locked':'Maintenance mode OFF — app is now open',newVal?'info':'ok');
+  window.getMaintenanceMode().then(function(current){
+    var newVal=!current;
+    window.setMaintenanceMode(newVal).then(function(){
+      var btn=document.getElementById('maintenanceBtn');
+      if(btn){
+        btn.textContent=newVal?'🔓 Disable maintenance mode':'🔒 Enable maintenance mode';
+        btn.style.background=newVal?'#1D9E75':'#E24B4A';
+      }
+      toast(newVal?'Maintenance mode ON — app locked for all users':'Maintenance mode OFF — app is live for all users',newVal?'info':'ok');
+    });
+  });
 }
-const WA_GROUP='https://chat.whatsapp.com/DdCdi8Eto8PHEJ8sNsqqi0';
 
 // Get logo from hidden img element - avoids JS string issues with base64
 function getLogoSrc(){return document.getElementById('fseLogo').src;}
@@ -871,6 +1017,12 @@ window.addEventListener('DOMContentLoaded',function(){
 });
 
 var codes={
+  mgt:[
+    {code:'MGT-001',name:'',active:false,pin:''},
+    {code:'MGT-002',name:'',active:false,pin:''},
+    {code:'MGT-003',name:'',active:false,pin:''},
+    {code:'MGT-004',name:'',active:false,pin:''}
+  ],
   qc:[
     {code:'QC-001',name:'Teboho Molete',active:true,pin:''},
     {code:'QC-002',name:'Bongani Sithole',active:true,pin:''},
@@ -986,6 +1138,10 @@ function showV(v,btn){
       if(sup&&window._savedSUP){sup.value=window._savedSUP;supValidated=window._savedSUPv||false;supName=window._savedSUPn||'';validateCode('sup');}
     },150);
   }
+  if(v==='messages'){
+    document.getElementById('msgLogo').src=getLogoSrc();
+    initMessagesView();
+  }
   if(v==='register'){
     document.getElementById('regLogo').src=getLogoSrc();
     // Always reload both collections fresh
@@ -1012,12 +1168,14 @@ function showV(v,btn){
 
   if(v==='admin'){
     document.getElementById('admLogo').src=getLogoSrc();
-    // Update maintenance button state
-    var isMaint=localStorage.getItem(MAINTENANCE_KEY)==='true';
-    var mb=document.getElementById('maintenanceBtn');
-    if(mb){
-      mb.textContent=isMaint?'🔓 Disable maintenance mode':'🔒 Enable maintenance mode';
-      mb.style.background=isMaint?'#1D9E75':'#E24B4A';
+    if(window.getMaintenanceMode){
+      window.getMaintenanceMode().then(function(isMaint){
+        var mb=document.getElementById('maintenanceBtn');
+        if(mb){
+          mb.textContent=isMaint?'🔓 Disable maintenance mode':'🔒 Enable maintenance mode';
+          mb.style.background=isMaint?'#1D9E75':'#E24B4A';
+        }
+      });
     }
   }
   if(v==='mgmt'){
@@ -1193,7 +1351,10 @@ function unlockAdmin(){
   if(entered===ADMIN_CODE){
     document.getElementById('adminLocked').style.display='none';
     document.getElementById('adminPanel').style.display='block';
+    window._adminUnlocked=true;
     renderCodeTables();
+    renderReg();
+    toast('Admin unlocked — delete buttons now visible in Register','ok');
   }else{
     toast('Incorrect admin code','err');
     document.getElementById('adminCodeIn').value='';
@@ -1204,10 +1365,15 @@ function lockAdmin(){
   document.getElementById('adminLocked').style.display='block';
   document.getElementById('adminPanel').style.display='none';
   document.getElementById('adminCodeIn').value='';
+  window._adminUnlocked=false;
+  renderReg();
+  toast('Admin locked — delete buttons hidden','info');
 }
 function renderCodeTables(){
-  ['qc','sup'].forEach(function(role){
-    var list=role==='qc'?codes.qc:codes.sup;
+  ['qc','sup','mgt'].forEach(function(role){
+    if(!codes[role])codes[role]=[];
+    var list=codes[role];
+    if(role==='mgt'&&!document.getElementById('mgtTable'))return;
     var rows='<tr><th>Code</th><th>Name assigned</th><th>PIN (4 digits)</th><th>Status</th><th>Action</th></tr>';
     list.forEach(function(c,i){
       rows+='<tr><td><span class="cbadge '+(c.active&&c.name?'active':'avail')+'">'+c.code+'</span></td>';
@@ -1223,16 +1389,16 @@ function updatePin(el,i){
   var val=el.value.replace(/\D/g,'').slice(0,4);
   el.value=val;
   var role=el.closest('table').id.replace('Table','');
-  if(role==='qc')codes.qc[i].pin=val;else codes.sup[i].pin=val;
+  codes[role][i].pin=val;
 }
 function updateName(el,i){
   var val=el.value;
   var role=el.closest('table').id.replace('Table','');
-  if(role==='qc')codes.qc[i].name=val;else codes.sup[i].name=val;
+  codes[role][i].name=val;
   var row=el.closest('tr');
   var badge=row.querySelector('.cbadge');
   var statusBadge=row.querySelectorAll('.cbadge')[1];
-  var list=role==='qc'?codes.qc:codes.sup;
+  var list=codes[role];
   var c=list[i];
   if(badge){badge.className='cbadge '+(c.active&&val?'active':'avail');}
   if(statusBadge){
@@ -1259,7 +1425,7 @@ function clearAllTestData(){
 function toggleCode(el){
   var role=el.dataset.role;
   var i=parseInt(el.dataset.idx);
-  var list=role==='qc'?codes.qc:codes.sup;
+  var list=codes[role];
   if(!list[i].name){toast('Assign a name first','err');return;}
   list[i].active=!list[i].active;
   renderCodeTables();
@@ -1267,8 +1433,8 @@ function toggleCode(el){
   if(window.saveCodesToFirebase)window.saveCodesToFirebase();
 }
 function addSlot(role){
-  var prefix=role==='qc'?'QC-':'SUP-';
-  var list=role==='qc'?codes.qc:codes.sup;
+  var prefix=role==='qc'?'QC-':role==='mgt'?'MGT-':'SUP-';
+  var list=codes[role];
   list.push({code:prefix+String(list.length+1).padStart(3,'0'),name:'',active:false});
   renderCodeTables();
   if(window.saveCodesToFirebase)window.saveCodesToFirebase();
@@ -1378,7 +1544,7 @@ function handleNewIRNClick(btn){
     // Has IRQ — show form
     showV('form',btn);
   } else {
-    toast('New IRN is only accessible via an inspection request WhatsApp link','err');
+    toast('New IRN is only accessible via an inspection request link - see Messages','err');
   }
 }
 var _regFilt='all';
@@ -1615,11 +1781,16 @@ function getRequestData(){
   };
 }
 async function submitRequest(){
+  var _b=document.getElementById('reqSubmitBtn');
+  if(_b&&_b.dataset.busy==='1')return;
   var d=getRequestData();
   if(!d.job){toast('Enter order/job number','err');return;}
   if(reqItems.filter(function(i){return i.desc;}).length===0){toast('Add at least one item','err');return;}
   if(selectedInspTypes.length===0){toast('Select at least one inspection type','err');return;}
   if(!reqSupValidated){toast('Supervisor code required','err');return;}
+  if(_b){_b.dataset.busy='1';_b.disabled=true;var _t=_b.innerHTML;_b.innerHTML='Sending request&hellip;';}
+  var _guard=setTimeout(function(){if(_b&&_b.dataset.busy==='1'){_b.dataset.busy='';_b.disabled=false;_b.style.background='';_b.innerHTML=_t;toast('Slow connection - request may still be sending in background','err');}},15000);
+  try{
   // Always get a fresh IRQ number — never reuse
   d.reqNo=await window.getNextIRQ();
   document.getElementById('reqNo').value=d.reqNo;
@@ -1637,10 +1808,13 @@ async function submitRequest(){
   if(window.saveRequestToFirebase){
     await window.saveRequestToFirebase(d);
   }
-  toast('Request submitted to QC group','ok');
-  window.open('https://wa.me/?text='+encodeURIComponent(msg));
-  // Reset form
-  var cb=document.getElementById('reqAckCheck');if(cb)cb.checked=false;
+  toast('Request IRQ-'+d.reqNo+' sent to QC','ok');
+  var _mp=window.sendAppMessage?window.sendAppMessage({to:'QC',from:d.supervisor||'Supervisor',fromCode:d.supCode||'',kind:'request',irq:d.reqNo,text:msg}):Promise.resolve('');
+  if(window.sendPushToRole)Promise.resolve(_mp).then(function(mid){window.sendPushToRole('qc',(d.urgency==='urgent'?'\u26A1 URGENT - ':'')+'New inspection request IRQ-'+d.reqNo,d.job+(d.client?' | '+d.client:'')+' - '+(d.inspTypes||''),liveLink,d.urgency==='urgent'?{repeat:3,intervalSec:25,msgId:(typeof mid==='string'?mid:''),senderCode:d.supCode||''}:null);});
+  var _ack=document.getElementById('reqAckCheck');if(_ack)_ack.checked=false;
+  clearTimeout(_guard);
+  if(_b){_b.innerHTML='\u2713 Request sent';_b.style.background='#1F7A45';setTimeout(function(){_b.dataset.busy='';_b.disabled=false;_b.style.background='';_b.innerHTML=_t;},2500);}
+  }catch(_err){clearTimeout(_guard);console.log('submitRequest error:',_err);toast('Request failed to send - please try again','err');if(_b){_b.dataset.busy='';_b.disabled=false;_b.style.background='';_b.innerHTML=_t;}return;}
   // Reset IRQ number for next request
   var reqNoEl=document.getElementById('reqNo');
   if(reqNoEl){reqNoEl.value='';reqNoEl.style.color='rgba(255,255,255,0.6)';}
@@ -1674,7 +1848,9 @@ function printRequest(){
   html+='<h2>QC sign-off</h2><table><tr><th>QC Inspector</th><th>Date attended</th><th>IRN number</th><th>Signature</th></tr>';
   html+='<tr><td style="padding:8px;border:1px solid #ccc;height:40px"></td><td style="padding:8px;border:1px solid #ccc"></td><td style="padding:8px;border:1px solid #ccc"></td><td style="padding:8px;border:1px solid #ccc;width:180px"></td></tr></table>';
   html+='<div style="margin-top:16px;font-size:9px;color:#999;border-top:1px solid #eee;padding-top:6px">FSE eIRN System &middot; '+new Date().toLocaleString('en-ZA')+'</div>';
-  html+='<div class="np" style="margin-top:16px;display:flex;gap:8px;justify-content:center"><button onclick="window.print()" style="padding:8px 24px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">Print / Save as PDF</button><button onclick="window.close()" style="padding:8px 20px;background:#f0f0f0;border:none;border-radius:6px;font-size:13px;cursor:pointer">Close</button></div>';
+  html+='<div class="np" style="margin-top:16px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button onclick="window.print()" style="padding:8px 24px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">Print / Save as PDF</button><button onclick="fsT()" style="padding:8px 20px;background:#fff;border:1px solid #1a3a5c;color:#1a3a5c;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer">&#9974; Full screen</button><button onclick="window.close()" style="padding:8px 20px;background:#f0f0f0;border:none;border-radius:6px;font-size:13px;cursor:pointer">Close</button></div>';
+  html+='<scr'+'ipt>function fsT(){var el=document.documentElement;if(!document.fullscreenElement){var pr=el.requestFullscreen?el.requestFullscreen():Promise.reject();pr.then(function(){if(screen.orientation&&screen.orientation.lock){screen.orientation.lock("landscape").catch(function(){});}}).catch(function(){});}else{if(screen.orientation&&screen.orientation.unlock)screen.orientation.unlock();document.exitFullscreen();}}document.addEventListener("fullscreenchange",function(){if(!document.fullscreenElement&&screen.orientation&&screen.orientation.unlock){try{screen.orientation.unlock();}catch(e){}}});</scr'+'ipt>';
+  html+='<style>@media screen and (orientation:landscape){body{zoom:1.3;margin:12px}}</style>';
   html+='</body></html>';
   pw.document.write(html);pw.document.close();
 }
@@ -1711,8 +1887,8 @@ function raiseConcession(){
   msg+='QC: '+d.qc+' ('+d.qcCode+') | '+d.date+'\n';
   msg+='Reason: [add details]\n';
   msg+='Reg: https://eric0103360.github.io/fse-irn-system';
-  toast('Opening WhatsApp for concession notification','info');
-  window.open('https://wa.me/?text='+encodeURIComponent(msg));
+  if(window.sendAppMessage)window.sendAppMessage({to:'ALL',from:d.qc||'QC',fromCode:d.qcCode||'',kind:'hold',irn:d.reportNo||'',text:msg});
+  toast('Concession hold notice sent','ok');
 }
 function addItem(){items.push({id:'i'+iCnt++,desc:'',qty:''});renderItems();}
 function removeItem(id){if(items.length<=1)return;items=items.filter(function(i){return i.id!==id;});renderItems();}
@@ -1782,11 +1958,16 @@ function validateQRSup(){
   }
 }
 async function submitQuickRequest(){
+  var _qb=document.getElementById('qrSubmitBtn');
+  if(_qb&&_qb.dataset.busy==='1')return;
   var job=document.getElementById('qrJob').value.trim();
   var client=document.getElementById('qrClient').value.trim();
   if(!job){toast('Enter job number','err');return;}
   if(!qrSelectedType){toast('Select inspection type','err');return;}
   if(!qrSupValidated){toast('SUP code required','err');return;}
+  if(_qb){_qb.dataset.busy='1';_qb.disabled=true;var _qt=_qb.innerHTML;_qb.innerHTML='Sending request&hellip;';}
+  var _qguard=setTimeout(function(){if(_qb&&_qb.dataset.busy==='1'){_qb.dataset.busy='';_qb.disabled=false;_qb.innerHTML=_qt;toast('Slow connection - request may still be sending in background','err');}},15000);
+  try{
   var reqNo=await window.getNextIRQ();
   var d={
     reqNo:reqNo,job:job,client:client,
@@ -1803,8 +1984,13 @@ async function submitQuickRequest(){
   msg+='Type: '+qrSelectedType+'\n';
   msg+='SUP: '+qrSupName+'\n';
   msg+='👉 https://eric0103360.github.io/fse-irn-system?irq='+encodeURIComponent(reqNo);
-  toast('Quick request IRQ-'+reqNo+' sent','ok');
-  window.open('https://wa.me/?text='+encodeURIComponent(msg));
+  toast('Quick request IRQ-'+reqNo+' sent to QC','ok');
+  clearTimeout(_qguard);
+  if(_qb){_qb.innerHTML='\u2713 Request sent';setTimeout(function(){_qb.dataset.busy='';_qb.disabled=false;_qb.innerHTML=_qt;},2500);}
+  }catch(_err){clearTimeout(_qguard);console.log('quickRequest error:',_err);toast('Request failed to send - please try again','err');if(_qb){_qb.dataset.busy='';_qb.disabled=false;_qb.innerHTML=_qt;}return;}
+  var _qc=document.getElementById('qrSupCode').value.toUpperCase();
+  var _mp=window.sendAppMessage?window.sendAppMessage({to:'QC',from:qrSupName||'Supervisor',fromCode:_qc,kind:'request',irq:reqNo,text:msg}):Promise.resolve('');
+  if(window.sendPushToRole)Promise.resolve(_mp).then(function(mid){window.sendPushToRole('qc',(qrUrgency==='urgent'?'\u26A1 URGENT - ':'')+'New inspection request IRQ-'+reqNo,job+(client?' | '+client:''),'https://eric0103360.github.io/fse-irn-system?irq='+encodeURIComponent(reqNo),qrUrgency==='urgent'?{repeat:3,intervalSec:25,msgId:(typeof mid==='string'?mid:''),senderCode:_qc}:null);});
   // Reset
   document.getElementById('qrJob').value='';
   document.getElementById('qrClient').value='';
@@ -1829,8 +2015,9 @@ function upTDEl(el){upTD(el.getAttribute('data-sid'),el.getAttribute('data-did')
 function sendStagePhoto(stageLabel){
   var d=getFormBasic();
   var irn=(d.bookRef&&d.reportNo)?d.bookRef+'/'+d.reportNo:'(IRN pending)';
-  var msg='*FSE IRN PHOTO*\nIRN: '+irn+'\nJob: '+(d.job||'pending')+'\nStage: '+stageLabel+'\nInspector: '+(d.inspector||'--')+'\nDate: '+d.date+'\n\n[Attach photo here]';
-  window.open('https://wa.me/?text='+encodeURIComponent(msg));
+  var msg='*FSE IRN PHOTO*\nIRN: '+irn+'\nJob: '+(d.job||'pending')+'\nStage: '+stageLabel+'\nInspector: '+(d.inspector||'--')+'\nDate: '+d.date+'\n\nPhotos attached in the app - open the job to view.';
+  if(window.sendAppMessage)window.sendAppMessage({to:'ALL',from:d.inspector||'QC',fromCode:d.qcCode||'',kind:'photo',irn:d.reportNo||'',text:msg});
+  toast('Photo notification sent','ok');
 }
 function setStageResult(sid,r){
   if(r==='reject'){
@@ -2133,7 +2320,8 @@ function sendWA(){
   }
   msg+='================================\n';
   msg+='Register: https://eric0103360.github.io/fse-irn-system';
-  window.open('https://wa.me/?text='+encodeURIComponent(msg));
+  if(window.sendAppMessage)window.sendAppMessage({to:'ALL',from:d.qc||'QC',fromCode:d.qcCode||'',kind:isPass?'release':'reject',irn:d.reportNo||'',text:msg});
+  toast('Result notification sent','ok');
 }
 async function submitIRN(){
   var d=getForm();
@@ -2184,7 +2372,7 @@ async function submitIRN(){
     // Hide unsaved banner
     var ub=document.getElementById('unsavedBanner');
     if(ub)ub.style.display='none';
-    // Open WhatsApp immediately
+    // Send in-app release notification
     var isPass=d.result==='accept';
     var isHold=d.result==='hold';
     var stageName=activeStageFilter&&STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;})?STAGES.find(function(s){return activeStageFilter.indexOf(s.id)!==-1;}).label:'';
@@ -2202,7 +2390,8 @@ async function submitIRN(){
       msg+='Action: '+(gv('rejectionAction')||'--')+'\n';
     }
     msg+='Reg: https://eric0103360.github.io/fse-irn-system';
-    window.open('https://wa.me/?text='+encodeURIComponent(msg));
+    if(window.sendAppMessage)window.sendAppMessage({to:'SUP',from:d.qc||'QC',fromCode:d.qcCode||'',kind:isPass?'release':isHold?'hold':'reject',irq:_irqParam||'',irn:d.reportNo||'',text:msg});
+    if(window.sendPushToRole)window.sendPushToRole('sup,mgt',(isPass?'\u2705 RELEASED':isHold?'\uD83D\uDFE0 ON HOLD':'\u274C REJECTED')+' - INS-C '+d.reportNo,d.job+(stageName?' | '+stageName:'')+' | QC: '+(d.qc||''),'');
     // Send to Google endpoint in background — don't wait
     fetch(ENDPOINT,{method:'POST',body:JSON.stringify(d),mode:'no-cors'}).catch(function(){});
     renderReg();
@@ -2251,7 +2440,7 @@ function renderReg(){
   var total=active.length;
   var released=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept';}).length;
   var pending=active.filter(function(e){var l=e.irns[e.irns.length-1];return !l;}).length;
-  var ftp=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&(!l.attempt||l.attempt===1);}).length;
+  var ftp=active.filter(function(e){var l=e.irns[e.irns.length-1];return e.irns.length===1&&l&&l.result==='accept';}).length;
   var ftpPct=released>0?Math.round(ftp/released*100):0;
   document.getElementById('statT').textContent=total;
   document.getElementById('statP').textContent=released;
@@ -2369,16 +2558,19 @@ function renderReg(){
     html+='<div style="display:flex;justify-content:flex-end;gap:6px">';
     if(isCancelled){
       var cancelReason=(req&&req.cancelReason)||(latestIrn&&latestIrn.cancelReason)||'No reason given';
-      html+='<div style="font-size:11px;color:#aaa;font-style:italic;align-self:center">Cancelled: '+cancelReason+'</div>';
+      html+='<div style="display:flex;align-items:center;gap:8px;flex:1"><div style="font-size:11px;color:#aaa;font-style:italic">Cancelled: '+cancelReason+'</div></div>';
+      if(window._adminUnlocked){html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irnfid="'+(latestIrn&&latestIrn.firebaseId||'')+'" data-irqno="'+irqNo+'" onclick="deleteRecord(this)" style="font-size:12px;padding:9px 14px;background:#FCEBEB;border:1px solid #E24B4A;color:#A32D2D;border-radius:8px;cursor:pointer;font-weight:600">🗑 Delete</button>';}
     } else if(latestIrn){
       html+='<button data-irn="'+latestIrn.reportNo+'" data-irq="'+irqNo+'" onclick="printFromReg(this)" style="font-size:13px;padding:9px 18px;background:#fff;border:1.5px solid #1a3a5c;color:#1a3a5c;border-radius:8px;cursor:pointer;font-weight:600"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> View / Print</button>';
       html+='<button data-irnfid="'+(latestIrn.firebaseId||'')+'" data-irqno="'+irqNo+'" data-irn="'+latestIrn.reportNo+'" onclick="amendIRN(this)" style="font-size:13px;padding:9px 14px;background:#FAEEDA;border:1.5px solid #BA7517;color:#633806;border-radius:8px;cursor:pointer;font-weight:600"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Amend</button>';
-      html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irnfid="'+(latestIrn&&latestIrn.firebaseId||'')+'" data-irqno="'+irqNo+'" onclick="cancelRecord(this)" style="font-size:12px;padding:9px 14px;background:#fff;border:1px solid #aaa;color:#888;border-radius:8px;cursor:pointer"><svg style="font-size:13px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Cancel</button>';
+      html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irnfid="'+(latestIrn&&latestIrn.firebaseId||'')+'" data-irqno="'+irqNo+'" onclick="cancelRecord(this)" style="font-size:12px;padding:9px 14px;background:#fff;border:1px solid #aaa;color:#888;border-radius:8px;cursor:pointer"> Cancel</button>';
+      if(window._adminUnlocked){html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irnfid="'+(latestIrn&&latestIrn.firebaseId||'')+'" data-irqno="'+irqNo+'" onclick="deleteRecord(this)" style="font-size:12px;padding:9px 14px;background:#FCEBEB;border:1px solid #E24B4A;color:#A32D2D;border-radius:8px;cursor:pointer;font-weight:600">🗑 Delete</button>';}
     } else {
       var inspType=(req&&req.inspTypes)||'';
       var instructions=(req&&req.instructions)||'';
       html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-reqno="'+irqNo+'" data-job="'+job.replace(/"/g,'&quot;')+'" data-client="'+client.replace(/"/g,'&quot;')+'" data-items="'+items_str.replace(/"/g,'&quot;')+'" data-insptype="'+inspType.replace(/"/g,'&quot;')+'" data-instructions="'+instructions.replace(/"/g,'&quot;')+'" data-by="'+supName.replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:14px;padding:10px 20px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">Complete IRN</button>';
       html+='<button data-irqno="'+irqNo+'" onclick="previewRequest(this)" style="font-size:13px;padding:10px 14px;background:#E6F1FB;border:1.5px solid #185FA5;color:#0C447C;border-radius:8px;cursor:pointer;font-weight:600"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> View Request</button>';
+      if(window._adminUnlocked){html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irnfid="" data-irqno="'+irqNo+'" onclick="deleteRecord(this)" style="font-size:12px;padding:10px 14px;background:#FCEBEB;border:1px solid #E24B4A;color:#A32D2D;border-radius:8px;cursor:pointer;font-weight:600">🗑 Delete</button>';}
       html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irqno="'+irqNo+'" onclick="cancelRecord(this)" style="font-size:12px;padding:10px 14px;background:#fff;border:1px solid #aaa;color:#888;border-radius:8px;cursor:pointer"><svg style="font-size:13px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Cancel</button>';
     }
     html+='</div>';
@@ -2435,7 +2627,7 @@ function printFromReg(btn){
   var rSup=r.reqSupervisor||(reqEntry&&reqEntry.supervisor)||'';var rDate=r.reqDate||(reqEntry&&reqEntry.date)||'';
   var reqPh2=(reqEntry&&reqEntry.reqPhotoData)||[];var inspPh2=r.inspPhotoData||[];
   var win=window.open('','_blank');
-  win.document.write('<!DOCTYPE html><html><head><title>IRN INS-C '+r.reportNo+(irqNo?' | IRQ-'+irqNo:'')+'</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10px;color:#1a1a1a}table{width:100%;border-collapse:collapse;margin-bottom:6px}th{background:#1a3a5c;color:#fff;padding:4px 6px;text-align:left;font-size:9px}td{font-size:10px;padding:3px 6px}.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:6px;margin-bottom:8px}.logo{height:36px}.result-pass{background:#EAF3DE;border:1px solid #1D9E75;padding:4px 8px;border-radius:4px;font-weight:700;color:#27500A;font-size:11px;margin-bottom:6px}.result-fail{background:#FCEBEB;border:1px solid #E24B4A;padding:4px 8px;border-radius:4px;font-weight:700;color:#A32D2D;font-size:11px;margin-bottom:6px}.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px}.cell{background:#f9f9f9;padding:4px 6px;border-radius:3px;border:0.5px solid #eee}.cl{font-size:8px;color:#888;text-transform:uppercase;margin-bottom:1px}.cv{font-size:10px;font-weight:500}.req-banner{background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:4px;padding:4px 8px;margin-bottom:6px;display:flex;gap:12px}.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px}.sign-box{border:0.5px solid #ddd;padding:6px 8px;border-radius:3px}.footer{font-size:8px;color:#aaa;text-align:center;margin-top:8px;border-top:0.5px solid #eee;padding-top:4px}.no-print{margin:8px 0}@media print{.no-print{display:none}body{margin:6mm}html{height:100%}}@page{size:A4 portrait;margin:8mm}</style></head><body>');
+  win.document.write('<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>IRN INS-C '+r.reportNo+(irqNo?' | IRQ-'+irqNo:'')+'</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10px;color:#1a1a1a}table{width:100%;border-collapse:collapse;margin-bottom:6px}th{background:#1a3a5c;color:#fff;padding:4px 6px;text-align:left;font-size:9px}td{font-size:10px;padding:3px 6px}.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:6px;margin-bottom:8px}.logo{height:36px}.result-pass{background:#EAF3DE;border:1px solid #1D9E75;padding:4px 8px;border-radius:4px;font-weight:700;color:#27500A;font-size:11px;margin-bottom:6px}.result-fail{background:#FCEBEB;border:1px solid #E24B4A;padding:4px 8px;border-radius:4px;font-weight:700;color:#A32D2D;font-size:11px;margin-bottom:6px}.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px}.cell{background:#f9f9f9;padding:4px 6px;border-radius:3px;border:0.5px solid #eee}.cl{font-size:8px;color:#888;text-transform:uppercase;margin-bottom:1px}.cv{font-size:10px;font-weight:500}.req-banner{background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:4px;padding:4px 8px;margin-bottom:6px;display:flex;gap:12px}.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px}.sign-box{border:0.5px solid #ddd;padding:6px 8px;border-radius:3px}.footer{font-size:8px;color:#aaa;text-align:center;margin-top:8px;border-top:0.5px solid #eee;padding-top:4px}.no-print{margin:8px 0}@media print{.no-print{display:none}body{margin:6mm}html{height:100%}}@page{size:A4 portrait;margin:8mm}@media screen and (orientation:landscape){body{zoom:1.3;margin:12px}}</style></head><body>');
   win.document.write('<div class="no-print" style="text-align:left;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back</button></div>');
   win.document.write('<div class="hdr"><div><img src="'+logoSrc+'" class="logo"><div style="margin-top:5px"><div style="font-size:16px;font-weight:500">Inspection Release Note</div><div style="font-size:12px;color:#555">FSE-QR-IRN.038 · Rev 02 · ISO9001 / ISO3834-2</div></div></div><div style="text-align:right"><div style="font-size:9px;color:#888;text-transform:uppercase">Report No</div><div style="font-size:24px;font-weight:700;color:#1a3a5c">INS-C '+r.reportNo+'</div>'+(irqNo?'<div style="font-size:11px;color:#185FA5">IRQ-'+irqNo+'</div>':'')+'</div></div>');
   win.document.write('<div class="'+(isPass?'result-pass':'result-fail')+'">'+(isPass?'✓ ACCEPTED — Released':'✗ REJECTED — Rework required')+'</div>');
@@ -2489,7 +2681,9 @@ function printFromReg(btn){
   win.document.write('<div class="sign-box"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:4px">Client <span style="font-weight:400">(optional)</span></div><div style="font-size:13px;font-weight:600">'+(r.client||'—')+'</div></div>');
   win.document.write('</div>');
   win.document.write('<div class="footer">FSE-QR-IRN.038 Rev 02 · This document is the property of FSE · If printed, verify against the authorised version on the server</div>');
-  win.document.write('<div class="no-print" style="margin-top:16px;display:flex;gap:8px;justify-content:center"><button onclick="window.print()" style="padding:10px 28px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer">Print / Save as PDF</button><button onclick="window.close()" style="padding:10px 20px;background:#f0f0f0;border:none;border-radius:8px;font-size:13px;cursor:pointer">Close</button></div>');
+  win.document.write('<div class="no-print" style="margin-top:16px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button onclick="window.print()" style="padding:10px 28px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer">Print / Save as PDF</button><button onclick="fsT()" style="padding:10px 20px;background:#fff;border:1px solid #1a3a5c;color:#1a3a5c;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer">&#9974; Full screen</button><button onclick="window.close()" style="padding:10px 20px;background:#f0f0f0;border:none;border-radius:8px;font-size:13px;cursor:pointer">Close</button></div>');
+  win.document.write('<scr'+'ipt>function fsT(){var el=document.documentElement;if(!document.fullscreenElement){var pr=el.requestFullscreen?el.requestFullscreen():Promise.reject();pr.then(function(){if(screen.orientation&&screen.orientation.lock){screen.orientation.lock("landscape").catch(function(){});}}).catch(function(){});}else{if(screen.orientation&&screen.orientation.unlock)screen.orientation.unlock();document.exitFullscreen();}}document.addEventListener("fullscreenchange",function(){if(!document.fullscreenElement&&screen.orientation&&screen.orientation.unlock){try{screen.orientation.unlock();}catch(e){}}});</scr'+'ipt>');
+
   win.document.write('</body></html>');win.document.close();
 }
 
@@ -2509,7 +2703,8 @@ function waRec(book,no){
   msg+='SUP: '+r.supCode+' ('+r.supervisor+') | QC: '+r.qcCode+' ('+r.qc+')\n';
   if(r.snags&&r.snags!=='None')msg+='*SNAGS:* '+r.snags+'\n';
   if(!isPass)msg+='\n*Action required - see snags*';
-  window.open('https://wa.me/?text='+encodeURIComponent(msg));
+  if(window.sendAppMessage)window.sendAppMessage({to:'ALL',from:r.qc||'QC',fromCode:r.qcCode||'',kind:isPass?'release':'reject',irn:r.reportNo||'',text:msg});
+  toast('Notification sent','ok');
 }
 function renderPendingReqs(){
   // Cards removed - pending requests shown in Register table
@@ -2641,7 +2836,9 @@ var fabRows='';
     html+='<td style="padding:8px;border:1px solid #ccc">_______________</td><td style="padding:8px;border:1px solid #ccc;height:50px;width:180px"></td></tr></table>';
   }
   html+='<div style="margin-top:16px;font-size:9px;color:#999;border-top:1px solid #eee;padding-top:6px">FSE eIRN System - Generated '+new Date().toLocaleString('en-ZA')+' - FSE-QR-IRN.038 - Controlled document</div>';
-  html+='<div class="np" style="margin-top:16px;text-align:center"><button onclick="window.print()" style="padding:8px 24px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">Print / Save as PDF</button></div>';
+  html+='<div class="np" style="margin-top:16px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button onclick="window.print()" style="padding:8px 24px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">Print / Save as PDF</button><button onclick="fsT()" style="padding:8px 20px;background:#fff;border:1px solid #1a3a5c;color:#1a3a5c;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer">&#9974; Full screen</button></div>';
+  html+='<scr'+'ipt>function fsT(){var el=document.documentElement;if(!document.fullscreenElement){var pr=el.requestFullscreen?el.requestFullscreen():Promise.reject();pr.then(function(){if(screen.orientation&&screen.orientation.lock){screen.orientation.lock("landscape").catch(function(){});}}).catch(function(){});}else{if(screen.orientation&&screen.orientation.unlock)screen.orientation.unlock();document.exitFullscreen();}}document.addEventListener("fullscreenchange",function(){if(!document.fullscreenElement&&screen.orientation&&screen.orientation.unlock){try{screen.orientation.unlock();}catch(e){}}});</scr'+'ipt>';
+  html+='<style>@media screen and (orientation:landscape){body{zoom:1.3;margin:12px}}</style>';
   html+='</body></html>';
   pw.document.write(html);pw.document.close();
 }
@@ -2667,7 +2864,7 @@ function printIRN(){
   var supName=_urlReq?(_urlReq.supervisor||''):'';
   var reqDate=_urlReq?(_urlReq.date||''):'';
   var win=window.open('','_blank');
-  win.document.write('<!DOCTYPE html><html><head><title>IRN INS-C '+d.reportNo+(irqRef?' | '+irqRef:'')+'</title>');
+  win.document.write('<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>IRN INS-C '+d.reportNo+(irqRef?' | '+irqRef:'')+'</title>');
   win.document.write('<style>');
   win.document.write('*{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:12px;margin:20px;color:#1a1a1a}');
   win.document.write('h1{font-size:16px;margin:0}h2{font-size:12px;margin:0;color:#555}');
@@ -2749,11 +2946,12 @@ function printIRN(){
   win.document.write('<div class="footer">FSE-QR-IRN.038 Rev 02 · This document is the property of FSE · If printed, verify against the authorised version on the server</div>');
 
   // Print button
-  win.document.write('<div class="no-print" style="margin-top:16px;display:flex;gap:8px;justify-content:center">');
+  win.document.write('<div class="no-print" style="margin-top:16px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">');
   win.document.write('<button onclick="window.print()" style="padding:10px 28px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer">🖨 Print / Save as PDF</button>');
+  win.document.write('<button onclick="fsT()" style="padding:10px 20px;background:#fff;border:1px solid #1a3a5c;color:#1a3a5c;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer">&#9974; Full screen</button>');
   win.document.write('<button onclick="window.close()" style="padding:10px 20px;background:#f0f0f0;border:none;border-radius:8px;font-size:13px;cursor:pointer">✕ Close</button>');
   win.document.write('</div>');
-
+  win.document.write('<scr'+'ipt>function fsT(){var el=document.documentElement;if(!document.fullscreenElement){var pr=el.requestFullscreen?el.requestFullscreen():Promise.reject();pr.then(function(){if(screen.orientation&&screen.orientation.lock){screen.orientation.lock("landscape").catch(function(){});}}).catch(function(){});}else{if(screen.orientation&&screen.orientation.unlock)screen.orientation.unlock();document.exitFullscreen();}}document.addEventListener("fullscreenchange",function(){if(!document.fullscreenElement&&screen.orientation&&screen.orientation.unlock){try{screen.orientation.unlock();}catch(e){}}});</scr'+'ipt>');
   win.document.write('</body></html>');
   win.document.close();
 }
@@ -2780,7 +2978,7 @@ function previewRequest(btn){
     photoHtml+='</div></div>';
   }
   var win=window.open('','_blank');
-  win.document.write('<!DOCTYPE html><html><head><title>Inspection Request IRQ-'+irqNo+'</title>');
+  win.document.write('<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Inspection Request IRQ-'+irqNo+'</title>');
   win.document.write('<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:13px;color:#1a1a1a;padding:20px}');
   win.document.write('.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:12px;margin-bottom:14px}');
   win.document.write('.logo{height:52px}.irq-no{text-align:right}.irq-label{font-size:9px;color:#888;text-transform:uppercase}.irq-val{font-size:26px;font-weight:700;color:#1a3a5c}');
@@ -2828,8 +3026,10 @@ function previewRequest(btn){
   // Buttons
   win.document.write('<div class="no-print">');
   win.document.write('<button onclick="window.print()" style="padding:10px 28px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer">🖨 Print / Save as PDF</button>');
+  win.document.write('<button onclick="fsT()" style="padding:10px 20px;background:#fff;border:1px solid #1a3a5c;color:#1a3a5c;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer">&#9974; Full screen</button>');
   win.document.write('<button onclick="window.close()" style="padding:10px 20px;background:#f0f0f0;border:none;border-radius:8px;font-size:13px;cursor:pointer">✕ Close</button>');
   win.document.write('</div>');
+  win.document.write('<scr'+'ipt>function fsT(){var el=document.documentElement;if(!document.fullscreenElement){var pr=el.requestFullscreen?el.requestFullscreen():Promise.reject();pr.then(function(){if(screen.orientation&&screen.orientation.lock){screen.orientation.lock("landscape").catch(function(){});}}).catch(function(){});}else{if(screen.orientation&&screen.orientation.unlock)screen.orientation.unlock();document.exitFullscreen();}}document.addEventListener("fullscreenchange",function(){if(!document.fullscreenElement&&screen.orientation&&screen.orientation.unlock){try{screen.orientation.unlock();}catch(e){}}});</scr'+'ipt>');
   win.document.write('</body></html>');
   win.document.close();
 }
@@ -2888,6 +3088,24 @@ function amendIRN(btn){
     toast('IRN INS-C '+irnNo+' reopened for amendment','info');
   },200);
 }
+function deleteRecord(btn){
+  var irqNo=btn.dataset.irqno;
+  var reqFid=btn.dataset.fid||'';
+  var irnFid=btn.dataset.irnfid||'';
+  if(!confirm('Permanently delete IRQ-'+irqNo+'?\n\nThis cannot be undone.')){return;}
+  var promises=[];
+  if(reqFid&&window.deleteRequest)promises.push(window.deleteRequest(reqFid));
+  if(irnFid&&window.deleteIRN)promises.push(window.deleteIRN(irnFid));
+  Promise.all(promises).then(function(){
+    toast('IRQ-'+irqNo+' permanently deleted','ok');
+    var loaded={irns:false,reqs:false};
+    function check(){if(loaded.irns&&loaded.reqs)renderReg();}
+    if(window.loadIRNsFromFirebase){window.loadIRNsFromFirebase(function(r){reg=r;loaded.irns=true;check();});}
+    else{loaded.irns=true;check();}
+    if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){reqs=r;loaded.reqs=true;check();});}
+    else{loaded.reqs=true;check();}
+  }).catch(function(){toast('Error deleting — check connection','err');});
+}
 function cancelRecord(btn){
   var irqNo=btn.dataset.irqno;
   var reqFid=btn.dataset.fid||'';
@@ -2908,6 +3126,113 @@ function cancelRecord(btn){
     else{loaded.reqs=true;check();}
   }).catch(function(){toast('Error cancelling — check connection','err');});
 }
+// ===== Artisan & failure analytics =====
+function anNorm(n){return String(n||'').trim().replace(/\./g,'').replace(/\s+/g,' ').toLowerCase();}
+function anEsc(t){return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+var AN_SNAG_BUCKETS=[['Porosity',/poros|blow ?hole|gas/i],['Crack',/crack/i],['Undercut',/undercut/i],['Dimensional',/dimens|size|length|tolerance|out of spec/i],['Fit-up / gap',/fit-?up|gap|misalign|alignment/i],['Spatter / cleaning',/spatter|clean/i],['Surface / paint',/surface|paint|primer|prep|blast|dft/i]];
+function anSnagBucket(text){for(var i=0;i<AN_SNAG_BUCKETS.length;i++){if(AN_SNAG_BUCKETS[i][1].test(text))return AN_SNAG_BUCKETS[i][0];}return 'Other';}
+function computeAnalytics(entries){
+  var art={},reasons={},stagesHit={},months={};
+  entries.forEach(function(e){
+    if(e.req&&e.req.status==='cancelled')return;
+    var irns=(e.irns||[]).filter(function(r){return !r.cancelled;});if(irns.length===0)return;
+    var last=irns[irns.length-1];if(last&&last.cancelled)return;
+    var rejects=irns.filter(function(r){return r.result==='reject';});
+    var names=[];(e.req&&e.req.artisans||[]).forEach(function(n){if(n)names.push(n);});
+    irns.forEach(function(r){if(r.artisan)String(r.artisan).split(',').forEach(function(n){if(n.trim())names.push(n.trim());});});
+    var seen={};names=names.filter(function(n){var k=anNorm(n);if(!k||seen[k])return false;seen[k]=true;return true;});
+    var job=(last&&last.job)||(e.req&&e.req.job)||e.reqNo||'';
+    names.forEach(function(n){
+      var k=anNorm(n);
+      if(!art[k])art[k]={display:n,first:0,rework:0,rejected:0,fails:0,jobs:{},snag:''};
+      var a=art[k];
+      if(last.result==='accept'){if(irns.length>1)a.rework++;else a.first++;}
+      else if(last.result==='reject')a.rejected++;
+      a.fails+=rejects.length;
+      if(rejects.length&&job)a.jobs[job]=1;
+      if(rejects.length&&!a.snag){var t=(rejects[0].snags&&rejects[0].snags!=='None'?rejects[0].snags:'')+' '+(rejects[0].rejectionReason||'');a.snag=anSnagBucket(t);}
+    });
+    rejects.forEach(function(r){
+      var t=(r.snags&&r.snags!=='None'?r.snags:'')+' '+(r.rejectionReason||'');
+      var b=anSnagBucket(t);reasons[b]=(reasons[b]||0)+1;
+      var st=r.stageStates||{};var hit=false;
+      STAGES.forEach(function(sd){if(st[sd.id]&&st[sd.id].result==='reject'){stagesHit[sd.label]=(stagesHit[sd.label]||0)+1;hit=true;}});
+      if(st['s2b']&&st['s2b'].result==='reject'){stagesHit['S2B: NDT']=(stagesHit['S2B: NDT']||0)+1;hit=true;}
+      if(!hit)stagesHit[r.stageName||'Overall']=(stagesHit[r.stageName||'Overall']||0)+1;
+    });
+    var dt=new Date(last.date||'');
+    if(!isNaN(dt)){var mk=dt.getFullYear()+'-'+('0'+(dt.getMonth()+1)).slice(-2);
+      if(!months[mk])months[mk]={rel:0,ftp:0,lab:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()]};
+      if(last.result==='accept'){months[mk].rel++;if(irns.length===1)months[mk].ftp++;}}
+  });
+  var artArr=Object.keys(art).map(function(k){return art[k];}).filter(function(a){return a.first+a.rework+a.rejected>0;});
+  artArr.sort(function(a,b){return (b.fails-a.fails)||((b.first+b.rework+b.rejected)-(a.first+a.rework+a.rejected));});
+  var monKeys=Object.keys(months).sort().slice(-5);
+  return{art:artArr,reasons:reasons,stagesHit:stagesHit,months:monKeys.map(function(k){var m=months[k];return{lab:m.lab,pct:m.rel?Math.round(m.ftp/m.rel*100):0,rel:m.rel};})};
+}
+function anBarRow(name,segs,label,sub){
+  var total=segs.reduce(function(t,x){return t+x[0];},0)||1;
+  var h='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><div style="width:132px;font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+anEsc(name)+(sub?' <span style="font-size:9px;color:#888;font-weight:400">'+anEsc(sub)+'</span>':'')+'</div><div style="flex:1;height:16px;background:#f0f2f4;border-radius:4px;overflow:hidden;display:flex">';
+  segs.forEach(function(x){if(x[0]>0)h+='<div style="width:'+(x[0]/total*100)+'%;background:'+x[1]+'"></div>';});
+  h+='</div><div style="width:62px;font-size:10.5px;text-align:right;color:#888">'+label+'</div></div>';
+  return h;
+}
+function buildAnalyticsHTML(a){
+  var h='';
+  if(a.months.length){
+    h+='<div style="font-size:11px;font-weight:700;color:#1a3a5c;margin:4px 0 8px">First-time pass rate — monthly</div><div style="display:flex;align-items:flex-end;gap:8px;height:96px;padding:0 2px;margin-bottom:14px">';
+    a.months.forEach(function(m,i){h+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px"><div style="width:100%;max-width:46px;height:'+Math.max(m.pct,4)+'%;background:'+(i===a.months.length-1?'#1F7A45':'#185FA5')+';border-radius:4px 4px 0 0;position:relative"><div style="position:absolute;top:-16px;left:0;right:0;text-align:center;font-size:10px;font-weight:700;color:#1a3a5c">'+m.pct+'%</div></div><div style="font-size:9.5px;color:#888">'+m.lab+'</div></div>';});
+    h+='</div>';
+  }
+  if(a.art.length){
+    h+='<div style="font-size:11px;font-weight:700;color:#1a3a5c;margin:4px 0 8px">Results by artisan <span style="font-weight:400;color:#888">(pass first time / rework / rejected)</span></div>';
+    a.art.slice(0,12).forEach(function(x){h+=anBarRow(x.display,[[x.first,'#1F7A45'],[x.rework,'#BA7517'],[x.rejected,'#A32D2D']],x.first+' / '+x.rework+' / '+x.rejected);});
+    h+='<div style="display:flex;gap:12px;font-size:10px;color:#888;margin:6px 0 14px;flex-wrap:wrap"><span><span style="display:inline-block;width:8px;height:8px;background:#1F7A45;border-radius:2px;margin-right:3px"></span>Passed first time</span><span><span style="display:inline-block;width:8px;height:8px;background:#BA7517;border-radius:2px;margin-right:3px"></span>Rework</span><span><span style="display:inline-block;width:8px;height:8px;background:#A32D2D;border-radius:2px;margin-right:3px"></span>Rejected</span></div>';
+    var rep=a.art.filter(function(x){return x.fails>=2;});
+    if(rep.length){
+      h+='<div style="font-size:11px;font-weight:700;color:#1a3a5c;margin:4px 0 8px">Repeat-failure register <span style="font-weight:400;color:#888">(2+ failed attempts)</span></div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px"><tr><th style="background:#1a3a5c;color:#fff;padding:5px 7px;text-align:left;font-size:9.5px;text-transform:uppercase">Artisan</th><th style="background:#1a3a5c;color:#fff;padding:5px 7px;text-align:left;font-size:9.5px;text-transform:uppercase">Failed attempts</th><th style="background:#1a3a5c;color:#fff;padding:5px 7px;text-align:left;font-size:9.5px;text-transform:uppercase">Jobs affected</th><th style="background:#1a3a5c;color:#fff;padding:5px 7px;text-align:left;font-size:9.5px;text-transform:uppercase">Main snag</th><th style="background:#1a3a5c;color:#fff;padding:5px 7px;text-align:left;font-size:9.5px;text-transform:uppercase">Flag</th></tr>';
+      rep.forEach(function(x){var flag=x.fails>=3?'<span style="background:#FCEBEB;color:#A32D2D;font-weight:700;padding:1px 7px;border-radius:3px;font-size:9.5px">RETRAINING</span>':'<span style="background:#FAEEDA;color:#BA7517;font-weight:700;padding:1px 7px;border-radius:3px;font-size:9.5px">WATCH</span>';
+        h+='<tr><td style="padding:5px 7px;border-bottom:1px solid #eee">'+anEsc(x.display)+'</td><td style="padding:5px 7px;border-bottom:1px solid #eee"><b>'+x.fails+'</b></td><td style="padding:5px 7px;border-bottom:1px solid #eee">'+anEsc(Object.keys(x.jobs).join(', '))+'</td><td style="padding:5px 7px;border-bottom:1px solid #eee">'+anEsc(x.snag||'--')+'</td><td style="padding:5px 7px;border-bottom:1px solid #eee">'+flag+'</td></tr>';});
+      h+='</table></div><div style="height:14px"></div>';
+    }
+  }
+  var rk=Object.keys(a.reasons).sort(function(x,y){return a.reasons[y]-a.reasons[x];});
+  if(rk.length){
+    var mx=a.reasons[rk[0]];
+    h+='<div style="font-size:11px;font-weight:700;color:#1a3a5c;margin:4px 0 8px">Failure reasons (from snag lists)</div>';
+    rk.forEach(function(r){h+=anBarRow(r,[[a.reasons[r],'#A32D2D'],[Math.max(mx-a.reasons[r],0.0001),'transparent']],String(a.reasons[r]));});
+    h+='<div style="height:10px"></div>';
+  }
+  var sk=Object.keys(a.stagesHit).sort(function(x,y){return a.stagesHit[y]-a.stagesHit[x];});
+  if(sk.length){
+    var smx=a.stagesHit[sk[0]];
+    h+='<div style="font-size:11px;font-weight:700;color:#1a3a5c;margin:4px 0 8px">Where failures are caught (by stage)</div>';
+    sk.forEach(function(st){h+=anBarRow(st,[[a.stagesHit[st],'#185FA5'],[Math.max(smx-a.stagesHit[st],0.0001),'transparent']],String(a.stagesHit[st]));});
+  }
+  if(!h)h='<div style="font-size:12px;color:#aaa;text-align:center;padding:12px">No completed inspections yet</div>';
+  return h;
+}
+var _anEntries=null;
+function renderAnalytics(entries){
+  _anEntries=entries;
+  var el=document.getElementById('mgAnalytics');if(!el)return;
+  el.innerHTML=buildAnalyticsHTML(computeAnalytics(entries));
+}
+function printAnalytics(){
+  if(!_anEntries){toast('Open Management View first','err');return;}
+  var a=computeAnalytics(_anEntries);
+  var pw=window.open('','_blank');if(!pw){toast('Allow pop-ups to print','err');return;}
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FSE Quality Analytics Report</title>';
+  html+='<style>body{font-family:Arial,Calibri,sans-serif;font-size:12px;margin:20px;color:#1a1a1a}h1{font-size:17px;color:#1a3a5c;margin:0}.sub{font-size:11px;color:#666;margin-bottom:14px}@media print{.np{display:none}body{margin:6mm}}@page{size:A4 portrait;margin:10mm}@media screen and (orientation:landscape){body{zoom:1.3;margin:12px}}</style></head><body>';
+  html+='<div style="border-bottom:3px solid #1a3a5c;padding-bottom:8px;margin-bottom:12px"><div style="font-size:9px;color:#888;letter-spacing:1px">FIELD SERVICES &amp; ENGINEERING</div><h1>Quality Analytics — Management Report</h1><div class="sub">Generated '+new Date().toLocaleDateString('en-ZA')+' from the live eIRN register &nbsp;&bull;&nbsp; FSE eIRN System</div></div>';
+  html+=buildAnalyticsHTML(a);
+  html+='<div style="margin-top:18px;font-size:10px;color:#888;border-top:1px solid #ddd;padding-top:6px">Compiled automatically by the FSE eIRN System. Repeat-failure flags: 2 failed attempts = WATCH, 3+ = RETRAINING.</div>';
+  html+='<div class="np" style="margin-top:16px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button onclick="window.print()" style="padding:8px 24px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">Print / Save as PDF</button><button onclick="fsT()" style="padding:8px 20px;background:#fff;border:1px solid #1a3a5c;color:#1a3a5c;border-radius:6px;font-size:13px;cursor:pointer">&#9974; Full screen</button><button onclick="window.close()" style="padding:8px 20px;background:#f0f0f0;border:none;border-radius:6px;font-size:13px;cursor:pointer">Close</button></div>';
+  html+='<scr'+'ipt>function fsT(){var el=document.documentElement;if(!document.fullscreenElement){var pr=el.requestFullscreen?el.requestFullscreen():Promise.reject();pr.then(function(){if(screen.orientation&&screen.orientation.lock){screen.orientation.lock("landscape").catch(function(){});}}).catch(function(){});}else{if(screen.orientation&&screen.orientation.unlock)screen.orientation.unlock();document.exitFullscreen();}}document.addEventListener("fullscreenchange",function(){if(!document.fullscreenElement&&screen.orientation&&screen.orientation.unlock){try{screen.orientation.unlock();}catch(e){}}});</scr'+'ipt>';
+  html+='</body></html>';
+  pw.document.write(html);pw.document.close();
+}
+// ===== end analytics =====
 function renderMgmt(){
   // Build merged entries same as renderReg
   var irqMap={};
@@ -2931,7 +3256,7 @@ function renderMgmt(){
   var rework=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='reject';}).length;
   var onHold=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='hold';}).length;
   var pending=active.filter(function(e){return e.irns.length===0;}).length;
-  var ftp=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&(!l.attempt||l.attempt===1);}).length;
+  var ftp=active.filter(function(e){var l=e.irns[e.irns.length-1];return e.irns.length===1&&l&&l.result==='accept';}).length;
   var ftpPct=released>0?Math.round(ftp/released*100):0;
 
   document.getElementById('mgStatTotal').textContent=total;
@@ -3007,7 +3332,9 @@ function renderMgmt(){
     ?reworkList.map(function(e){return mkRow(e,'#BA7517');}).join('')
     :'<div style="padding:14px;font-size:12px;color:#aaa;text-align:center">No rework items</div>';
 
-  // Concessions — flagged via concession WA message (no dedicated field yet, show placeholder)
+  renderAnalytics(entries);
+
+  // Concessions — flagged via concession in-app message (no dedicated field yet, show placeholder)
   document.getElementById('mgConcessionCount').textContent='0';
   document.getElementById('mgConcession').innerHTML='<div style="padding:14px;font-size:12px;color:#aaa;text-align:center">No concession holds</div>';
 }
@@ -3108,20 +3435,59 @@ if(_printParam&&window.loadIRNsFromFirebase){
     }
   });
 }
+// ===== In-app messaging (replaces WhatsApp) =====
+var msgs=[],msgUser=null,msgUnsub=null,msgFilter='all',msgOpenId=null;
+try{msgUser=JSON.parse(localStorage.getItem('fseMsgUser')||'null');}catch(e){msgUser=null;}
+function msgAudienceMatch(m){if(!msgUser)return false;if(msgUser.role==='mgt')return true;var t=(m.to||'ALL').toUpperCase();return t==='ALL'||(t==='QC'&&msgUser.role==='qc')||(t==='SUP'&&msgUser.role==='sup')||(t==='MGT'&&msgUser.role==='mgt')||t===msgUser.code;}
+function msgIsUnread(m){return msgUser&&msgAudienceMatch(m)&&m.fromCode!==msgUser.code&&(!m.readBy||m.readBy.indexOf(msgUser.code)<0);}
+function startMsgListener(){if(msgUnsub||!window.loadMessagesFromFirebase)return;msgUnsub=window.loadMessagesFromFirebase(function(r){var prevUnread=msgs.filter(msgIsUnread).length;msgs=r;updateMsgBadge();var el=document.getElementById('v-messages');if(el&&el.classList.contains('on'))renderMsgs();var nowUnread=msgs.filter(msgIsUnread).length;if(msgUser&&nowUnread>prevUnread&&prevUnread>=0&&msgs.length&&window._msgListenerWarm){toast('New message received','info');playMsgChime();}window._msgListenerWarm=true;});}
+function playMsgChime(){try{var C=window.AudioContext||window.webkitAudioContext;if(!C)return;if(!window._msgAC)window._msgAC=new C();var ac=window._msgAC;if(ac.state==='suspended')ac.resume();var t=ac.currentTime;[[880,0],[1174.66,0.16]].forEach(function(n){var o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.value=n[0];g.gain.setValueAtTime(0.0001,t+n[1]);g.gain.exponentialRampToValueAtTime(0.28,t+n[1]+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+n[1]+0.35);o.connect(g);g.connect(ac.destination);o.start(t+n[1]);o.stop(t+n[1]+0.4);});}catch(e){}}
+function updateMsgBadge(){var b=document.getElementById('msgBadge');if(!b)return;var n=msgUser?msgs.filter(msgIsUnread).length:0;b.textContent=n>99?'99+':n;b.style.display=n>0?'inline-block':'none';try{if(navigator.setAppBadge){if(n>0)navigator.setAppBadge(n);else if(navigator.clearAppBadge)navigator.clearAppBadge();}}catch(e){}}
+function initMessagesView(){var si=document.getElementById('msgSignIn'),ib=document.getElementById('msgInbox');if(!msgUser){si.style.display='block';ib.style.display='none';return;}si.style.display='none';ib.style.display='block';document.getElementById('msgWhoAmI').textContent=msgUser.name+' ('+msgUser.code+')';var pb=document.getElementById('msgPushBtn');if(pb){var en=false;try{en=localStorage.getItem('fsePushEnabled')==='1'&&Notification.permission==='granted';}catch(e){}if(en)pb.innerHTML='\u2713 Notifications on';}startMsgListener();renderMsgs();}
+function msgSignIn(){var code=document.getElementById('msgUserCode').value.trim().toUpperCase();var pin=document.getElementById('msgUserPin').value.trim();var st=document.getElementById('msgSignInStatus');var list=code.indexOf('QC')===0?codes.qc:code.indexOf('SUP')===0?codes.sup:code.indexOf('MGT')===0?codes.mgt:null;if(!list){st.innerHTML='<span style="color:#A32D2D">Enter a valid QC-xxx, SUP-xxx or MGT-xxx code</span>';return;}var match=null;for(var i=0;i<list.length;i++){if(list[i].code===code&&list[i].active&&list[i].name){match=list[i];break;}}if(!match){st.innerHTML='<span style="color:#A32D2D">Code not recognised</span>';return;}if(match.pin&&match.pin.length===4&&match.pin!==pin){st.innerHTML='<span style="color:#A32D2D">Incorrect PIN</span>';return;}msgUser={code:match.code,name:match.name,role:code.indexOf('QC')===0?'qc':code.indexOf('MGT')===0?'mgt':'sup'};try{localStorage.setItem('fseMsgUser',JSON.stringify(msgUser));}catch(e){}st.innerHTML='';document.getElementById('msgUserPin').value='';initMessagesView();updateMsgBadge();toast('Signed in as '+msgUser.name,'ok');}
+async function enablePushClicked(){
+  if(!msgUser){toast('Sign in first','err');return;}
+  var btn=document.getElementById('msgPushBtn');
+  if(btn){btn.disabled=true;btn.textContent='Enabling\u2026';}
+  var r=await window.enablePushNotifications(msgUser.code,msgUser.role);
+  toast(r.msg,r.ok?'ok':'err');
+  if(btn){btn.disabled=false;btn.innerHTML=r.ok?'\u2713 Notifications on':'\uD83D\uDD14 Enable notifications';}
+  if(r.ok){try{localStorage.setItem('fsePushEnabled','1');}catch(e){}}
+}
+function msgSignOut(){msgUser=null;try{localStorage.removeItem('fseMsgUser');}catch(e){}updateMsgBadge();initMessagesView();}
+function setMsgFilter(f){msgFilter=f;var a=document.getElementById('msgTabAll'),u=document.getElementById('msgTabUnread');if(a&&u){a.style.background=f==='all'?'#1a3a5c':'#fff';a.style.color=f==='all'?'#fff':'#555';u.style.background=f==='unread'?'#1a3a5c':'#fff';u.style.color=f==='unread'?'#fff':'#555';}renderMsgs();}
+function escMsg(t){return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function fmtMsgText(t){var h=escMsg(t);h=h.replace(/\*([^*\n]+)\*/g,'<b>$1</b>');h=h.replace(/(https?:\/\/[^\s]+)/g,function(u){return '<a href="'+u+'" onclick="event.stopPropagation()" style="color:#185FA5;word-break:break-all">'+u+'</a>';});return h.replace(/\n/g,'<br>');}
+function msgTimeLabel(ts){try{var d=new Date(ts);var now=new Date();var opts={hour:'2-digit',minute:'2-digit'};if(d.toDateString()===now.toDateString())return 'Today '+d.toLocaleTimeString('en-ZA',opts);return d.toLocaleDateString('en-ZA')+' '+d.toLocaleTimeString('en-ZA',opts);}catch(e){return '';}}
+function msgKindChip(m){var k=(m.kind||'').toLowerCase();var map={request:['#E6F1FB','#185FA5','REQUEST'],release:['#E7F4EC','#1F7A45','RELEASED'],hold:['#FAEEDA','#8A5A10','HOLD'],reject:['#FCEBEB','#A32D2D','REJECTED'],photo:['#F0F0F0','#555','PHOTOS']};if(!map[k])return '';var c=map[k];return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:'+c[0]+';color:'+c[1]+';letter-spacing:0.5px">'+c[2]+'</span>';}
+function renderMsgs(){var el=document.getElementById('msgList');if(!el||!msgUser)return;var mine=msgs.filter(function(m){return msgAudienceMatch(m)||m.fromCode===msgUser.code;});if(msgFilter==='unread')mine=mine.filter(msgIsUnread);if(mine.length===0){el.innerHTML='<div style="padding:32px;text-align:center;color:#999;font-size:13px">'+(msgFilter==='unread'?'No unread messages':'No messages yet - raise a request or send one with New message')+'</div>';return;}var html='';mine.slice(0,150).forEach(function(m){var unread=msgIsUnread(m);var open=msgOpenId===m.firebaseId;var toLbl=(m.to||'ALL').toUpperCase();toLbl=toLbl==='ALL'?'Everyone':toLbl==='QC'?'All QC':toLbl==='SUP'?'All Supervisors':toLbl==='MGT'?'All Management':toLbl;html+='<div onclick="openMsg(\''+m.firebaseId+'\')" style="padding:12px 14px;border-bottom:1px solid #eee;cursor:pointer;position:relative;'+(unread?'background:#FDF8EC;':'')+'">';if(unread)html+='<div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:#185FA5"></div>';html+='<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><span style="font-weight:700;font-size:13px;color:#1a3a5c">'+escMsg(m.from||'--')+(m.fromCode?' ('+escMsg(m.fromCode)+')':'')+'</span><span style="font-size:11px;color:#999">&rarr; '+escMsg(toLbl)+'</span><span style="margin-left:auto;font-size:11px;color:#999">'+msgTimeLabel(m.timestamp)+'</span></div>';html+='<div style="font-size:13px;color:#333;margin-top:4px;word-break:break-word;'+(open?'':'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;')+(unread?'font-weight:600;':'')+'">'+fmtMsgText(m.text)+'</div>';if(m.photoUrl){html+='<div style="margin-top:6px"><img src="'+escMsg(m.photoUrl)+'" onclick="event.stopPropagation();window.open(this.src)" style="'+(open?'max-width:100%;max-height:280px;':'width:96px;height:72px;object-fit:cover;')+'border-radius:8px;border:1px solid #ddd;cursor:pointer"></div>';}var chips='';if(m.irq)chips+='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:#EEF3F8;color:#1a3a5c">IRQ-'+escMsg(m.irq)+'</span> ';if(m.irn)chips+='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:#EEF3F8;color:#1a3a5c">INS-C '+escMsg(m.irn)+'</span> ';chips+=msgKindChip(m);if(chips)html+='<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+chips+'</div>';if(!open)html+='<div style="font-size:11px;color:#185FA5;margin-top:3px;font-weight:600">Tap to read full message</div>';if(open&&m.irq)html+='<div style="margin-top:8px"><a href="'+location.pathname+'?irq='+encodeURIComponent(m.irq)+'" onclick="event.stopPropagation()" style="display:inline-block;padding:7px 14px;background:#1a3a5c;color:#fff;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none">Open job &rarr;</a></div>';html+='</div>';});el.innerHTML=html;}
+function openMsg(fid){msgOpenId=msgOpenId===fid?null:fid;var m=msgs.find(function(x){return x.firebaseId===fid;});if(m&&msgUser&&msgIsUnread(m)&&window.markMessageRead){window.markMessageRead(fid,msgUser.code);if(!m.readBy)m.readBy=[];m.readBy.push(msgUser.code);updateMsgBadge();}renderMsgs();}
+var msgPhotoData=null;
+function msgPhotoPicked(inp){var f=inp.files&&inp.files[0];if(!f)return;compressImage(f,function(dataUrl){msgPhotoData=dataUrl;document.getElementById('msgPhotoThumb').src=dataUrl;document.getElementById('msgPhotoPreview').style.display='block';});inp.value='';}
+function msgPhotoClear(){msgPhotoData=null;document.getElementById('msgPhotoPreview').style.display='none';}
+function openMsgCompose(){var sel=document.getElementById('msgComposeTo');var opts='<option value="ALL">Everyone</option><option value="QC">All QC</option><option value="SUP">All Supervisors</option><option value="MGT">All Management</option>';[codes.qc,codes.sup,codes.mgt||[]].forEach(function(lst){lst.forEach(function(c){if(c.active&&c.name)opts+='<option value="'+c.code+'">'+escMsg(c.name)+' ('+c.code+')</option>';});});sel.innerHTML=opts;document.getElementById('msgComposeOverlay').style.display='flex';}
+function closeMsgCompose(){document.getElementById('msgComposeOverlay').style.display='none';}
+async function sendComposedMsg(){if(!msgUser){toast('Sign in first','err');return;}var to=document.getElementById('msgComposeTo').value;var irq=document.getElementById('msgComposeIrq').value.trim();var text=document.getElementById('msgComposeText').value.trim();if(!text&&!msgPhotoData){toast('Type a message or attach a photo','err');return;}var photoUrl='';if(msgPhotoData){toast('Uploading photo\u2026','info');try{var urls=await window.uploadPhotosToStorage([msgPhotoData],'msg_photos/'+Date.now());if(urls&&urls[0])photoUrl=urls[0];}catch(e){toast('Photo upload failed - sending without it','err');}}var ok=await window.sendAppMessage({to:to,from:msgUser.name,fromCode:msgUser.code,text:text,irq:irq||'',kind:'general',photoUrl:photoUrl});if(ok){toast('Message sent','ok');document.getElementById('msgComposeText').value='';document.getElementById('msgComposeIrq').value='';msgPhotoClear();closeMsgCompose();}else{toast('Send failed - check connection','err');}}
+// ===== end in-app messaging =====
 setTimeout(function(){
-  if(!checkMaintenanceMode()){
+  if(window.getMaintenanceMode){
+    checkMaintenanceMode().then(function(isMaint){
+      if(!isMaint){enterApp();}
+    });
+  } else {
     enterApp();
   }
   if(_irqParam){
-    // Inspector opened WhatsApp link — go straight to Register
-    var regBtn=document.querySelectorAll('.nb')[2];
+    // Inspector opened inspection request link — go straight to Register
+    var regBtn=document.querySelectorAll('.nb')[3];
     if(regBtn)showV('register',regBtn);
   } else {
     // Normal open — go to Inspect Req
     var reqBtn=document.querySelectorAll('.nb')[0];
     if(reqBtn)showV('request',reqBtn);
   }
-},2500);
+  startMsgListener();
+},3000);
 
 // IRN number assigned at submission only
 
