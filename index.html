@@ -2495,7 +2495,7 @@ function renderReg(){
     var client=(req&&req.client)||(latestIrn&&latestIrn.project)||'--';
     var items_str='--';
     if(req&&req.items&&Array.isArray(req.items)){items_str=req.items.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', ');}
-    else if(latestIrn&&latestIrn.items&&Array.isArray(latestIrn.items)){items_str=latestIrn.items.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', ');} var items_data='(req&&req.items)?req.items.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(' | '):''';
+    else if(latestIrn&&latestIrn.items&&Array.isArray(latestIrn.items)){items_str=latestIrn.items.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', ');} var items_data=(req&&req.items)?req.items.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(' | '):'';
     var supName=(req&&req.supervisor)||(latestIrn&&latestIrn.reqSupervisor)||'--';
     var qcDisplay=latestIrn?latestIrn.qc+' ('+latestIrn.qcCode+')':'--';
     var irqNo=entry.reqNo||'--';
