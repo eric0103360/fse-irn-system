@@ -1075,7 +1075,7 @@ var STAGES=[
   {id:'s6',num:6,label:'Shot blasting',gate:'Shot blasting inspection complete',criteria:['Blast profile / SA grade acceptable','Surface free of dust and debris','Primer applied within recoat window']},
   {id:'s7',num:7,label:'After primer',gate:'Primer inspection complete',criteria:['Correct primer product applied','DFT (dry film thickness) acceptable','No runs, sags or holidays','Coverage complete — no bare metal']},
   {id:'s8',num:8,label:'Final paint',gate:'Final paint inspection complete',criteria:['Correct paint product and colour','DFT acceptable per specification','Finish quality acceptable','Total DFT system acceptable']},
-  {id:'s9',num:9,label:'Final release / despatch',gate:'Final release inspection complete',criteria:['All previous stages signed off','Documentation package complete','Client hold points released','Items correctly tagged and identified','Safe for transport / loading acceptable']}
+  {id:'s9',num:9,label:'Final release / despatch',gate:'Final release inspection complete',criteria:['All previous stages signed off','Documentation package complete','Client hold points released','Items correctly tagged and identified','Safe for transport / loading acceptable'],{id:'s10',num:10,label:'Release from Balancing',gate:'Balancing release inspection complete',criteria:['Balancing certificate/report received and signed','Balance grade achieved matches specification','Trim weights correctly fitted and secured','No physical damage during balancing process','Component correctly identified (serial/tag matches job)']},{id:'s11',num:11,label:'Alignment',gate:'Alignment inspection complete',criteria:['Alignment method confirmed (laser/dial indicator)','Angular alignment within tolerance','Parallel/offset alignment within tolerance','Soft foot checked and corrected','Alignment readings recorded and signed']}}
 ];
 
 // Maps inspection type labels to stage IDs
@@ -1089,7 +1089,7 @@ var INSP_TYPE_STAGE_MAP={
   'S2B: NDT':['s2b'],
   'NDT':['s2b'],
   'Release for PWHT':['s2b'],
-  'Release for Balancing':['s9'],
+  'Release TO Balancing':['s9'],'Release FROM Balancing':['s10'],'Alignment':['s11'],
   'Release for Machining':['s9'],
   'S3: Trial assembly':['s3'],
   'Trial assembly':['s3'],
@@ -1446,7 +1446,7 @@ var reqUrgency='normal';
 var reqSupValidated=false;
 var reqSupName='';
 var reqItemCnt=2;
-var REQ_INSP_TYPES=['Prior to welding (pre-stage)','S2: Welding','S2B: NDT','S3: Trial assembly','S4: Match-marking','S5: Cleaning','S6: Shot blasting','S7: After primer','S8: Final paint','Final release / despatch','Release for PWHT','Release for Balancing','Release for Machining'];
+var REQ_INSP_TYPES=['Prior to welding (pre-stage)','S2: Welding','S2B: NDT','S3: Trial assembly','S4: Match-marking','S5: Cleaning','S6: Shot blasting','S7: After primer','S8: Final paint','Final release / despatch','Release for PWHT','Release TO Balancing','Release FROM Balancing','Alignment','Release for Machining'];
 
 function setDrawing(state){
   var okBtn=document.getElementById('drawOkBtn');
@@ -1874,7 +1874,7 @@ function renderArtisans(){
 }
 // Show/hide subcontractor card based on inspection type selection
 function checkSubcontractorCard(){
-  var subTypes=['Release for PWHT','Release for Balancing','Release for Machining'];
+  var subTypes=['Release for PWHT','Release TO Balancing','Release for Machining'];
   var needsSub=selectedInspTypes.some(function(t){return subTypes.indexOf(t)>=0;});
   var card=document.getElementById('subcontractorCard');
   if(card)card.style.display=needsSub?'block':'none';
@@ -2440,7 +2440,7 @@ function renderReg(){
   var total=active.length;
   var released=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept';}).length;
   var pending=active.filter(function(e){var l=e.irns[e.irns.length-1];return !l;}).length;
-  var ftp=active.filter(function(e){var l=e.irns[e.irns.length-1];return e.irns.length===1&&l&&l.result==='accept';}).length;
+  var ftp=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&(!l.attempt||l.attempt===1);}).length;
   var ftpPct=released>0?Math.round(ftp/released*100):0;
   document.getElementById('statT').textContent=total;
   document.getElementById('statP').textContent=released;
@@ -2495,7 +2495,7 @@ function renderReg(){
     var client=(req&&req.client)||(latestIrn&&latestIrn.project)||'--';
     var items_str='--';
     if(req&&req.items&&Array.isArray(req.items)){items_str=req.items.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', ');}
-    else if(latestIrn&&latestIrn.items&&Array.isArray(latestIrn.items)){items_str=latestIrn.items.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', ');} var items_data=(req&&req.items)?req.items.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(' | '):'';
+    else if(latestIrn&&latestIrn.items&&Array.isArray(latestIrn.items)){items_str=latestIrn.items.filter(function(i){return i.desc;}).map(function(i){return i.desc+(i.qty?' x'+i.qty:'');}).join(', ');}
     var supName=(req&&req.supervisor)||(latestIrn&&latestIrn.reqSupervisor)||'--';
     var qcDisplay=latestIrn?latestIrn.qc+' ('+latestIrn.qcCode+')':'--';
     var irqNo=entry.reqNo||'--';
@@ -2568,7 +2568,7 @@ function renderReg(){
     } else {
       var inspType=(req&&req.inspTypes)||'';
       var instructions=(req&&req.instructions)||'';
-      html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-reqno="'+irqNo+'" data-job="'+job.replace(/"/g,'&quot;')+'" data-client="'+client.replace(/"/g,'&quot;')+'" data-items="'+items_data.replace(/"/g,'&quot;')+'" data-insptype="'+inspType.replace(/"/g,'&quot;')+'" data-instructions="'+instructions.replace(/"/g,'&quot;')+'" data-by="'+supName.replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:14px;padding:10px 20px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">Complete IRN</button>';
+      html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-reqno="'+irqNo+'" data-job="'+job.replace(/"/g,'&quot;')+'" data-client="'+client.replace(/"/g,'&quot;')+'" data-items="'+items_str.replace(/"/g,'&quot;')+'" data-insptype="'+inspType.replace(/"/g,'&quot;')+'" data-instructions="'+instructions.replace(/"/g,'&quot;')+'" data-by="'+supName.replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:14px;padding:10px 20px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">Complete IRN</button>';
       html+='<button data-irqno="'+irqNo+'" onclick="previewRequest(this)" style="font-size:13px;padding:10px 14px;background:#E6F1FB;border:1.5px solid #185FA5;color:#0C447C;border-radius:8px;cursor:pointer;font-weight:600"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> View Request</button>';
       if(window._adminUnlocked){html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irnfid="" data-irqno="'+irqNo+'" onclick="deleteRecord(this)" style="font-size:12px;padding:10px 14px;background:#FCEBEB;border:1px solid #E24B4A;color:#A32D2D;border-radius:8px;cursor:pointer;font-weight:600">🗑 Delete</button>';}
       html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irqno="'+irqNo+'" onclick="cancelRecord(this)" style="font-size:12px;padding:10px 14px;background:#fff;border:1px solid #aaa;color:#888;border-radius:8px;cursor:pointer"><svg style="font-size:13px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Cancel</button>';
@@ -3135,7 +3135,7 @@ function computeAnalytics(entries){
   var art={},reasons={},stagesHit={},months={};
   entries.forEach(function(e){
     if(e.req&&e.req.status==='cancelled')return;
-    var irns=(e.irns||[]).filter(function(r){return !r.cancelled;});if(irns.length===0)return;
+    var irns=e.irns||[];if(irns.length===0)return;
     var last=irns[irns.length-1];if(last&&last.cancelled)return;
     var rejects=irns.filter(function(r){return r.result==='reject';});
     var names=[];(e.req&&e.req.artisans||[]).forEach(function(n){if(n)names.push(n);});
@@ -3256,7 +3256,7 @@ function renderMgmt(){
   var rework=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='reject';}).length;
   var onHold=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='hold';}).length;
   var pending=active.filter(function(e){return e.irns.length===0;}).length;
-  var ftp=active.filter(function(e){var l=e.irns[e.irns.length-1];return e.irns.length===1&&l&&l.result==='accept';}).length;
+  var ftp=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&(!l.attempt||l.attempt===1);}).length;
   var ftpPct=released>0?Math.round(ftp/released*100):0;
 
   document.getElementById('mgStatTotal').textContent=total;
