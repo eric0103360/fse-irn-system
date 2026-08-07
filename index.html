@@ -908,6 +908,10 @@ window.addEventListener('DOMContentLoaded',function(){
         <div style="font-size:28px;font-weight:700;color:#27500A" id="mgStatReleased">0</div>
         <div style="font-size:10px;color:#3B6D11;text-transform:uppercase;letter-spacing:0.5px">Released</div>
       </div>
+      <div style="background:#FCEBEB;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#A32D2D" id="mgStatRejected">0</div>
+        <div style="font-size:10px;color:#A32D2D;text-transform:uppercase;letter-spacing:0.5px">Rejected</div>
+      </div>
       <div style="background:#FAEEDA;border-radius:10px;padding:12px;text-align:center">
         <div style="font-size:28px;font-weight:700;color:#633806" id="mgStatOnHold">0</div>
         <div style="font-size:10px;color:#633806;text-transform:uppercase;letter-spacing:0.5px">On hold</div>
@@ -2444,7 +2448,7 @@ function renderReg(){
   var total=active.length;
   var released=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept';}).length;
   var pending=active.filter(function(e){var l=e.irns[e.irns.length-1];return !l;}).length;
-  var ftp=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&(!l.attempt||l.attempt===1);}).length;
+  var ftp=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&e.irns.length===1;}).length;
   var ftpPct=released>0?Math.round(ftp/released*100):0;
   document.getElementById('statT').textContent=total;
   document.getElementById('statP').textContent=released;
@@ -2631,17 +2635,19 @@ function printFromReg(btn){
   var rSup=r.reqSupervisor||(reqEntry&&reqEntry.supervisor)||'';var rDate=r.reqDate||(reqEntry&&reqEntry.date)||'';
   var reqPh2=(reqEntry&&reqEntry.reqPhotoData)||[];var inspPh2=r.inspPhotoData||[];
   var win=window.open('','_blank');
-  win.document.write('<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>IRN INS-C '+r.reportNo+(irqNo?' | IRQ-'+irqNo:'')+'</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10px;color:#1a1a1a}table{width:100%;border-collapse:collapse;margin-bottom:6px}th{background:#1a3a5c;color:#fff;padding:4px 6px;text-align:left;font-size:9px}td{font-size:10px;padding:3px 6px}.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:6px;margin-bottom:8px}.logo{height:36px}.result-pass{background:#EAF3DE;border:1px solid #1D9E75;padding:4px 8px;border-radius:4px;font-weight:700;color:#27500A;font-size:11px;margin-bottom:6px}.result-fail{background:#FCEBEB;border:1px solid #E24B4A;padding:4px 8px;border-radius:4px;font-weight:700;color:#A32D2D;font-size:11px;margin-bottom:6px}.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px}.cell{background:#f9f9f9;padding:4px 6px;border-radius:3px;border:0.5px solid #eee}.cl{font-size:8px;color:#888;text-transform:uppercase;margin-bottom:1px}.cv{font-size:10px;font-weight:500}.req-banner{background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:4px;padding:4px 8px;margin-bottom:6px;display:flex;gap:12px}.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px}.sign-box{border:0.5px solid #ddd;padding:6px 8px;border-radius:3px}.footer{font-size:8px;color:#aaa;text-align:center;margin-top:8px;border-top:0.5px solid #eee;padding-top:4px}.no-print{margin:8px 0}@media print{.no-print{display:none}body{margin:6mm}html{height:100%}}@page{size:A4 portrait;margin:8mm}@media screen and (orientation:landscape){body{zoom:1.3;margin:12px}}</style></head><body>');
+  win.document.write('<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>IRN INS-C '+r.reportNo+(irqNo?' | IRQ-'+irqNo:'')+'</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10px;color:#1a1a1a}table{width:100%;border-collapse:collapse;margin-bottom:6px}th{background:#1a3a5c;color:#fff;padding:4px 6px;text-align:left;font-size:9px}td{font-size:10px;padding:3px 6px}.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1a3a5c;padding-bottom:6px;margin-bottom:8px}.logo{height:36px}.result-pass{background:#EAF3DE;border:1px solid #1D9E75;padding:4px 8px;border-radius:4px;font-weight:700;color:#27500A;font-size:11px;margin-bottom:6px}.result-fail{background:#FCEBEB;border:1px solid #E24B4A;padding:4px 8px;border-radius:4px;font-weight:700;color:#A32D2D;font-size:11px;margin-bottom:6px}.result-hold{background:#FAEEDA;border:1px solid #BA7517;padding:4px 8px;border-radius:4px;font-weight:700;color:#633806;font-size:11px;margin-bottom:6px}.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px}.cell{background:#f9f9f9;padding:4px 6px;border-radius:3px;border:0.5px solid #eee}.cl{font-size:8px;color:#888;text-transform:uppercase;margin-bottom:1px}.cv{font-size:10px;font-weight:500}.req-banner{background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:4px;padding:4px 8px;margin-bottom:6px;display:flex;gap:12px}.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px}.sign-box{border:0.5px solid #ddd;padding:6px 8px;border-radius:3px}.footer{font-size:8px;color:#aaa;text-align:center;margin-top:8px;border-top:0.5px solid #eee;padding-top:4px}.no-print{margin:8px 0}@media print{.no-print{display:none}body{margin:6mm}html{height:100%}}@page{size:A4 portrait;margin:8mm}@media screen and (orientation:landscape){body{zoom:1.3;margin:12px}}</style></head><body>');
   win.document.write('<div class="no-print" style="text-align:left;margin-bottom:12px"><button onclick="window.close()" style="padding:6px 14px;background:#f0f0f0;border:none;border-radius:6px;font-size:12px;cursor:pointer">← Back</button></div>');
   win.document.write('<div class="hdr"><div><img src="'+logoSrc+'" class="logo"><div style="margin-top:5px"><div style="font-size:16px;font-weight:500">Inspection Release Note</div><div style="font-size:12px;color:#555">FSE-QR-IRN.038 · Rev 02 · ISO9001 / ISO3834-2</div></div></div><div style="text-align:right"><div style="font-size:9px;color:#888;text-transform:uppercase">Report No</div><div style="font-size:24px;font-weight:700;color:#1a3a5c">INS-C '+r.reportNo+'</div>'+(irqNo?'<div style="font-size:11px;color:#185FA5">IRQ-'+irqNo+'</div>':'')+'</div></div>');
-  win.document.write('<div class="'+(isPass?'result-pass':'result-fail')+'">'+(isPass?'✓ ACCEPTED — Released':'✗ REJECTED — Rework required')+'</div>');
+  var isHold=r.result==='hold';
+  win.document.write('<div class="'+(isPass?'result-pass':isHold?'result-hold':'result-fail')+'">'+(isPass?'✓ ACCEPTED — Released':isHold?'🟠 ON HOLD — See details below':'✗ REJECTED — Rework required')+'</div>');
   if(stageName)win.document.write('<div style="background:#1a3a5c;color:#fff;padding:5px 10px;border-radius:4px;font-size:11px;font-weight:600;margin-bottom:6px">Inspection stage: '+stageName+'</div>');
   if(irqNo||rSup)win.document.write('<div class="req-banner">'+(irqNo?'<div><div class="cl">Request ref</div><div class="cv" style="color:#185FA5">IRQ-'+irqNo+'</div></div>':'')+(rSup?'<div><div class="cl">Requested by</div><div class="cv">'+rSup+'</div></div>':'')+(rDate?'<div><div class="cl">Request date</div><div class="cv">'+rDate+'</div></div>':'')+'</div>');
   win.document.write('<div class="grid"><div class="cell"><div class="cl">Job / Order</div><div class="cv">'+r.job+'</div></div><div class="cell"><div class="cl">Client</div><div class="cv">'+(r.project||'--')+'</div></div><div class="cell"><div class="cl">PO Number</div><div class="cv">'+(r.po||'--')+'</div></div><div class="cell"><div class="cl">Artisan</div><div class="cv">'+(r.artisan||'--')+'</div></div><div class="cell"><div class="cl">Drawing / Rev</div><div class="cv">'+(r.drawing||'--')+'</div></div><div class="cell"><div class="cl">Inspection stage</div><div class="cv" style="color:#1a3a5c;font-weight:600">'+(stageName||'--')+'</div></div></div>');
   if(itemRows)win.document.write('<table><thead><tr><th style="width:30px">#</th><th>Item description</th><th style="width:50px;text-align:center">Qty</th></tr></thead><tbody>'+itemRows+'</tbody></table>');
   if(stageName&&criteriaRows)win.document.write('<table><thead><tr><th colspan="2">Inspection checklist — '+stageName+'</th></tr></thead><tbody>'+criteriaRows+'</tbody></table>');
   if(r.notes)win.document.write('<div style="margin-bottom:12px;padding:8px;background:#f9f9f9;border-radius:4px;border:0.5px solid #eee"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:3px">Inspection notes</div><div style="font-size:12px">'+r.notes+'</div></div>');
-  if(!isPass&&r.rejectionReason)win.document.write('<div style="padding:10px;background:#FCEBEB;border:1px solid #E24B4A;border-radius:6px;margin-bottom:12px"><div style="font-weight:600;color:#A32D2D;margin-bottom:4px">Rejection details</div><div style="font-size:11px;color:#A32D2D;margin-bottom:3px"><strong>Reason:</strong> '+r.rejectionReason+'</div><div style="font-size:11px;color:#A32D2D"><strong>Action:</strong> '+r.rejectionAction+'</div></div>');
+  if(!isPass&&!isHold&&r.rejectionReason)win.document.write('<div style="padding:10px;background:#FCEBEB;border:1px solid #E24B4A;border-radius:6px;margin-bottom:12px"><div style="font-weight:600;color:#A32D2D;margin-bottom:4px">Rejection details</div><div style="font-size:11px;color:#A32D2D;margin-bottom:3px"><strong>Reason:</strong> '+r.rejectionReason+'</div><div style="font-size:11px;color:#A32D2D"><strong>Action:</strong> '+r.rejectionAction+'</div></div>');
+  if(isHold&&r.holdReason)win.document.write('<div style="padding:10px;background:#FAEEDA;border:1px solid #BA7517;border-radius:6px;margin-bottom:12px"><div style="font-weight:600;color:#633806;margin-bottom:4px">Hold details</div><div style="font-size:11px;color:#633806;margin-bottom:3px"><strong>Reason:</strong> '+r.holdReason+'</div><div style="font-size:11px;color:#633806"><strong>To release:</strong> '+(r.holdAction||'--')+'</div></div>');
   var dimRows='';
   if(r.fabDims&&r.fabDims.length>0){
     r.fabDims.filter(function(d){return d.draw||d.meas;}).forEach(function(d){
@@ -2879,6 +2885,7 @@ function printIRN(){
   win.document.write('.irq-ref{font-size:11px;color:#185FA5;margin-top:2px}');
   win.document.write('.result-pass{background:#EAF3DE;border:1.5px solid #1D9E75;padding:8px 12px;border-radius:6px;font-weight:700;color:#27500A;font-size:13px;margin-bottom:12px}');
   win.document.write('.result-fail{background:#FCEBEB;border:1.5px solid #E24B4A;padding:8px 12px;border-radius:6px;font-weight:700;color:#A32D2D;font-size:13px;margin-bottom:12px}');
+  win.document.write('.result-hold{background:#FAEEDA;border:1.5px solid #BA7517;padding:8px 12px;border-radius:6px;font-weight:700;color:#633806;font-size:13px;margin-bottom:12px}');
   win.document.write('.grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}');
   win.document.write('.cell{background:#f9f9f9;padding:6px 8px;border-radius:4px;border:0.5px solid #eee}');
   win.document.write('.cell-label{font-size:9px;color:#888;text-transform:uppercase;margin-bottom:2px}.cell-val{font-size:12px;font-weight:500}');
@@ -2899,7 +2906,8 @@ function printIRN(){
   win.document.write('<div class="irn-no"><div class="irn-label">Report No</div><div class="irn-val">INS-C '+d.reportNo+'</div>'+(irqRef?'<div class="irq-ref">'+irqRef+'</div>':'')+'</div></div>');
 
   // Result
-  win.document.write('<div class="'+(isPass?'result-pass':'result-fail')+'">'+(isPass?'✓ ACCEPTED — Released for next stage':'✗ REJECTED — Rework required')+'</div>');
+  var isHold=d.result==='hold';
+  win.document.write('<div class="'+(isPass?'result-pass':isHold?'result-hold':'result-fail')+'">'+(isPass?'✓ ACCEPTED — Released for next stage':isHold?'🟠 ON HOLD — See details below':'✗ REJECTED — Rework required')+'</div>');
 
   // Request reference banner
   if(irqRef||supName){
@@ -2926,11 +2934,25 @@ function printIRN(){
   // Checklist
   if(stageName&&criteriaRows){win.document.write('<table><thead><tr><th colspan="2">Inspection checklist — '+stageName+'</th></tr></thead><tbody>'+criteriaRows+'</tbody></table>');}
 
+  // Dimensions
+  var irnDimRows='';
+  fabDims.filter(function(dm){return dm.draw||dm.meas;}).forEach(function(dm){
+    var pf=dm.pf||'';
+    var dcolor=pf.toLowerCase()==='pass'?'#27500A':pf.toLowerCase()==='fail'?'#A32D2D':'#888';
+    irnDimRows+='<tr><td style="padding:6px 10px;border:0.5px solid #ddd;font-weight:600;text-align:center;color:#1a3a5c">'+dm.label+'</td>';
+    irnDimRows+='<td style="padding:6px 10px;border:0.5px solid #ddd">'+(dm.lbl||'--')+'</td>';
+    irnDimRows+='<td style="padding:6px 10px;border:0.5px solid #ddd;text-align:center">'+(dm.draw||'--')+'</td>';
+    irnDimRows+='<td style="padding:6px 10px;border:0.5px solid #ddd;text-align:center">'+(dm.meas||'--')+'</td>';
+    irnDimRows+='<td style="padding:6px 10px;border:0.5px solid #ddd;text-align:center;color:'+dcolor+';font-weight:600">'+(pf||'--')+'</td></tr>';
+  });
+  if(irnDimRows)win.document.write('<table><thead><tr><th style="width:30px;text-align:center">Dim</th><th>Description</th><th style="width:80px;text-align:center">Drawing</th><th style="width:80px;text-align:center">Measured</th><th style="width:80px;text-align:center">Status</th></tr></thead><tbody>'+irnDimRows+'</tbody></table>');
+
   // Notes
   if(d.notes){win.document.write('<div style="margin-bottom:12px;padding:8px;background:#f9f9f9;border-radius:4px;border:0.5px solid #eee"><div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:3px">Inspection notes</div><div style="font-size:12px">'+d.notes+'</div></div>');}
 
   // Rejection details
-  if(!isPass&&d.rejectionReason){win.document.write('<div style="padding:10px;background:#FCEBEB;border:1px solid #E24B4A;border-radius:6px;margin-bottom:12px"><div style="font-weight:600;color:#A32D2D;margin-bottom:4px;font-size:12px">Rejection details</div><div style="font-size:11px;color:#A32D2D;margin-bottom:3px"><strong>Reason:</strong> '+d.rejectionReason+'</div><div style="font-size:11px;color:#A32D2D"><strong>Action required:</strong> '+d.rejectionAction+'</div></div>');}
+  if(!isPass&&!isHold&&d.rejectionReason){win.document.write('<div style="padding:10px;background:#FCEBEB;border:1px solid #E24B4A;border-radius:6px;margin-bottom:12px"><div style="font-weight:600;color:#A32D2D;margin-bottom:4px;font-size:12px">Rejection details</div><div style="font-size:11px;color:#A32D2D;margin-bottom:3px"><strong>Reason:</strong> '+d.rejectionReason+'</div><div style="font-size:11px;color:#A32D2D"><strong>Action required:</strong> '+d.rejectionAction+'</div></div>');}
+  if(isHold&&d.holdReason){win.document.write('<div style="padding:10px;background:#FAEEDA;border:1px solid #BA7517;border-radius:6px;margin-bottom:12px"><div style="font-weight:600;color:#633806;margin-bottom:4px;font-size:12px">Hold details</div><div style="font-size:11px;color:#633806;margin-bottom:3px"><strong>Reason:</strong> '+d.holdReason+'</div><div style="font-size:11px;color:#633806"><strong>To release:</strong> '+(d.holdAction||'--')+'</div></div>');}
 
   // Photos
   if(inspPhotosArr.length>0){
@@ -3071,6 +3093,10 @@ function amendIRN(btn){
     if(r.result==='reject'){
       var rrEl=document.getElementById('rejectionReason');if(rrEl)rrEl.value=r.rejectionReason||'';
       var raEl=document.getElementById('rejectionAction');if(raEl)raEl.value=r.rejectionAction||'';
+    }
+    if(r.result==='hold'){
+      var hrEl=document.getElementById('holdReason');if(hrEl)hrEl.value=r.holdReason||'';
+      var haEl=document.getElementById('holdAction');if(haEl)haEl.value=r.holdAction||'';
     }
     // Restore items
     if(r.items&&r.items.length){items=JSON.parse(JSON.stringify(r.items));renderItems();}
@@ -3260,12 +3286,13 @@ function renderMgmt(){
   var rework=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='reject';}).length;
   var onHold=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='hold';}).length;
   var pending=active.filter(function(e){return e.irns.length===0;}).length;
-  var ftp=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&(!l.attempt||l.attempt===1);}).length;
+  var ftp=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&e.irns.length===1;}).length;
   var ftpPct=released>0?Math.round(ftp/released*100):0;
 
   document.getElementById('mgStatTotal').textContent=total;
   document.getElementById('mgStatUrgent').textContent=urgent;
   document.getElementById('mgStatReleased').textContent=released;
+  document.getElementById('mgStatRejected').textContent=rework;
   document.getElementById('mgStatOnHold').textContent=onHold;
   document.getElementById('mgStatFTP').textContent=ftpPct+'%';
   document.getElementById('mgStatPending').textContent=pending;
@@ -3307,7 +3334,8 @@ function renderMgmt(){
     var date=(req&&req.date)||(latestIrn&&latestIrn.date)||'--';
     var irqNo=e.reqNo||'--';
     var isUrgent=req&&req.urgency==='urgent';
-    var html='<div style="padding:10px 12px;border-bottom:0.5px solid #eee;display:flex;align-items:flex-start;justify-content:space-between;gap:8px">';
+    var hasIrn=latestIrn&&latestIrn.reportNo;
+    var html='<div'+(hasIrn?' onclick="printFromReg({dataset:{irn:\''+latestIrn.reportNo+'\',irq:\''+irqNo+'\'}})" style="padding:10px 12px;border-bottom:0.5px solid #eee;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;cursor:pointer" onmouseover="this.style.background=\'#f9f9f7\'" onmouseout="this.style.background=\'\'"':' style="padding:10px 12px;border-bottom:0.5px solid #eee;display:flex;align-items:flex-start;justify-content:space-between;gap:8px"')+'>';
     html+='<div style="flex:1">';
     html+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">';
     html+='<span style="font-size:13px;font-weight:700;color:#1a3a5c">IRQ-'+irqNo+'</span>';
@@ -3317,7 +3345,7 @@ function renderMgmt(){
     html+='<div style="font-size:11px;color:#888">'+stage+' &middot; '+client+'</div>';
     html+='<div style="font-size:10px;color:#aaa;margin-top:2px">SUP: '+sup+' &middot; '+date+'</div>';
     html+='</div>';
-    html+='<div style="width:8px;height:8px;border-radius:50%;background:'+borderColor+';flex-shrink:0;margin-top:4px"></div>';
+    html+=hasIrn?'<div style="font-size:10px;color:#185FA5;font-weight:600;white-space:nowrap;flex-shrink:0;margin-top:4px">View report &rarr;</div>':'<div style="width:8px;height:8px;border-radius:50%;background:'+borderColor+';flex-shrink:0;margin-top:4px"></div>';
     html+='</div>';
     return html;
   }
