@@ -926,6 +926,12 @@ window.addEventListener('DOMContentLoaded',function(){
       </div>
     </div>
 
+    <!-- Month-by-month summary -->
+    <div style="background:#fff;border:0.5px solid #eee;border-radius:10px;padding:12px;margin-bottom:10px;overflow-x:auto">
+      <div style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Month by month</div>
+      <div id="mgMonthlyTable"><div style="font-size:12px;color:#aaa;text-align:center;padding:12px">No data yet</div></div>
+    </div>
+
     <!-- Stage pass rate chart -->
     <div style="background:#fff;border:0.5px solid #eee;border-radius:10px;padding:12px;margin-bottom:10px">
       <div style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Stage pass rate</div>
@@ -2237,7 +2243,7 @@ function getFormBasic(){
     job:gv('job'),
     project:gv('project'),
     drawing:gv('drawing'),
-    artisan:gv('artisan'),
+    artisan:(_urlReq&&_urlReq.artisans&&_urlReq.artisans.length)?_urlReq.artisans.join(', '):'',
     date:gv('irnDate')||new Date().toLocaleDateString('en-ZA'),
     result:iRes||'not set',
     rejectionReason:iRes==='reject'?gv('rejectionReason'):'',
@@ -2375,6 +2381,7 @@ async function submitIRN(){
       var linkedReq=reqs.find(function(x){return x.reqNo===_irqParam;});
       if(linkedReq&&linkedReq.firebaseId&&window.markRequestRework)window.markRequestRework(linkedReq.firebaseId);
     }
+    _irqParam=null;
     toast(d.reportNo+' submitted','ok');
     window._irnSubmitted=d.reportNo;
     // Hide unsaved banner
@@ -3161,6 +3168,36 @@ function anNorm(n){return String(n||'').trim().replace(/\./g,'').replace(/\s+/g,
 function anEsc(t){return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 var AN_SNAG_BUCKETS=[['Porosity',/poros|blow ?hole|gas/i],['Crack',/crack/i],['Undercut',/undercut/i],['Dimensional',/dimens|size|length|tolerance|out of spec/i],['Fit-up / gap',/fit-?up|gap|misalign|alignment/i],['Spatter / cleaning',/spatter|clean/i],['Surface / paint',/surface|paint|primer|prep|blast|dft/i]];
 function anSnagBucket(text){for(var i=0;i<AN_SNAG_BUCKETS.length;i++){if(AN_SNAG_BUCKETS[i][1].test(text))return AN_SNAG_BUCKETS[i][0];}return 'Other';}
+function computeMonthlyTable(entries){
+  var months={};
+  var monLab=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  entries.forEach(function(e){
+    if(e.req&&e.req.status==='cancelled')return;
+    var last=e.irns&&e.irns.length?e.irns[e.irns.length-1]:null;
+    if(last&&last.cancelled)return;
+    // Requested — bucketed by when the request was actually raised (reliable ISO timestamp)
+    if(e.req&&e.req.timestamp){
+      var rdt=new Date(e.req.timestamp);
+      if(!isNaN(rdt)){var rmk=rdt.getFullYear()+'-'+('0'+(rdt.getMonth()+1)).slice(-2);
+        if(!months[rmk])months[rmk]={lab:monLab[rdt.getMonth()],yr:rdt.getFullYear(),req:0,rel:0,rej:0,hold:0,ftp:0};
+        months[rmk].req++;
+      }
+    }
+    // Outcome — bucketed by the latest IRN's date (same basis as the existing monthly FTP chart)
+    if(last&&last.date){
+      var dt=new Date(last.date);
+      if(!isNaN(dt)){var mk=dt.getFullYear()+'-'+('0'+(dt.getMonth()+1)).slice(-2);
+        if(!months[mk])months[mk]={lab:monLab[dt.getMonth()],yr:dt.getFullYear(),req:0,rel:0,rej:0,hold:0,ftp:0};
+        if(last.result==='accept'){months[mk].rel++;if(e.irns.length===1)months[mk].ftp++;}
+        else if(last.result==='reject')months[mk].rej++;
+        else if(last.result==='hold')months[mk].hold++;
+      }
+    }
+  });
+  var keys=Object.keys(months).sort();
+  return keys.map(function(k){var m=months[k];return{key:k,lab:m.lab+' '+m.yr,req:m.req,rel:m.rel,rej:m.rej,hold:m.hold,ftpPct:m.rel>0?Math.round(m.ftp/m.rel*100):0};}).reverse();
+}
+
 function computeAnalytics(entries){
   var art={},reasons={},stagesHit={},months={};
   entries.forEach(function(e){
@@ -3243,6 +3280,28 @@ function buildAnalyticsHTML(a){
   return h;
 }
 var _anEntries=null;
+function renderMonthlyTable(entries){
+  var el=document.getElementById('mgMonthlyTable');if(!el)return;
+  var rows=computeMonthlyTable(entries);
+  if(!rows.length){el.innerHTML='<div style="font-size:12px;color:#aaa;text-align:center;padding:12px">No data yet</div>';return;}
+  var html='<table style="width:100%;border-collapse:collapse;font-size:12px"><tr>';
+  ['Month','Requested','Released','Rejected','On Hold','1st Pass %'].forEach(function(h){
+    html+='<th style="background:#1a3a5c;color:#fff;padding:6px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.3px">'+h+'</th>';
+  });
+  html+='</tr>';
+  rows.forEach(function(r){
+    html+='<tr>';
+    html+='<td style="padding:6px 10px;border-bottom:0.5px solid #eee;font-weight:600;color:#1a3a5c">'+r.lab+'</td>';
+    html+='<td style="padding:6px 10px;border-bottom:0.5px solid #eee">'+r.req+'</td>';
+    html+='<td style="padding:6px 10px;border-bottom:0.5px solid #eee;color:#27500A;font-weight:600">'+r.rel+'</td>';
+    html+='<td style="padding:6px 10px;border-bottom:0.5px solid #eee;color:#A32D2D;font-weight:600">'+r.rej+'</td>';
+    html+='<td style="padding:6px 10px;border-bottom:0.5px solid #eee;color:#BA7517;font-weight:600">'+r.hold+'</td>';
+    html+='<td style="padding:6px 10px;border-bottom:0.5px solid #eee;font-weight:600">'+(r.rel>0?r.ftpPct+'%':'--')+'</td>';
+    html+='</tr>';
+  });
+  html+='</table>';
+  el.innerHTML=html;
+}
 function renderAnalytics(entries){
   _anEntries=entries;
   var el=document.getElementById('mgAnalytics');if(!el)return;
@@ -3364,6 +3423,7 @@ function renderMgmt(){
     ?reworkList.map(function(e){return mkRow(e,'#BA7517');}).join('')
     :'<div style="padding:14px;font-size:12px;color:#aaa;text-align:center">No rework items</div>';
 
+  renderMonthlyTable(entries);
   renderAnalytics(entries);
 
   // Concessions — flagged via concession in-app message (no dedicated field yet, show placeholder)
