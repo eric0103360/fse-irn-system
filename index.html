@@ -2381,7 +2381,6 @@ async function submitIRN(){
       var linkedReq=reqs.find(function(x){return x.reqNo===_irqParam;});
       if(linkedReq&&linkedReq.firebaseId&&window.markRequestRework)window.markRequestRework(linkedReq.firebaseId);
     }
-    _irqParam=null;
     toast(d.reportNo+' submitted','ok');
     window._irnSubmitted=d.reportNo;
     // Hide unsaved banner
@@ -2409,6 +2408,7 @@ async function submitIRN(){
     if(window.sendPushToRole)window.sendPushToRole('sup,mgt',(isPass?'\u2705 RELEASED':isHold?'\uD83D\uDFE0 ON HOLD':'\u274C REJECTED')+' - INS-C '+d.reportNo,d.job+(stageName?' | '+stageName:'')+' | QC: '+(d.qc||''),'');
     // Send to Google endpoint in background — don't wait
     fetch(ENDPOINT,{method:'POST',body:JSON.stringify(d),mode:'no-cors'}).catch(function(){});
+    _irqParam=null;
     renderReg();
   }catch(e){
     toast('Saved locally - check connection','err');
