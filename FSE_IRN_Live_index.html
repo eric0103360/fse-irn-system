@@ -281,6 +281,20 @@ window.markRequestCancelled=async function(firebaseId,reason){try{var r=doc(db,'
 window.markIRNCancelled=async function(firebaseId,reason){try{var r=doc(db,'irns',firebaseId);await updateDoc(r,{cancelled:true,cancelReason:reason,cancelledAt:new Date().toISOString()});return true;}catch(e){return false;}};
 window.deleteRequest=async function(firebaseId){try{await deleteDoc(doc(db,'requests',firebaseId));return true;}catch(e){return false;}};
 window.deleteIRN=async function(firebaseId){try{await deleteDoc(doc(db,'irns',firebaseId));return true;}catch(e){return false;}};
+window.updateRequestInFirebase=async function(firebaseId,data){
+  try{
+    var s=Object.assign({},data);
+    if(s.reqPhotoData&&s.reqPhotoData.length>0){
+      var urls=await window.uploadPhotosToStorage(s.reqPhotoData,'req_photos/'+Date.now());
+      s.reqPhotoData=urls;
+    }
+    s.editedAt=new Date().toISOString();
+    s.edited=true;
+    var r=doc(db,'requests',firebaseId);
+    await updateDoc(r,s);
+    return true;
+  }catch(e){console.error('Request update error:',e);return false;}
+};
 window.updateIRNInFirebase=async function(firebaseId,data){
   try{
     var s=Object.assign({},data);
@@ -628,6 +642,10 @@ window.addEventListener('DOMContentLoaded',function(){
 
     <!-- Full request form -->
     <div id="fullReqForm">
+    <div id="reqEditBanner" style="display:none;background:#E6F1FB;border:1.5px solid #185FA5;border-radius:10px;padding:10px 14px;margin-bottom:10px;align-items:center;gap:10px">
+      <svg style="font-size:18px;color:#185FA5;flex-shrink:0" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      <div><div style="font-size:12px;font-weight:700;color:#0C447C" id="reqEditBannerText">Editing request</div><div style="font-size:11px;color:#0C447C;margin-top:1px">Correct the details below, then tap Save changes.</div></div>
+    </div>
     <div class="card">
       <div class="ct"><svg style="font-size:13px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="12"/><line x1="2" y1="12" x2="22" y2="12"/></svg> Job details</div>
       <div class="fr"><div class="fl">Order / Job no.</div><input class="fi" id="reqJob" placeholder="e.g. F52551 / FSJ507"></div>
@@ -1835,6 +1853,26 @@ async function submitRequest(){
   if(_b){_b.dataset.busy='1';_b.disabled=true;var _t=_b.innerHTML;_b.innerHTML='Sending request&hellip;';}
   var _guard=setTimeout(function(){if(_b&&_b.dataset.busy==='1'){_b.dataset.busy='';_b.disabled=false;_b.style.background='';_b.innerHTML=_t;toast('Slow connection - request may still be sending in background','err');}},15000);
   try{
+  var wasEdit=!!(window._editReqMode&&window._editReqFirebaseId);
+  if(wasEdit){
+    d.reqNo=window._editReqNo||d.reqNo;
+    document.getElementById('reqNo').value=d.reqNo;
+    var _editSaveOk=window.updateRequestInFirebase?await window.updateRequestInFirebase(window._editReqFirebaseId,d):false;
+    if(!_editSaveOk){
+      clearTimeout(_guard);
+      toast('Changes failed to save — check your connection and try again','err');
+      if(_b){_b.dataset.busy='';_b.disabled=false;_b.style.background='';_b.innerHTML=_t;}
+      return;
+    }
+    toast('IRQ-'+d.reqNo+' updated','ok');
+    if(window.sendAppMessage)window.sendAppMessage({to:'QC',from:d.supervisor||'Supervisor',fromCode:d.supCode||'',kind:'request',irq:d.reqNo,text:'✏️ *IRQ-'+d.reqNo+' updated* — '+d.job+(d.client?' | '+d.client:'')+'\n'+'Details were corrected by the supervisor — please review before inspecting.'});
+    window._editReqMode=false;window._editReqFirebaseId=null;window._editReqNo=null;
+    var _editBanner=document.getElementById('reqEditBanner');if(_editBanner)_editBanner.style.display='none';
+    clearTimeout(_guard);
+    if(_b){_b.innerHTML='\u2713 Changes saved';_b.style.background='#1F7A45';setTimeout(function(){_b.dataset.busy='';_b.disabled=false;_b.style.background='';_b.innerHTML=_t;},2500);}
+    showV('register',document.querySelectorAll('.nb')[3]);
+    return;
+  }
   // Always get a fresh IRQ number — never reuse
   d.reqNo=await window.getNextIRQ();
   document.getElementById('reqNo').value=d.reqNo;
@@ -1867,6 +1905,21 @@ async function submitRequest(){
   var reqNoEl=document.getElementById('reqNo');
   if(reqNoEl){reqNoEl.value='';reqNoEl.style.color='rgba(255,255,255,0.6)';}
   if(window.peekNextIRQ){window.peekNextIRQ().then(function(n){var el=document.getElementById('reqNo');if(el){el.value=n;el.style.color='rgba(255,255,255,0.6)';}});}
+  // Clear the rest of the form so another request can be raised straight away
+  var joEl=document.getElementById('reqJob');if(joEl)joEl.value='';
+  var clEl=document.getElementById('reqClient');if(clEl)clEl.value='';
+  var inEl=document.getElementById('reqInstructions');if(inEl)inEl.value='';
+  reqItems=[{id:'r1',desc:'',qty:''},{id:'r2',desc:'',qty:''}];
+  renderReqItems();
+  selectedInspTypes=[];
+  renderInspTypes();
+  checkSubcontractorCard();
+  artisans=[{id:'a1',name:''}];
+  renderArtisans();
+  reqPhotos=[];
+  renderReqPhotos();
+  reqUrgency='normal';
+  setUrgency('normal');
   toggleReqSubmit();
 }
 function printRequest(){
@@ -2490,6 +2543,9 @@ function renderReg(){
     if(!irqMap[key])irqMap[key]={req:null,irns:[],reqNo:r.irqRef||''};
     irqMap[key].irns.push(r);
   });
+  Object.keys(irqMap).forEach(function(k){
+    irqMap[k].irns.sort(function(a,b){return parseInt(a.reportNo||0)-parseInt(b.reportNo||0);});
+  });
 
   var entries=Object.values(irqMap).sort(function(a,b){
     var aD=(a.req&&a.req.timestamp)||(a.irns[0]&&a.irns[0].date)||'';
@@ -2574,9 +2630,11 @@ function renderReg(){
     var latestIrn=irns[irns.length-1];
     var status='pending';
     var isCancelled=(latestIrn&&latestIrn.cancelled)||(req&&req.status==='cancelled');
+    var isResubmitted=!isCancelled&&req&&req.status==='pending'&&latestIrn&&latestIrn.result==='reject';
     if(isCancelled){status='cancelled';}
+    else if(isResubmitted){status='resubmitted';}
     else if(latestIrn){status=latestIrn.result==='accept'?'released':latestIrn.result==='hold'?'hold':'rework';}
-    var borderColor=status==='released'?'#1D9E75':status==='rework'?'#BA7517':status==='hold'?'#EF9F27':status==='cancelled'?'#aaa':'#E24B4A';
+    var borderColor=status==='released'?'#1D9E75':status==='rework'?'#BA7517':status==='hold'?'#EF9F27':status==='cancelled'?'#aaa':status==='resubmitted'?'#185FA5':'#E24B4A';
     var job=(req&&req.job)||(latestIrn&&latestIrn.job)||'--';
     var client=(req&&req.client)||(latestIrn&&latestIrn.project)||'--';
     var items_str='--';
@@ -2586,9 +2644,9 @@ function renderReg(){
     var qcDisplay=latestIrn?latestIrn.qc+' ('+latestIrn.qcCode+')':'--';
     var irqNo=entry.reqNo||'--';
     var stage=(req&&req.inspTypes)||(latestIrn&&latestIrn.stageName)||'--';
-    var sBg=status==='released'?'#EAF3DE':status==='rework'?'#FAEEDA':status==='hold'?'#FFF3CD':status==='cancelled'?'#f0f0f0':'#FCEBEB';
-    var sCol=status==='released'?'#27500A':status==='rework'?'#633806':status==='hold'?'#856404':status==='cancelled'?'#888':'#A32D2D';
-    var sLbl=status==='released'?'Released':status==='rework'?'Rework':status==='hold'?'🟠 On Hold':status==='cancelled'?'Cancelled':'Pending';
+    var sBg=status==='released'?'#EAF3DE':status==='rework'?'#FAEEDA':status==='hold'?'#FFF3CD':status==='cancelled'?'#f0f0f0':status==='resubmitted'?'#E6F1FB':'#FCEBEB';
+    var sCol=status==='released'?'#27500A':status==='rework'?'#633806':status==='hold'?'#856404':status==='cancelled'?'#888':status==='resubmitted'?'#0C447C':'#A32D2D';
+    var sLbl=status==='released'?'Released':status==='rework'?'Rework':status==='hold'?'🟠 On Hold':status==='cancelled'?'Cancelled':status==='resubmitted'?'Attempt '+(req.attempt||2)+' — Awaiting QC':'Pending';
     var isHighlighted=_irqParam&&String(irqNo)===String(_irqParam);
 
     html+='<div id="reg-row-'+irqNo+'" style="background:#fff;border-left:5px solid '+borderColor+';border:0.5px solid #ddd;border-left:5px solid '+borderColor+';border-radius:10px;margin-bottom:10px;overflow:hidden'+(isCancelled?';opacity:0.55':'')+''+(isHighlighted?';box-shadow:0 0 0 3px rgba(226,75,74,0.3)':'')+'">';
@@ -2606,6 +2664,9 @@ function renderReg(){
     html+='<span style="font-size:12px;color:#666;background:#f0f0f0;padding:3px 10px;border-radius:8px">'+stage+'</span>';
     html+='</div>';
     html+='<span style="font-size:12px;padding:4px 12px;border-radius:10px;font-weight:600;background:'+sBg+';color:'+sCol+'">'+sLbl+'</span>';
+    if(status==='released'&&irns.length>1){
+      html+='<span style="font-size:11px;padding:4px 10px;border-radius:10px;font-weight:600;background:#FAEEDA;color:#BA7517;margin-left:6px">'+(irns.length===2?'2nd attempt':irns.length+' attempts')+'</span>';
+    }
     html+='</div>';
 
     // Job details grid
@@ -2646,8 +2707,11 @@ function renderReg(){
       var cancelReason=(req&&req.cancelReason)||(latestIrn&&latestIrn.cancelReason)||'No reason given';
       html+='<div style="display:flex;align-items:center;gap:8px;flex:1"><div style="font-size:11px;color:#aaa;font-style:italic">Cancelled: '+cancelReason+'</div></div>';
       if(window._adminUnlocked){html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irnfid="'+(latestIrn&&latestIrn.firebaseId||'')+'" data-irqno="'+irqNo+'" onclick="deleteRecord(this)" style="font-size:12px;padding:9px 14px;background:#FCEBEB;border:1px solid #E24B4A;color:#A32D2D;border-radius:8px;cursor:pointer;font-weight:600">🗑 Delete</button>';}
-    } else if(latestIrn){
+    } else if(latestIrn&&!isResubmitted){
       html+='<button data-irn="'+latestIrn.reportNo+'" data-irq="'+irqNo+'" onclick="printFromReg(this)" style="font-size:13px;padding:9px 18px;background:#fff;border:1.5px solid #1a3a5c;color:#1a3a5c;border-radius:8px;cursor:pointer;font-weight:600"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> View / Print</button>';
+      if(latestIrn.result==='reject'&&req&&req.firebaseId){
+        html+='<button data-fid="'+req.firebaseId+'" data-irqno="'+irqNo+'" data-attempt="'+((req.attempt||1)+1)+'" onclick="resubmitForQC(this)" style="font-size:13px;padding:9px 14px;background:#185FA5;border:none;color:#fff;border-radius:8px;cursor:pointer;font-weight:600"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg> Resubmit for QC</button>';
+      }
       html+='<button data-irnfid="'+(latestIrn.firebaseId||'')+'" data-irqno="'+irqNo+'" data-irn="'+latestIrn.reportNo+'" onclick="amendIRN(this)" style="font-size:13px;padding:9px 14px;background:#FAEEDA;border:1.5px solid #BA7517;color:#633806;border-radius:8px;cursor:pointer;font-weight:600"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Amend</button>';
       html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irnfid="'+(latestIrn&&latestIrn.firebaseId||'')+'" data-irqno="'+irqNo+'" onclick="cancelRecord(this)" style="font-size:12px;padding:9px 14px;background:#fff;border:1px solid #aaa;color:#888;border-radius:8px;cursor:pointer"> Cancel</button>';
       if(window._adminUnlocked){html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irnfid="'+(latestIrn&&latestIrn.firebaseId||'')+'" data-irqno="'+irqNo+'" onclick="deleteRecord(this)" style="font-size:12px;padding:9px 14px;background:#FCEBEB;border:1px solid #E24B4A;color:#A32D2D;border-radius:8px;cursor:pointer;font-weight:600">🗑 Delete</button>';}
@@ -2655,6 +2719,9 @@ function renderReg(){
       var inspType=(req&&req.inspTypes)||'';
       var instructions=(req&&req.instructions)||'';
       html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-reqno="'+irqNo+'" data-job="'+job.replace(/"/g,'&quot;')+'" data-client="'+client.replace(/"/g,'&quot;')+'" data-items="'+items_str.replace(/"/g,'&quot;')+'" data-insptype="'+inspType.replace(/"/g,'&quot;')+'" data-instructions="'+instructions.replace(/"/g,'&quot;')+'" data-by="'+supName.replace(/"/g,'&quot;')+'" onclick="completeRequest(this)" style="font-size:14px;padding:10px 20px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">Complete IRN</button>';
+      if(req&&req.firebaseId){
+        html+='<button data-fid="'+req.firebaseId+'" data-reqno="'+irqNo+'" onclick="editRequest(this)" style="font-size:13px;padding:10px 14px;background:#fff;border:1.5px solid #BA7517;color:#633806;border-radius:8px;cursor:pointer;font-weight:600"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit</button>';
+      }
       html+='<button data-irqno="'+irqNo+'" onclick="previewRequest(this)" style="font-size:13px;padding:10px 14px;background:#E6F1FB;border:1.5px solid #185FA5;color:#0C447C;border-radius:8px;cursor:pointer;font-weight:600"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> View Request</button>';
       if(window._adminUnlocked){html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irnfid="" data-irqno="'+irqNo+'" onclick="deleteRecord(this)" style="font-size:12px;padding:10px 14px;background:#FCEBEB;border:1px solid #E24B4A;color:#A32D2D;border-radius:8px;cursor:pointer;font-weight:600">🗑 Delete</button>';}
       html+='<button data-fid="'+(req&&req.firebaseId||'')+'" data-irqno="'+irqNo+'" onclick="cancelRecord(this)" style="font-size:12px;padding:10px 14px;background:#fff;border:1px solid #aaa;color:#888;border-radius:8px;cursor:pointer"><svg style="font-size:13px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Cancel</button>';
@@ -2684,6 +2751,7 @@ function printFromReg(btn){
   var r=reg.find(function(x){return x.reportNo===irnNo;});
   if(!r){toast('Report data not found','err');return;}
   var reqEntry=reqs.find(function(x){return x.reqNo===irqNo;});
+  var attemptCount=irqNo?reg.filter(function(x){return x.irqRef===irqNo;}).length:1;
   var logoSrc=getLogoSrc();var isPass=r.result==='accept';
   var stageName=r.stageName||r.stage||'';
   var criteriaRows='';
@@ -2718,6 +2786,7 @@ function printFromReg(btn){
   win.document.write('<div class="hdr"><div><img src="'+logoSrc+'" class="logo"><div style="margin-top:5px"><div style="font-size:16px;font-weight:500">Inspection Release Note</div><div style="font-size:12px;color:#555">FSE-QR-IRN.038 · Rev 02 · ISO9001 / ISO3834-2</div></div></div><div style="text-align:right"><div style="font-size:9px;color:#888;text-transform:uppercase">Report No</div><div style="font-size:24px;font-weight:700;color:#1a3a5c">INS-C '+r.reportNo+'</div>'+(irqNo?'<div style="font-size:11px;color:#185FA5">IRQ-'+irqNo+'</div>':'')+'</div></div>');
   var isHold=r.result==='hold';
   win.document.write('<div class="'+(isPass?'result-pass':isHold?'result-hold':'result-fail')+'">'+(isPass?'✓ ACCEPTED — Released':isHold?'🟠 ON HOLD — See details below':'✗ REJECTED — Rework required')+'</div>');
+  if(isPass&&attemptCount>1)win.document.write('<div style="background:#FAEEDA;border:1px solid #BA7517;color:#633806;font-weight:700;font-size:11px;padding:4px 8px;border-radius:4px;margin-bottom:6px;display:inline-block">'+(attemptCount===2?'2nd attempt — released after rework':attemptCount+' attempts — released after rework')+'</div>');
   if(stageName)win.document.write('<div style="background:#1a3a5c;color:#fff;padding:5px 10px;border-radius:4px;font-size:11px;font-weight:600;margin-bottom:6px">Inspection stage: '+stageName+'</div>');
   if(irqNo||rSup)win.document.write('<div class="req-banner">'+(irqNo?'<div><div class="cl">Request ref</div><div class="cv" style="color:#185FA5">IRQ-'+irqNo+'</div></div>':'')+(rSup?'<div><div class="cl">Requested by</div><div class="cv">'+rSup+'</div></div>':'')+(rDate?'<div><div class="cl">Request date</div><div class="cv">'+rDate+'</div></div>':'')+'</div>');
   win.document.write('<div class="grid"><div class="cell"><div class="cl">Job / Order</div><div class="cv">'+r.job+'</div></div><div class="cell"><div class="cl">Client</div><div class="cv">'+(r.project||'--')+'</div></div><div class="cell"><div class="cl">PO Number</div><div class="cv">'+(r.po||'--')+'</div></div><div class="cell"><div class="cl">Artisan</div><div class="cv">'+(r.artisan||'--')+'</div></div><div class="cell"><div class="cl">Drawing / Rev</div><div class="cv">'+(r.drawing||'--')+'</div></div><div class="cell"><div class="cl">Inspection stage</div><div class="cv" style="color:#1a3a5c;font-weight:600">'+(stageName||'--')+'</div></div></div>');
@@ -2806,6 +2875,42 @@ function resubmitRequest(btn){
     if(window.resubmitRequest)window.resubmitRequest(firebaseId,attempt);
     toast('IRQ-'+reqNo+' re-submitted (Attempt '+attempt+')','ok');
   }
+}
+function editRequest(btn){
+  var fid=btn.dataset.fid;
+  var reqNo=btn.dataset.reqno;
+  var req=reqs.find(function(x){return x.firebaseId===fid;});
+  if(!req){toast('Request data not found','err');return;}
+  window._editReqMode=true;
+  window._editReqFirebaseId=fid;
+  window._editReqNo=reqNo;
+  var reqBtn=document.querySelectorAll('.nb')[0];
+  showV('request',reqBtn);
+  setReqMode('full');
+  setTimeout(function(){
+    var jo=document.getElementById('reqJob');if(jo)jo.value=req.job||'';
+    var cl=document.getElementById('reqClient');if(cl)cl.value=req.client||'';
+    var da=document.getElementById('reqDate');if(da)da.value=req.date||'';
+    var rn=document.getElementById('reqNo');if(rn)rn.value=reqNo;
+    var ins=document.getElementById('reqInstructions');if(ins)ins.value=req.instructions||'';
+    reqItems=(req.items&&req.items.length)?JSON.parse(JSON.stringify(req.items)):[{id:'r1',desc:'',qty:''}];
+    renderReqItems();
+    selectedInspTypes=(req.inspTypes||'').split(',').map(function(s){return s.trim();}).filter(function(s){return s&&s!=='Not specified';});
+    renderInspTypes();
+    checkSubcontractorCard();
+    artisans=(req.artisans&&req.artisans.length)?req.artisans.map(function(n,i){return{id:'a'+(i+1),name:n};}):[{id:'a1',name:''}];
+    renderArtisans();
+    reqPhotos=req.reqPhotoData?JSON.parse(JSON.stringify(req.reqPhotoData)):[];
+    renderReqPhotos();
+    reqUrgency=req.urgency||'normal';
+    setUrgency(reqUrgency);
+    var supEl=document.getElementById('reqSupCode');if(supEl){supEl.value=req.supCode||'';validateReqSup();}
+    var ackEl=document.getElementById('reqAckCheck');if(ackEl){ackEl.checked=true;toggleReqSubmit();}
+    var banner=document.getElementById('reqEditBanner');
+    if(banner){banner.style.display='flex';var bt=document.getElementById('reqEditBannerText');if(bt)bt.textContent='Editing IRQ-'+reqNo;}
+    var subBtn=document.getElementById('reqSubmitBtn');if(subBtn)subBtn.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save changes';
+    toast('Editing IRQ-'+reqNo+' — correct the details and save','info');
+  },150);
 }
 function completeRequest(btn){
   var firebaseId=btn.dataset.fid;
@@ -2933,6 +3038,9 @@ var fabRows='';
 function printIRN(){
   var d=getForm();
   if(!d.reportNo||d.reportNo==='--'){toast('Enter a report number','err');return;}
+  var _existingAttempts=_irqParam?reg.filter(function(x){return x.irqRef===_irqParam;}).length:0;
+  var _alreadySaved=reg.some(function(x){return x.reportNo===d.reportNo;});
+  var printAttemptCount=_alreadySaved?_existingAttempts:_existingAttempts+1;
   var logoSrc=getLogoSrc();
   var stageName='';
   var criteriaRows='';
@@ -2986,6 +3094,7 @@ function printIRN(){
   // Result
   var isHold=d.result==='hold';
   win.document.write('<div class="'+(isPass?'result-pass':isHold?'result-hold':'result-fail')+'">'+(isPass?'✓ ACCEPTED — Released for next stage':isHold?'🟠 ON HOLD — See details below':'✗ REJECTED — Rework required')+'</div>');
+  if(isPass&&printAttemptCount>1)win.document.write('<div style="background:#FAEEDA;border:1.5px solid #BA7517;color:#633806;font-weight:700;font-size:12px;padding:6px 10px;border-radius:6px;margin-bottom:12px;display:inline-block">'+(printAttemptCount===2?'2nd attempt — released after rework':printAttemptCount+' attempts — released after rework')+'</div>');
 
   // Request reference banner
   if(irqRef||supName){
@@ -3218,6 +3327,27 @@ function deleteRecord(btn){
     else{loaded.reqs=true;check();}
   }).catch(function(){toast('Error deleting — check connection','err');});
 }
+function resubmitForQC(btn){
+  var fid=btn.dataset.fid;
+  var irqNo=btn.dataset.irqno;
+  var attempt=parseInt(btn.dataset.attempt)||2;
+  if(!confirm('Resubmit IRQ-'+irqNo+' for QC re-inspection?\n\nThis will be Attempt '+attempt+'. The item must be physically corrected before QC re-checks it.'))return;
+  if(!window.resubmitRequest){toast('Resubmit not available — check connection','err');return;}
+  window.resubmitRequest(fid,attempt).then(function(ok){
+    if(!ok){
+      toast('Resubmit failed to save — check your connection and try again','err');
+      return;
+    }
+    toast('IRQ-'+irqNo+' resubmitted — Attempt '+attempt+' now waiting for QC','ok');
+    if(window.sendPushToRole)window.sendPushToRole('qc','Resubmitted — IRQ-'+irqNo,'Attempt '+attempt+' now ready for re-inspection','');
+    var loaded={irns:false,reqs:false};
+    function check(){if(loaded.irns&&loaded.reqs)renderReg();}
+    if(window.loadIRNsFromFirebase){if(_irnsUnsub)_irnsUnsub();_irnsUnsub=window.loadIRNsFromFirebase(function(r){reg=r;loaded.irns=true;check();});}
+    else{loaded.irns=true;}
+    if(window.loadRequestsFromFirebase){if(_reqsUnsub)_reqsUnsub();_reqsUnsub=window.loadRequestsFromFirebase(function(r){reqs=r;loaded.reqs=true;check();});}
+    else{loaded.reqs=true;}
+  }).catch(function(){toast('Resubmit failed — check your connection and try again','err');});
+}
 function cancelRecord(btn){
   var irqNo=btn.dataset.irqno;
   var reqFid=btn.dataset.fid||'';
@@ -3413,6 +3543,9 @@ function renderMgmt(){
     var key=r.irqRef||('irn_'+r.reportNo);
     if(!irqMap[key])irqMap[key]={req:null,irns:[],reqNo:r.irqRef||''};
     irqMap[key].irns.push(r);
+  });
+  Object.keys(irqMap).forEach(function(k){
+    irqMap[k].irns.sort(function(a,b){return parseInt(a.reportNo||0)-parseInt(b.reportNo||0);});
   });
   var entries=Object.values(irqMap);
 
