@@ -268,6 +268,10 @@ window.loadRequestsFromFirebase=function(cb){
       snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});
       console.log('Loaded',r.length,'requests from Firebase. Pending:',r.filter(function(x){return x.status==='pending';}).length);
       cb(r);
+    },function(err){
+      console.error('Requests listener error — reconnecting in 3s:',err);
+      if(typeof toast==='function')toast('Connection lost — reconnecting...','err');
+      setTimeout(function(){window.loadRequestsFromFirebase(cb);},3000);
     });
   }catch(e){console.error('Load requests error:',e);cb([]);}
 };
@@ -290,7 +294,7 @@ window.updateIRNInFirebase=async function(firebaseId,data){
   }catch(e){console.error('IRN update error:',e);return false;}
 };
 window.sendAppMessage=async function(m){try{m.timestamp=new Date().toISOString();if(!m.readBy)m.readBy=m.fromCode?[m.fromCode]:[];var ref=await addDoc(collection(db,'messages'),m);return ref.id;}catch(e){console.log('Message send error:',e);return false;}};
-window.loadMessagesFromFirebase=function(cb){try{var q=query(collection(db,'messages'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);});}catch(e){cb([]);return null;}};
+window.loadMessagesFromFirebase=function(cb){try{var q=query(collection(db,'messages'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);},function(err){console.error('Messages listener error — reconnecting in 3s:',err);setTimeout(function(){window.loadMessagesFromFirebase(cb);},3000);});}catch(e){cb([]);return null;}};
 window.markMessageRead=async function(firebaseId,code){try{await updateDoc(doc(db,'messages',firebaseId),{readBy:arrayUnion(code)});return true;}catch(e){return false;}};
 // ===== Push notifications (FCM) =====
 // STEP 1: paste your Web Push certificate key (Firebase Console > Project settings > Cloud Messaging > Web Push certificates > Generate key pair)
@@ -323,7 +327,7 @@ window.sendPushToRole=async function(role,title,body,url,opts){
   }catch(e){console.log('Push send error:',e);}
 };
 // ===== end push =====
-window.loadIRNsFromFirebase=function(cb){try{var q=query(collection(db,'irns'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);});}catch(e){cb([]);}};
+window.loadIRNsFromFirebase=function(cb){try{var q=query(collection(db,'irns'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);},function(err){console.error('IRNs listener error — reconnecting in 3s:',err);if(typeof toast==='function')toast('Connection lost — reconnecting...','err');setTimeout(function(){window.loadIRNsFromFirebase(cb);},3000);});}catch(e){cb([]);}};
 window.addEventListener('DOMContentLoaded',function(){
   var el=document.getElementById('reportNo');
   if(el&&!el.value){el.value='----';el.style.color='rgba(255,255,255,0.4)';}
@@ -736,6 +740,10 @@ window.addEventListener('DOMContentLoaded',function(){
       <div style="background:#E6F1FB;border-radius:8px;padding:8px 10px;text-align:center"><div style="font-size:22px;font-weight:500;color:#0C447C" id="statFTP">0%</div><div style="font-size:10px;color:#185FA5">1st pass</div></div>
     </div>
     <div id="stageChart" style="display:none;background:#fff;border:0.5px solid #eee;border-radius:10px;padding:12px;margin-bottom:8px"></div>
+    <div style="position:relative;margin-bottom:10px">
+      <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;color:#aaa" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="regSearchIn" placeholder="Search job, client, IRQ, supervisor, QC, or status (e.g. cancelled)..." oninput="setRegSearch(this.value)" style="width:100%;padding:10px 12px 10px 36px;border:1.5px solid #ddd;border-radius:10px;font-size:13px;outline:none;background:#fff">
+    </div>
     <div class="filt-row">
       <button class="filt-btn on" onclick="setRegFilt('all',this)">All</button>
       <button class="filt-btn" onclick="setRegFilt('pending',this)">Pending</button>
@@ -926,6 +934,22 @@ window.addEventListener('DOMContentLoaded',function(){
       </div>
     </div>
 
+    <!-- First-Time-Pass evidence panel -->
+    <div style="background:#fff;border:0.5px solid #B5D4F4;border-radius:10px;padding:12px;margin-bottom:10px">
+      <div style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Why the 1st pass rate is what it is</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="background:#FCEBEB;border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:24px;font-weight:700;color:#A32D2D" id="mgStatTotalRejections">0</div>
+          <div style="font-size:10px;color:#A32D2D;text-transform:uppercase;letter-spacing:0.3px">Total rejection events (all-time)</div>
+        </div>
+        <div style="background:#FAEEDA;border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:24px;font-weight:700;color:#633806" id="mgStatReworkedBeforePass">0</div>
+          <div style="font-size:10px;color:#633806;text-transform:uppercase;letter-spacing:0.3px">Released jobs that needed rework first</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#666;margin-top:8px;line-height:1.5">The "Rejected" count above only shows what's <strong>currently</strong> open and unresolved. Once a rejected item is fixed and resubmitted, it moves into "Released" — so it stops showing as rejected even though it didn't pass first time. These two numbers are the full history: every rejection QC has ever raised, and how many of today's released jobs actually needed that rework before they passed.</div>
+    </div>
+
     <!-- Month-by-month summary -->
     <div style="background:#fff;border:0.5px solid #eee;border-radius:10px;padding:12px;margin-bottom:10px;overflow-x:auto">
       <div style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Month by month</div>
@@ -1026,6 +1050,7 @@ window.addEventListener('DOMContentLoaded',function(){
   document.getElementById('admLogo').src=src;
 });
 
+var _irnsUnsub=null,_reqsUnsub=null;
 var codes={
   mgt:[
     {code:'MGT-001',name:'',active:false,pin:''},
@@ -1161,9 +1186,9 @@ function showV(v,btn){
     // Always reload both collections fresh
     var regLoaded={irns:false,reqs:false};
     function checkRegReady(){if(regLoaded.irns&&regLoaded.reqs)renderReg();}
-    if(window.loadIRNsFromFirebase){window.loadIRNsFromFirebase(function(r){reg=r;regLoaded.irns=true;checkRegReady();});}
+    if(window.loadIRNsFromFirebase){if(_irnsUnsub)_irnsUnsub();_irnsUnsub=window.loadIRNsFromFirebase(function(r){reg=r;regLoaded.irns=true;checkRegReady();});}
     else{regLoaded.irns=true;}
-    if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){reqs=r;regLoaded.reqs=true;checkRegReady();});}
+    if(window.loadRequestsFromFirebase){if(_reqsUnsub)_reqsUnsub();_reqsUnsub=window.loadRequestsFromFirebase(function(r){reqs=r;regLoaded.reqs=true;checkRegReady();});}
     else{regLoaded.reqs=true;}
     renderReg();
   }
@@ -1176,7 +1201,7 @@ function showV(v,btn){
   if(v==='request'){
     document.getElementById('reqLogo').src=getLogoSrc();
     if(window.peekNextIRQ){window.peekNextIRQ().then(function(n){var el=document.getElementById('reqNo');if(el&&!el.value){el.value=n;el.style.color='rgba(255,255,255,0.6)';}});}
-    if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){reqs=r;renderPendingReqs();});}
+    if(window.loadRequestsFromFirebase){if(_reqsUnsub)_reqsUnsub();_reqsUnsub=window.loadRequestsFromFirebase(function(r){reqs=r;renderPendingReqs();});}
     else{renderPendingReqs();}
   }
 
@@ -1196,9 +1221,9 @@ function showV(v,btn){
     document.getElementById('mgmtLogo').src=getLogoSrc();
     var mgLoaded={irns:false,reqs:false};
     function checkMgReady(){if(mgLoaded.irns&&mgLoaded.reqs)renderMgmt();}
-    if(window.loadIRNsFromFirebase){window.loadIRNsFromFirebase(function(r){reg=r;mgLoaded.irns=true;checkMgReady();});}
+    if(window.loadIRNsFromFirebase){if(_irnsUnsub)_irnsUnsub();_irnsUnsub=window.loadIRNsFromFirebase(function(r){reg=r;mgLoaded.irns=true;checkMgReady();});}
     else{mgLoaded.irns=true;checkMgReady();}
-    if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){reqs=r;mgLoaded.reqs=true;checkMgReady();});}
+    if(window.loadRequestsFromFirebase){if(_reqsUnsub)_reqsUnsub();_reqsUnsub=window.loadRequestsFromFirebase(function(r){reqs=r;mgLoaded.reqs=true;checkMgReady();});}
     else{mgLoaded.reqs=true;checkMgReady();}
   }
 }
@@ -1562,6 +1587,11 @@ function handleNewIRNClick(btn){
   }
 }
 var _regFilt='all';
+var _regSearch='';
+function setRegSearch(val){
+  _regSearch=val.trim().toLowerCase();
+  renderReg();
+}
 function setRegFilt(f,btn){
   _regFilt=f;
   document.querySelectorAll('.filt-btn').forEach(function(b){b.classList.remove('on');});
@@ -2496,13 +2526,37 @@ function renderReg(){
 
   // Filter
   var filtered=entries;
-  var filtered=entries;
   if(_regFilt==='pending')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return !l&&!(e.req&&e.req.status==='cancelled');});
   else if(_regFilt==='released')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&!l.cancelled;});
   else if(_regFilt==='rework')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='reject'&&!l.cancelled;});
   else if(_regFilt==='hold')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='hold'&&!l.cancelled;});
   else if(_regFilt==='cancelled')filtered=entries.filter(function(e){var l=e.irns[e.irns.length-1];return (e.req&&e.req.status==='cancelled')||(l&&l.cancelled);});
   // All filter shows everything including cancelled
+
+  // Search — searches ALL entries regardless of the status filter above, using status keywords or free text
+  if(_regSearch){
+    var statusWords={'pending':'pending','released':'released','release':'released','reject':'rework','rejected':'rework','rework':'rework','hold':'hold','onhold':'hold','cancel':'cancelled','cancelled':'cancelled','canceled':'cancelled'};
+    var matchedStatus=null;
+    Object.keys(statusWords).forEach(function(k){if(_regSearch.indexOf(k)>=0)matchedStatus=statusWords[k];});
+    if(matchedStatus){
+      filtered=entries.filter(function(e){
+        var l=e.irns[e.irns.length-1];
+        var isCancelled=(e.req&&e.req.status==='cancelled')||(l&&l.cancelled);
+        var st=isCancelled?'cancelled':!l?'pending':l.result==='accept'?'released':l.result==='reject'?'rework':l.result==='hold'?'hold':'pending';
+        return st===matchedStatus;
+      });
+    } else {
+      filtered=entries.filter(function(e){
+        var req=e.req,l=e.irns[e.irns.length-1];
+        var job=((req&&req.job)||(l&&l.job)||'').toLowerCase();
+        var client=((req&&req.client)||(l&&l.project)||'').toLowerCase();
+        var irqTxt=String(e.reqNo||'').toLowerCase();
+        var sup=((req&&req.supervisor)||(l&&l.reqSupervisor)||'').toLowerCase();
+        var qc=(l&&l.qc||'').toLowerCase();
+        return job.indexOf(_regSearch)>=0||client.indexOf(_regSearch)>=0||irqTxt.indexOf(_regSearch)>=0||sup.indexOf(_regSearch)>=0||qc.indexOf(_regSearch)>=0;
+      });
+    }
+  }
 
   if(!filtered.length){
     document.getElementById('regList').innerHTML='<div style="text-align:center;padding:32px 16px;color:#888;font-size:14px"><svg style="font-size:40px;display:block;margin-bottom:8px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="15" y2="16"/></svg>No records found.</div>';
@@ -3150,13 +3204,17 @@ function deleteRecord(btn){
   var promises=[];
   if(reqFid&&window.deleteRequest)promises.push(window.deleteRequest(reqFid));
   if(irnFid&&window.deleteIRN)promises.push(window.deleteIRN(irnFid));
-  Promise.all(promises).then(function(){
+  Promise.all(promises).then(function(results){
+    if(results.length===0||results.some(function(ok){return ok===false;})){
+      toast('Delete failed to save — check your connection and try again','err');
+      return;
+    }
     toast('IRQ-'+irqNo+' permanently deleted','ok');
     var loaded={irns:false,reqs:false};
     function check(){if(loaded.irns&&loaded.reqs)renderReg();}
-    if(window.loadIRNsFromFirebase){window.loadIRNsFromFirebase(function(r){reg=r;loaded.irns=true;check();});}
+    if(window.loadIRNsFromFirebase){if(_irnsUnsub)_irnsUnsub();_irnsUnsub=window.loadIRNsFromFirebase(function(r){reg=r;loaded.irns=true;check();});}
     else{loaded.irns=true;check();}
-    if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){reqs=r;loaded.reqs=true;check();});}
+    if(window.loadRequestsFromFirebase){if(_reqsUnsub)_reqsUnsub();_reqsUnsub=window.loadRequestsFromFirebase(function(r){reqs=r;loaded.reqs=true;check();});}
     else{loaded.reqs=true;check();}
   }).catch(function(){toast('Error deleting — check connection','err');});
 }
@@ -3170,13 +3228,17 @@ function cancelRecord(btn){
   var promises=[];
   if(reqFid&&window.markRequestCancelled)promises.push(window.markRequestCancelled(reqFid,reason));
   if(irnFid&&window.markIRNCancelled)promises.push(window.markIRNCancelled(irnFid,reason));
-  Promise.all(promises).then(function(){
+  Promise.all(promises).then(function(results){
+    if(results.length===0||results.some(function(ok){return ok===false;})){
+      toast('Cancellation failed to save — check your connection and try again','err');
+      return;
+    }
     toast('IRQ-'+irqNo+' marked as cancelled','ok');
     var loaded={irns:false,reqs:false};
     function check(){if(loaded.irns&&loaded.reqs)renderReg();}
-    if(window.loadIRNsFromFirebase){window.loadIRNsFromFirebase(function(r){reg=r;loaded.irns=true;check();});}
+    if(window.loadIRNsFromFirebase){if(_irnsUnsub)_irnsUnsub();_irnsUnsub=window.loadIRNsFromFirebase(function(r){reg=r;loaded.irns=true;check();});}
     else{loaded.irns=true;check();}
-    if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){reqs=r;loaded.reqs=true;check();});}
+    if(window.loadRequestsFromFirebase){if(_reqsUnsub)_reqsUnsub();_reqsUnsub=window.loadRequestsFromFirebase(function(r){reqs=r;loaded.reqs=true;check();});}
     else{loaded.reqs=true;check();}
   }).catch(function(){toast('Error cancelling — check connection','err');});
 }
@@ -3364,6 +3426,11 @@ function renderMgmt(){
   var pending=active.filter(function(e){return e.irns.length===0;}).length;
   var ftp=active.filter(function(e){var l=e.irns[e.irns.length-1];return l&&l.result==='accept'&&e.irns.length===1;}).length;
   var ftpPct=released>0?Math.round(ftp/released*100):0;
+  var reworkedBeforePass=released-ftp;
+  var cancelledIrqs={};
+  reqs.forEach(function(r){if(r.status==='cancelled'&&r.reqNo)cancelledIrqs[r.reqNo]=true;});
+  reg.forEach(function(r){if(r.cancelled&&r.irqRef)cancelledIrqs[r.irqRef]=true;});
+  var totalRejectionEvents=reg.filter(function(r){return r.result==='reject'&&!(r.irqRef&&cancelledIrqs[r.irqRef]);}).length;
 
   document.getElementById('mgStatTotal').textContent=total;
   document.getElementById('mgStatUrgent').textContent=urgent;
@@ -3371,6 +3438,8 @@ function renderMgmt(){
   document.getElementById('mgStatRejected').textContent=rework;
   document.getElementById('mgStatOnHold').textContent=onHold;
   document.getElementById('mgStatFTP').textContent=ftpPct+'%';
+  document.getElementById('mgStatTotalRejections').textContent=totalRejectionEvents;
+  document.getElementById('mgStatReworkedBeforePass').textContent=reworkedBeforePass;
   document.getElementById('mgStatPending').textContent=pending;
 
   // Stage pass rate chart
@@ -3507,8 +3576,8 @@ if(_irqParam){
 }
 
 // Load from Firebase — updates the placeholder with real data
-if(window.loadIRNsFromFirebase){window.loadIRNsFromFirebase(function(r){reg=r;renderReg();});}
-if(window.loadRequestsFromFirebase){window.loadRequestsFromFirebase(function(r){
+if(window.loadIRNsFromFirebase){if(_irnsUnsub)_irnsUnsub();_irnsUnsub=window.loadIRNsFromFirebase(function(r){reg=r;renderReg();});}
+if(window.loadRequestsFromFirebase){if(_reqsUnsub)_reqsUnsub();_reqsUnsub=window.loadRequestsFromFirebase(function(r){
   reqs=r;
   if(_irqParam){
     var found=reqs.find(function(x){return String(x.reqNo)===String(_irqParam);});
