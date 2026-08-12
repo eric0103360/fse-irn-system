@@ -1819,8 +1819,12 @@ async function submitRequest(){
   var liveLink='https://eric0103360.github.io/fse-irn-system?irq='+encodeURIComponent(d.reqNo);
   msg+='👉 '+liveLink;
   // Save to Firebase FIRST before anything else
-  if(window.saveRequestToFirebase){
-    await window.saveRequestToFirebase(d);
+  var _reqSaveOk=window.saveRequestToFirebase?await window.saveRequestToFirebase(d):false;
+  if(!_reqSaveOk){
+    clearTimeout(_guard);
+    toast('Request failed to save — check your connection and try again. QC was not notified.','err');
+    if(_b){_b.dataset.busy='';_b.disabled=false;_b.style.background='';_b.innerHTML=_t;}
+    return;
   }
   toast('Request IRQ-'+d.reqNo+' sent to QC','ok');
   var _mp=window.sendAppMessage?window.sendAppMessage({to:'QC',from:d.supervisor||'Supervisor',fromCode:d.supCode||'',kind:'request',irq:d.reqNo,text:msg}):Promise.resolve('');
@@ -1993,7 +1997,13 @@ async function submitQuickRequest(){
     photos:0,reqPhotoData:[],
     timestamp:new Date().toISOString(),status:'pending'
   };
-  if(window.saveRequestToFirebase)await window.saveRequestToFirebase(d);
+  var _qrSaveOk=window.saveRequestToFirebase?await window.saveRequestToFirebase(d):false;
+  if(!_qrSaveOk){
+    clearTimeout(_qguard);
+    toast('Request failed to save — check your connection and try again. QC was not notified.','err');
+    if(_qb){_qb.dataset.busy='';_qb.disabled=false;_qb.innerHTML=_qt;}
+    return;
+  }
   var msg=(qrUrgency==='urgent'?'⚡ ':'🔵 ')+'*IRQ-'+reqNo+' | '+job+(client?' | '+client:'')+'*\n';
   msg+='Type: '+qrSelectedType+'\n';
   msg+='SUP: '+qrSupName+'\n';
@@ -2360,21 +2370,28 @@ async function submitIRN(){
     // Only get new IRN number if not already assigned and not amending
     var el=document.getElementById('reportNo');
     var currentIRN=el?el.value:'';
-    if(window._amendMode&&window._amendFirebaseId){
+    var saveOk=false;
+    var wasAmend=!!(window._amendMode&&window._amendFirebaseId);
+    if(wasAmend){
       // Amendment — update existing record
       d.reportNo=window._amendIRNNo||currentIRN;
       if(el)el.value=d.reportNo;
-      if(window.updateIRNInFirebase)await window.updateIRNInFirebase(window._amendFirebaseId,d);
-      toast('INS-C '+d.reportNo+' amended and saved','ok');
-      window._amendMode=false;window._amendFirebaseId=null;window._amendIRNNo=null;
+      saveOk=window.updateIRNInFirebase?await window.updateIRNInFirebase(window._amendFirebaseId,d):false;
     } else {
       // Always get a fresh number from Firebase counter
       var freshIRN=await window.getNextIRN();
       d.reportNo=freshIRN;
       if(el){el.value=freshIRN;el.style.color='rgba(255,255,255,0.6)';}
+      saveOk=window.saveIRNToFirebase?await window.saveIRNToFirebase(d):false;
     }
-    // Save to Firebase — skip if already handled by amendment
-    if(!window._amendMode&&window.saveIRNToFirebase)await window.saveIRNToFirebase(d);
+    if(!saveOk){
+      toast('Save failed — check your connection and try again. Nothing was released.','err');
+      return;
+    }
+    if(wasAmend){
+      toast('INS-C '+d.reportNo+' amended and saved','ok');
+      window._amendMode=false;window._amendFirebaseId=null;window._amendIRNNo=null;
+    }
     var ex=reg.findIndex(function(r){return r.reportNo===d.reportNo;});
     if(ex>=0)reg[ex]=d;else reg.unshift(d);
     if(d.result==='reject'&&_irqParam){
