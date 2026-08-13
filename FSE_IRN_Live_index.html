@@ -171,13 +171,15 @@ const app=initializeApp({apiKey:"AIzaSyC3sKMm02GnikBdgXPd4RUm7RxnsR90A_I",authDo
 const db=getFirestore(app);
 const storage=getStorage(app);
 // Upload photos to Firebase Storage and return URLs
-window.uploadPhotosToStorage=async function(photos,prefix){
+window.uploadPhotosToStorage=async function(photos,prefix,onProgress){
   if(!photos||photos.length===0)return[];
   var urls=[];
   for(var i=0;i<photos.length;i++){
+    if(onProgress)onProgress(i+1,photos.length);
     var uploaded=false;
     for(var attempt=0;attempt<2&&!uploaded;attempt++){
       try{
+        if(attempt>0)await new Promise(function(res){setTimeout(res,1500);});
         var storageRef=ref(storage,prefix+'/photo_'+Date.now()+'_'+i+'.jpg');
         await uploadString(storageRef,photos[i],'data_url');
         var url=await getDownloadURL(storageRef);
@@ -200,7 +202,7 @@ window.saveIRNToFirebase=async function(data){
     var s=Object.assign({},data);
     // Upload inspector photos to Storage
     if(s.inspPhotoData&&s.inspPhotoData.length>0){
-      var urls=await window.uploadPhotosToStorage(s.inspPhotoData,'irn_photos/'+Date.now());
+      var urls=await window.uploadPhotosToStorage(s.inspPhotoData,'irn_photos/'+Date.now(),function(n,total){if(typeof toast==='function')toast('Uploading photo '+n+' of '+total+'…','info');});
       s.inspPhotoData=urls;
     }
     // Strip stage photos from Firestore doc (too large)
@@ -255,7 +257,7 @@ window.saveRequestToFirebase=async function(data){
     s.attempt=data.attempt||1;
     // Upload request photos to Storage
     if(s.reqPhotoData&&s.reqPhotoData.length>0){
-      var urls=await window.uploadPhotosToStorage(s.reqPhotoData,'req_photos/'+Date.now());
+      var urls=await window.uploadPhotosToStorage(s.reqPhotoData,'req_photos/'+Date.now(),function(n,total){if(typeof toast==='function')toast('Uploading photo '+n+' of '+total+'…','info');});
       s.reqPhotoData=urls;
     }
     var ref2=await addDoc(collection(db,'requests'),s);
@@ -292,7 +294,7 @@ window.updateRequestInFirebase=async function(firebaseId,data){
   try{
     var s=Object.assign({},data);
     if(s.reqPhotoData&&s.reqPhotoData.length>0){
-      var urls=await window.uploadPhotosToStorage(s.reqPhotoData,'req_photos/'+Date.now());
+      var urls=await window.uploadPhotosToStorage(s.reqPhotoData,'req_photos/'+Date.now(),function(n,total){if(typeof toast==='function')toast('Uploading photo '+n+' of '+total+'…','info');});
       s.reqPhotoData=urls;
     }
     s.editedAt=new Date().toISOString();
@@ -1122,6 +1124,50 @@ var iRes=null,openS=null,iCnt=3,tdCnt=0,reg=[],reqs=[],regFilt='all';
 var items=[{id:'i1',desc:'',qty:''},{id:'i2',desc:'',qty:''}];
 var inspPhotosArr=[];
 var ss={};
+function saveDraftToSession(irq){
+  if(!irq)return;
+  try{
+    var draft={
+      ss:ss,items:items,inspPhotosArr:inspPhotosArr,
+      notes:(document.getElementById('notes')||{}).value||'',
+      qcCode:(document.getElementById('qcCode')||{}).value||'',
+      result:iRes,
+      rejectionReason:(document.getElementById('rejectionReason')||{}).value||'',
+      rejectionAction:(document.getElementById('rejectionAction')||{}).value||'',
+      holdReason:(document.getElementById('holdReason')||{}).value||'',
+      holdAction:(document.getElementById('holdAction')||{}).value||'',
+      savedAt:new Date().toISOString()
+    };
+    sessionStorage.setItem('fse_draft_'+irq,JSON.stringify(draft));
+  }catch(e){console.error('Draft save error:',e);}
+}
+function restoreDraftFromSession(irq){
+  if(!irq)return null;
+  try{
+    var raw=sessionStorage.getItem('fse_draft_'+irq);
+    return raw?JSON.parse(raw):null;
+  }catch(e){return null;}
+}
+function clearDraftFromSession(irq){
+  if(!irq)return;
+  try{sessionStorage.removeItem('fse_draft_'+irq);}catch(e){}
+}
+function applyDraftToForm(draft){
+  if(!draft)return;
+  if(draft.ss){Object.keys(draft.ss).forEach(function(k){if(ss[k])ss[k]=Object.assign({},ss[k],draft.ss[k],{photos:(draft.ss[k]&&draft.ss[k].photos)||[]});});}
+  if(draft.items&&draft.items.length){items=draft.items;renderItems();}
+  if(draft.inspPhotosArr&&draft.inspPhotosArr.length){inspPhotosArr=draft.inspPhotosArr;renderInspPhotos();}
+  var noEl=document.getElementById('notes');if(noEl&&draft.notes)noEl.value=draft.notes;
+  var qcEl=document.getElementById('qcCode');if(qcEl&&draft.qcCode){qcEl.value=draft.qcCode;validateCode('qc');}
+  if(draft.result){setRes(draft.result);
+    var rrEl=document.getElementById('rejectionReason');if(rrEl&&draft.rejectionReason)rrEl.value=draft.rejectionReason;
+    var raEl=document.getElementById('rejectionAction');if(raEl&&draft.rejectionAction)raEl.value=draft.rejectionAction;
+    var hrEl=document.getElementById('holdReason');if(hrEl&&draft.holdReason)hrEl.value=draft.holdReason;
+    var haEl=document.getElementById('holdAction');if(haEl&&draft.holdAction)haEl.value=draft.holdAction;
+  }
+  renderStages();
+  toast('Recovered your unsaved inspection work from before','info');
+}
 var fabDims=['A','B','C','D','E','F','G','H','I','J','K','L','M'].map(function(l){return{label:l,lbl:'',draw:'',meas:'',pf:''};});
 var lastIRNs={};
 
@@ -1254,20 +1300,37 @@ function showV(v,btn){
 }
 // Compress image before storing — fixes large camera photo issues
 function compressImage(file,callback){
+  var done=false;
+  var safety=setTimeout(function(){
+    if(done)return;
+    done=true;
+    console.error('Photo processing timed out:',file&&file.name);
+    callback(null);
+  },20000);
+  function finish(result){
+    if(done)return;
+    done=true;
+    clearTimeout(safety);
+    callback(result);
+  }
   var reader=new FileReader();
+  reader.onerror=function(){console.error('Photo read error:',file&&file.name);finish(null);};
   reader.onload=function(e){
     var img=new Image();
+    img.onerror=function(){console.error('Photo decode error:',file&&file.name);finish(null);};
     img.onload=function(){
-      var canvas=document.createElement('canvas');
-      var maxW=1200;var maxH=1200;
-      var w=img.width;var h=img.height;
-      if(w>maxW){h=Math.round(h*maxW/w);w=maxW;}
-      if(h>maxH){w=Math.round(w*maxH/h);h=maxH;}
-      canvas.width=w;canvas.height=h;
-      var ctx=canvas.getContext('2d');
-      ctx.drawImage(img,0,0,w,h);
-      var compressed=canvas.toDataURL('image/jpeg',0.75);
-      callback(compressed);
+      try{
+        var canvas=document.createElement('canvas');
+        var maxW=900;var maxH=900;
+        var w=img.width;var h=img.height;
+        if(w>maxW){h=Math.round(h*maxW/w);w=maxW;}
+        if(h>maxH){w=Math.round(w*maxH/h);h=maxH;}
+        canvas.width=w;canvas.height=h;
+        var ctx=canvas.getContext('2d');
+        ctx.drawImage(img,0,0,w,h);
+        var compressed=canvas.toDataURL('image/jpeg',0.6);
+        finish(compressed);
+      }catch(err){console.error('Photo compression error:',err);finish(null);}
     };
     img.src=e.target.result;
   };
@@ -1277,6 +1340,7 @@ function capturePhoto(input,sid){
   if(!input.files||!input.files[0])return;
   var file=input.files[0];
   compressImage(file,function(compressed){
+    if(!compressed){toast('Photo failed to process — try again or use a smaller photo','err');return;}
     if(!ss[sid].photos)ss[sid].photos=[];
     ss[sid].photos.push(compressed);
     renderStages();
@@ -1566,6 +1630,7 @@ function addInspPhotos(input){
   Array.from(input.files).forEach(function(file){
     if(inspPhotosArr.length>=40){toast('Maximum 40 photos','err');return;}
     compressImage(file,function(compressed){
+      if(!compressed){toast('A photo failed to process — try again or use a smaller photo','err');return;}
       inspPhotosArr.push(compressed);
       renderInspPhotos();
     });
@@ -1743,6 +1808,7 @@ function addReqPhoto(input){
   Array.from(input.files).forEach(function(file){
     if(reqPhotos.length>=40){toast('Maximum 40 photos','err');return;}
     compressImage(file,function(compressed){
+      if(!compressed){toast('A photo failed to process — try again or use a smaller photo','err');return;}
       reqPhotos.push(compressed);
       renderReqPhotos();
     });
@@ -2495,6 +2561,7 @@ async function submitIRN(){
   }
   var btn=document.getElementById('submitBtn');
   btn.disabled=true;btn.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> Submitting...';
+  saveDraftToSession(_irqParam);
   try{
     // Only get new IRN number if not already assigned and not amending
     var el=document.getElementById('reportNo');
@@ -2514,9 +2581,11 @@ async function submitIRN(){
       saveOk=window.saveIRNToFirebase?await window.saveIRNToFirebase(d):false;
     }
     if(!saveOk){
-      toast('Save failed — check your connection and try again. Nothing was released.','err');
+      alert('Could not save — please move to an area with a stronger network signal and try again.\n\nYour inspection work (checklist, notes, photos) has been kept — you do not need to redo it. Just tap Release & Notify again once you have signal.');
+      toast('Not saved — move to a stronger signal area and try again','err');
       return;
     }
+    clearDraftFromSession(_irqParam);
     if(wasAmend){
       toast('INS-C '+d.reportNo+' amended and saved','ok');
       window._amendMode=false;window._amendFirebaseId=null;window._amendIRNNo=null;
@@ -2992,7 +3061,9 @@ function completeRequest(btn){
     renderStages();
     showFormOrWaiting();
     renderIrqBanner();
-    toast('Complete IRN for IRQ-'+reqNo+' — '+job,'ok');
+    var _savedDraft=restoreDraftFromSession(reqNo);
+    if(_savedDraft){applyDraftToForm(_savedDraft);}
+    else{toast('Complete IRN for IRQ-'+reqNo+' — '+job,'ok');}
   },150);
   if(window.markRequestComplete)window.markRequestComplete(firebaseId);
 }
@@ -3348,7 +3419,9 @@ function amendIRN(btn){
     // Show amendment banner
     var banner=document.getElementById('inheritedBanner');
     if(banner){banner.style.display='block';banner.innerHTML='<svg style="font-size:13px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> <strong>Amendment mode</strong> — editing INS-C '+irnNo+'. Resubmit to save changes.';}
-    toast('IRN INS-C '+irnNo+' reopened for amendment','info');
+    var _savedDraft=restoreDraftFromSession(irqNo);
+    if(_savedDraft){applyDraftToForm(_savedDraft);}
+    else{toast('IRN INS-C '+irnNo+' reopened for amendment','info');}
   },200);
 }
 function deleteRecord(btn){
@@ -3820,7 +3893,7 @@ function msgKindChip(m){var k=(m.kind||'').toLowerCase();var map={request:['#E6F
 function renderMsgs(){var el=document.getElementById('msgList');if(!el||!msgUser)return;var mine=msgs.filter(function(m){return msgAudienceMatch(m)||m.fromCode===msgUser.code;});if(msgFilter==='unread')mine=mine.filter(msgIsUnread);if(mine.length===0){el.innerHTML='<div style="padding:32px;text-align:center;color:#999;font-size:13px">'+(msgFilter==='unread'?'No unread messages':'No messages yet - raise a request or send one with New message')+'</div>';return;}var html='';mine.slice(0,150).forEach(function(m){var unread=msgIsUnread(m);var open=msgOpenId===m.firebaseId;var toLbl=(m.to||'ALL').toUpperCase();toLbl=toLbl==='ALL'?'Everyone':toLbl==='QC'?'All QC':toLbl==='SUP'?'All Supervisors':toLbl==='MGT'?'All Management':toLbl;html+='<div onclick="openMsg(\''+m.firebaseId+'\')" style="padding:12px 14px;border-bottom:1px solid #eee;cursor:pointer;position:relative;'+(unread?'background:#FDF8EC;':'')+'">';if(unread)html+='<div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:#185FA5"></div>';html+='<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><span style="font-weight:700;font-size:13px;color:#1a3a5c">'+escMsg(m.from||'--')+(m.fromCode?' ('+escMsg(m.fromCode)+')':'')+'</span><span style="font-size:11px;color:#999">&rarr; '+escMsg(toLbl)+'</span><span style="margin-left:auto;font-size:11px;color:#999">'+msgTimeLabel(m.timestamp)+'</span></div>';html+='<div style="font-size:13px;color:#333;margin-top:4px;word-break:break-word;'+(open?'':'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;')+(unread?'font-weight:600;':'')+'">'+fmtMsgText(m.text)+'</div>';if(m.photoUrl){html+='<div style="margin-top:6px"><img src="'+escMsg(m.photoUrl)+'" onclick="event.stopPropagation();window.open(this.src)" style="'+(open?'max-width:100%;max-height:280px;':'width:96px;height:72px;object-fit:cover;')+'border-radius:8px;border:1px solid #ddd;cursor:pointer"></div>';}var chips='';if(m.irq)chips+='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:#EEF3F8;color:#1a3a5c">IRQ-'+escMsg(m.irq)+'</span> ';if(m.irn)chips+='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:#EEF3F8;color:#1a3a5c">INS-C '+escMsg(m.irn)+'</span> ';chips+=msgKindChip(m);if(chips)html+='<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+chips+'</div>';if(!open)html+='<div style="font-size:11px;color:#185FA5;margin-top:3px;font-weight:600">Tap to read full message</div>';if(open&&m.irq)html+='<div style="margin-top:8px"><a href="'+location.pathname+'?irq='+encodeURIComponent(m.irq)+'" onclick="event.stopPropagation()" style="display:inline-block;padding:7px 14px;background:#1a3a5c;color:#fff;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none">Open job &rarr;</a></div>';html+='</div>';});el.innerHTML=html;}
 function openMsg(fid){msgOpenId=msgOpenId===fid?null:fid;var m=msgs.find(function(x){return x.firebaseId===fid;});if(m&&msgUser&&msgIsUnread(m)&&window.markMessageRead){window.markMessageRead(fid,msgUser.code);if(!m.readBy)m.readBy=[];m.readBy.push(msgUser.code);updateMsgBadge();}renderMsgs();}
 var msgPhotoData=null;
-function msgPhotoPicked(inp){var f=inp.files&&inp.files[0];if(!f)return;compressImage(f,function(dataUrl){msgPhotoData=dataUrl;document.getElementById('msgPhotoThumb').src=dataUrl;document.getElementById('msgPhotoPreview').style.display='block';});inp.value='';}
+function msgPhotoPicked(inp){var f=inp.files&&inp.files[0];if(!f)return;compressImage(f,function(dataUrl){if(!dataUrl){toast('Photo failed to process — try again or use a smaller photo','err');return;}msgPhotoData=dataUrl;document.getElementById('msgPhotoThumb').src=dataUrl;document.getElementById('msgPhotoPreview').style.display='block';});inp.value='';}
 function msgPhotoClear(){msgPhotoData=null;document.getElementById('msgPhotoPreview').style.display='none';}
 function openMsgCompose(){var sel=document.getElementById('msgComposeTo');var opts='<option value="ALL">Everyone</option><option value="QC">All QC</option><option value="SUP">All Supervisors</option><option value="MGT">All Management</option>';[codes.qc,codes.sup,codes.mgt||[]].forEach(function(lst){lst.forEach(function(c){if(c.active&&c.name)opts+='<option value="'+c.code+'">'+escMsg(c.name)+' ('+c.code+')</option>';});});sel.innerHTML=opts;document.getElementById('msgComposeOverlay').style.display='flex';}
 function closeMsgCompose(){document.getElementById('msgComposeOverlay').style.display='none';}
