@@ -175,12 +175,19 @@ window.uploadPhotosToStorage=async function(photos,prefix){
   if(!photos||photos.length===0)return[];
   var urls=[];
   for(var i=0;i<photos.length;i++){
-    try{
-      var storageRef=ref(storage,prefix+'/photo_'+Date.now()+'_'+i+'.jpg');
-      await uploadString(storageRef,photos[i],'data_url');
-      var url=await getDownloadURL(storageRef);
-      urls.push(url);
-    }catch(e){console.error('Photo upload error:',e);urls.push(photos[i]);}// fallback to base64
+    var uploaded=false;
+    for(var attempt=0;attempt<2&&!uploaded;attempt++){
+      try{
+        var storageRef=ref(storage,prefix+'/photo_'+Date.now()+'_'+i+'.jpg');
+        await uploadString(storageRef,photos[i],'data_url');
+        var url=await getDownloadURL(storageRef);
+        urls.push(url);
+        uploaded=true;
+      }catch(e){
+        console.error('Photo upload error (attempt '+(attempt+1)+' of 2):',e);
+        if(attempt===1){throw new Error('Photo '+(i+1)+' of '+photos.length+' failed to upload — check your connection and try again');}
+      }
+    }
   }
   return urls;
 };
