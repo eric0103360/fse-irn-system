@@ -187,7 +187,7 @@ window.uploadPhotosToStorage=async function(photos,prefix,onProgress){
         uploaded=true;
       }catch(e){
         console.error('Photo upload error (attempt '+(attempt+1)+' of 2):',e);
-        if(attempt===1){throw new Error('Photo '+(i+1)+' of '+photos.length+' failed to upload — check your connection and try again');}
+        if(attempt===1){throw new Error('Photo '+(i+1)+' of '+photos.length+' failed to upload. '+((e&&e.code)?'['+e.code+'] ':'')+((e&&e.message)?e.message:'Unknown error'));}
       }
     }
   }
@@ -218,7 +218,7 @@ window.saveIRNToFirebase=async function(data){
     s.timestamp=new Date().toISOString();
     await addDoc(collection(db,'irns'),s);
     return true;
-  }catch(e){console.error('IRN save error:',e);return false;}
+  }catch(e){console.error('IRN save error:',e);window._lastSaveError=(e&&e.message)||'Unknown error';return false;}
 };
 window.clearAllData=async function(){
   try{
@@ -265,6 +265,7 @@ window.saveRequestToFirebase=async function(data){
     return true;
   }catch(e){
     console.error('Firebase save error:',e);
+    window._lastSaveError=(e&&e.message)||'Unknown error';
     return false;
   }
 };
@@ -302,7 +303,7 @@ window.updateRequestInFirebase=async function(firebaseId,data){
     var r=doc(db,'requests',firebaseId);
     await updateDoc(r,s);
     return true;
-  }catch(e){console.error('Request update error:',e);return false;}
+  }catch(e){console.error('Request update error:',e);window._lastSaveError=(e&&e.message)||'Unknown error';return false;}
 };
 window.updateIRNInFirebase=async function(firebaseId,data){
   try{
@@ -314,7 +315,7 @@ window.updateIRNInFirebase=async function(firebaseId,data){
     var r=doc(db,'irns',firebaseId);
     await updateDoc(r,s);
     return true;
-  }catch(e){console.error('IRN update error:',e);return false;}
+  }catch(e){console.error('IRN update error:',e);window._lastSaveError=(e&&e.message)||'Unknown error';return false;}
 };
 window.sendAppMessage=async function(m){try{m.timestamp=new Date().toISOString();if(!m.readBy)m.readBy=m.fromCode?[m.fromCode]:[];var ref=await addDoc(collection(db,'messages'),m);return ref.id;}catch(e){console.log('Message send error:',e);return false;}};
 window.loadMessagesFromFirebase=function(cb){try{var q=query(collection(db,'messages'),orderBy('timestamp','desc'));return onSnapshot(q,function(snap){var r=[];snap.forEach(function(d){r.push(Object.assign({firebaseId:d.id},d.data()));});cb(r);},function(err){console.error('Messages listener error — reconnecting in 3s:',err);setTimeout(function(){window.loadMessagesFromFirebase(cb);},3000);});}catch(e){cb([]);return null;}};
@@ -2021,7 +2022,7 @@ async function submitRequest(){
   var _reqSaveOk=window.saveRequestToFirebase?await window.saveRequestToFirebase(d):false;
   if(!_reqSaveOk){
     clearTimeout(_guard);
-    alert('Could not send — please move to an area with a stronger network signal and try again.\n\nYour request details (job, items, photos) have been kept — you do not need to redo it. Just tap Submit again once you have signal.');
+    alert('Could not send.\n\nReason: '+(window._lastSaveError||'Unknown error')+'\n\nYour request details (job, items, photos) have been kept — you do not need to redo it. Just tap Submit again.');
     toast('Not sent — move to a stronger signal area and try again','err');
     if(_b){_b.dataset.busy='';_b.disabled=false;_b.style.background='';_b.innerHTML=_t;}
     return;
@@ -2228,7 +2229,7 @@ async function submitQuickRequest(){
   var _qrSaveOk=window.saveRequestToFirebase?await window.saveRequestToFirebase(d):false;
   if(!_qrSaveOk){
     clearTimeout(_qguard);
-    alert('Could not send — please move to an area with a stronger network signal and try again.\n\nYour details are still filled in below — just tap Send again once you have signal.');
+    alert('Could not send.\n\nReason: '+(window._lastSaveError||'Unknown error')+'\n\nYour details are still filled in below — just tap Send again.');
     toast('Not sent — move to a stronger signal area and try again','err');
     if(_qb){_qb.dataset.busy='';_qb.disabled=false;_qb.innerHTML=_qt;}
     return;
@@ -2629,7 +2630,7 @@ async function submitIRN(){
       saveOk=window.saveIRNToFirebase?await window.saveIRNToFirebase(d):false;
     }
     if(!saveOk){
-      alert('Could not save — please move to an area with a stronger network signal and try again.\n\nYour inspection work (checklist, notes, photos) has been kept — you do not need to redo it. Just tap Release & Notify again once you have signal.');
+      alert('Could not save.\n\nReason: '+(window._lastSaveError||'Unknown error')+'\n\nYour inspection work (checklist, notes, photos) has been kept — you do not need to redo it. Just tap Release & Notify again.');
       toast('Not saved — move to a stronger signal area and try again','err');
       return;
     }
