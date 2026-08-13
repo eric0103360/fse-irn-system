@@ -1765,6 +1765,46 @@ function viewReqPhotoPreview(i){
   overlay.onclick=function(){document.body.removeChild(overlay);};
   document.body.appendChild(overlay);
 }
+function resetIRNFormForNextJob(){
+  var joEl=document.getElementById('job');if(joEl)joEl.value='';
+  var prEl=document.getElementById('project');if(prEl)prEl.value='';
+  var poEl=document.getElementById('po');if(poEl)poEl.value='';
+  var drEl=document.getElementById('drawing');if(drEl)drEl.value='';
+  var dnEl=document.getElementById('drawingNote');if(dnEl)dnEl.value='';
+  var dfn=document.getElementById('drawFlagNote');if(dfn)dfn.style.display='none';
+  var okBtn=document.getElementById('drawOkBtn');if(okBtn){okBtn.style.background='#fff';okBtn.style.borderColor='#ccc';okBtn.style.color='#666';}
+  var flagBtn=document.getElementById('drawFlagBtn');if(flagBtn){flagBtn.style.background='#fff';flagBtn.style.borderColor='#ccc';flagBtn.style.color='#666';}
+  var noEl=document.getElementById('notes');if(noEl)noEl.value='';
+  var rrEl=document.getElementById('rejectionReason');if(rrEl)rrEl.value='';
+  var raEl=document.getElementById('rejectionAction');if(raEl)raEl.value='';
+  var hrEl=document.getElementById('holdReason');if(hrEl)hrEl.value='';
+  var haEl=document.getElementById('holdAction');if(haEl)haEl.value='';
+  var clnEl=document.getElementById('clientName');if(clnEl)clnEl.value='';
+  var clcEl=document.getElementById('clientCo');if(clcEl)clcEl.value='';
+  items=[{id:'i1',desc:'',qty:''},{id:'i2',desc:'',qty:''}];
+  renderItems();
+  ss={};
+  STAGES.forEach(function(s){ss[s.id]={gate:false,na:false,crit:new Array(s.criteria.length).fill(null),tdims:[],result:null,rejectReason:'',rejectAction:'',photos:[],clientHold:'na'};});
+  if(!ss['s2b'])ss['s2b']={gate:false,na:false,crit:new Array(4).fill(null),tdims:[],result:null,rejectReason:'',rejectAction:'',photos:[],clientHold:'na'};
+  inspPhotosArr=[];
+  renderInspPhotos();
+  fabDims=['A','B','C','D','E','F','G','H','I','J','K','L','M'].map(function(l){return{label:l,lbl:'',draw:'',meas:'',pf:''};});
+  renderFab();
+  iRes=null;
+  var accBtn=document.getElementById('btnAcc');if(accBtn)accBtn.className='rb acc';
+  var rejBtn=document.getElementById('btnRej');if(rejBtn)rejBtn.className='rb rej';
+  var holdBtnEl=document.getElementById('btnHold');if(holdBtnEl){holdBtnEl.style.background='transparent';holdBtnEl.style.color='#BA7517';}
+  var rejPanel=document.getElementById('rejectionPanel');if(rejPanel)rejPanel.style.display='none';
+  var holdPanel=document.getElementById('holdPanel');if(holdPanel)holdPanel.style.display='none';
+  var inheritedBanner=document.getElementById('inheritedBanner');if(inheritedBanner)inheritedBanner.style.display='none';
+  activeStageFilter=null;
+  _irqParam=null;
+  _urlReq=null;
+  window._irnSubmitted=null;
+  var el=document.getElementById('reportNo');if(el){el.value='';el.style.color='rgba(255,255,255,0.4)';}
+  showFormOrWaiting();
+  renderStages();
+}
 function showFormOrWaiting(){
   var hasReq=!!_irqParam;
   var waiting=document.getElementById('waitingScreen');
@@ -2672,8 +2712,8 @@ async function submitIRN(){
     if(window.sendPushToRole)window.sendPushToRole('sup,mgt',(isPass?'\u2705 RELEASED':isHold?'\uD83D\uDFE0 ON HOLD':'\u274C REJECTED')+' - INS-C '+d.reportNo,d.job+(stageName?' | '+stageName:'')+' | QC: '+(d.qc||''),'');
     // Send to Google endpoint in background — don't wait
     fetch(ENDPOINT,{method:'POST',body:JSON.stringify(d),mode:'no-cors'}).catch(function(){});
-    _irqParam=null;
     renderReg();
+    setTimeout(resetIRNFormForNextJob,2000);
   }catch(e){
     toast('Saved locally - check connection','err');
     reg.unshift(d);renderReg();
