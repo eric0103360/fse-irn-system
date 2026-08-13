@@ -1849,7 +1849,20 @@ async function submitRequest(){
   if(!d.job){toast('Enter order/job number','err');return;}
   if(reqItems.filter(function(i){return i.desc;}).length===0){toast('Add at least one item','err');return;}
   if(selectedInspTypes.length===0){toast('Select at least one inspection type','err');return;}
-  if(!reqSupValidated){toast('Supervisor code required','err');return;}
+  if(!reqSupValidated){
+    var supCodeEl=document.getElementById('reqSupCode');
+    if(supCodeEl&&supCodeEl.value&&supCodeEl.value.trim().length>=5){validateReqSup();}
+  }
+  if(!reqSupValidated){
+    var supCodeEl2=document.getElementById('reqSupCode');
+    if(supCodeEl2&&supCodeEl2.value){
+      alert('Your sign-in was lost — this can happen if the phone switched apps (e.g. camera) while filling this in.\n\nPlease re-enter your PIN (or code) in the SUP code box, then tap Submit again. Nothing has been sent yet.');
+      supCodeEl2.scrollIntoView({behavior:'smooth',block:'center'});
+      supCodeEl2.focus();
+    }
+    toast('Sign-in lost — please re-enter your code/PIN and try again','err');
+    return;
+  }
   if(_b){_b.dataset.busy='1';_b.disabled=true;var _t=_b.innerHTML;_b.innerHTML='Sending request&hellip;';}
   var _guard=setTimeout(function(){if(_b&&_b.dataset.busy==='1'){_b.dataset.busy='';_b.disabled=false;_b.style.background='';_b.innerHTML=_t;toast('Slow connection - request may still be sending in background','err');}},15000);
   try{
@@ -2065,7 +2078,19 @@ async function submitQuickRequest(){
   var client=document.getElementById('qrClient').value.trim();
   if(!job){toast('Enter job number','err');return;}
   if(!qrSelectedType){toast('Select inspection type','err');return;}
-  if(!qrSupValidated){toast('SUP code required','err');return;}
+  if(!qrSupValidated){
+    var qrSupEl=document.getElementById('qrSupCode');
+    if(qrSupEl&&qrSupEl.value&&qrSupEl.value.trim().length>=5){validateQRSup();}
+  }
+  if(!qrSupValidated){
+    var qrSupEl2=document.getElementById('qrSupCode');
+    if(qrSupEl2&&qrSupEl2.value){
+      alert('Your sign-in was lost — please re-enter your SUP code, then tap Send again. Nothing has been sent yet.');
+      qrSupEl2.focus();
+    }
+    toast('Sign-in lost — please re-enter your code and try again','err');
+    return;
+  }
   if(_qb){_qb.dataset.busy='1';_qb.disabled=true;var _qt=_qb.innerHTML;_qb.innerHTML='Sending request&hellip;';}
   var _qguard=setTimeout(function(){if(_qb&&_qb.dataset.busy==='1'){_qb.dataset.busy='';_qb.disabled=false;_qb.innerHTML=_qt;toast('Slow connection - request may still be sending in background','err');}},15000);
   try{
@@ -2446,7 +2471,21 @@ async function submitIRN(){
     if(!holdReason){toast('Enter hold reason before submitting','err');document.getElementById('holdReason').focus();return;}
     if(!holdAction){toast('Enter what is needed to release before submitting','err');document.getElementById('holdAction').focus();return;}
   }
-  if(!qcValidated){toast('QC code required','err');return;}
+  if(!qcValidated){
+    // Recover from state that may have been silently lost (e.g. phone suspended the tab while using the camera)
+    var qcCodeEl=document.getElementById('qcCode');
+    if(qcCodeEl&&qcCodeEl.value&&qcCodeEl.value.trim().length>=5){validateCode('qc');}
+  }
+  if(!qcValidated){
+    var qcCodeEl2=document.getElementById('qcCode');
+    if(qcCodeEl2&&qcCodeEl2.value){
+      alert('Your QC sign-in was lost — this can happen if the phone switched apps (e.g. camera) mid-inspection.\n\nPlease re-enter your PIN (or code) in the QC inspector box, then tap Release & Notify again. Nothing has been submitted yet.');
+      qcCodeEl2.scrollIntoView({behavior:'smooth',block:'center'});
+      qcCodeEl2.focus();
+    }
+    toast('QC sign-in lost — please re-enter your code/PIN and try again','err');
+    return;
+  }
   var btn=document.getElementById('submitBtn');
   btn.disabled=true;btn.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> Submitting...';
   try{
