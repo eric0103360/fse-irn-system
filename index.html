@@ -308,7 +308,7 @@ window.updateIRNInFirebase=async function(firebaseId,data){
   try{
     var s=Object.assign({},data);
     if(s.stageStates){var cs={};Object.keys(s.stageStates).forEach(function(k){var st=Object.assign({},s.stageStates[k]);st.photos=[];cs[k]=st;});s.stageStates=cs;}
-    if(s.inspPhotoData&&s.inspPhotoData.length>0){s.inspPhotoData=s.inspPhotoData.slice(0,40);}
+    if(s.inspPhotoData&&s.inspPhotoData.length>0){s.inspPhotoData=s.inspPhotoData.slice(0,20);}
     s.amendedAt=new Date().toISOString();
     s.amended=true;
     var r=doc(db,'irns',firebaseId);
@@ -493,7 +493,7 @@ window.addEventListener('DOMContentLoaded',function(){
       </div>
       <!-- Inspector photos -->
       <div style="padding:0 14px 12px;border-top:0.5px solid #eee;margin-top:4px">
-        <div style="font-size:10px;font-weight:500;color:#666;text-transform:uppercase;letter-spacing:0.5px;padding:8px 0 6px">Inspector photos</div>
+        <div style="font-size:10px;font-weight:500;color:#666;text-transform:uppercase;letter-spacing:0.5px;padding:8px 0 6px">Inspector photos <span style="font-weight:700;color:#A32D2D;text-transform:none;letter-spacing:normal;font-size:11px">— Max 20</span></div>
         <div id="inspPhotos" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px"></div>
         <div style="display:flex;gap:8px">
           <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 8px;border-radius:8px;border:1.5px dashed #185FA5;background:#f0f6ff;color:#185FA5;font-size:12px;font-weight:500;cursor:pointer">
@@ -687,7 +687,7 @@ window.addEventListener('DOMContentLoaded',function(){
     </div>
 
     <div class="card">
-      <div class="ct"><svg style="font-size:13px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg> Photos of item</div>
+      <div class="ct"><svg style="font-size:13px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg> Photos of item <span style="font-weight:700;color:#A32D2D;font-size:11px">— Max 20</span></div>
       <div style="padding:10px 14px">
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px" id="reqPhotoGrid"></div>
         <div style="display:flex;gap:8px">
@@ -906,7 +906,7 @@ window.addEventListener('DOMContentLoaded',function(){
         <div style="padding:8px 14px"><button class="add-btn" onclick="addSlot('mgt')"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add MGT slot</button></div>
       </div>
       <div style="padding:8px 0 16px;font-size:11px;color:#888;text-align:center">Deactivated codes cannot sign off new IRNs.</div>
-      <button onclick="if(window.saveCodesToFirebase)window.saveCodesToFirebase().then(function(){toast('Codes saved','ok');})" style="width:100%;padding:10px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:8px"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save all names &amp; codes</button>
+      <button onclick="if(window.saveCodesToFirebase)window.saveCodesToFirebase().then(function(ok){toast(ok?'Codes saved':'Save failed — check your connection and try again',ok?'ok':'err');})" style="width:100%;padding:10px;background:#1a3a5c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:8px"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save all names &amp; codes</button>
       <button onclick="clearAllTestData()" style="width:100%;padding:10px;background:#FCEBEB;color:#A32D2D;border:1px solid #E24B4A;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:8px"><svg style="font-size:14px" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg> Clear all test IRNs &amp; requests</button>
       <button id="maintenanceBtn" onclick="toggleMaintenanceMode()" style="width:100%;padding:10px;background:#E24B4A;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:12px">🔒 Enable maintenance mode</button>
     </div>
@@ -1138,19 +1138,22 @@ function saveDraftToSession(irq){
       holdAction:(document.getElementById('holdAction')||{}).value||'',
       savedAt:new Date().toISOString()
     };
-    sessionStorage.setItem('fse_draft_'+irq,JSON.stringify(draft));
+    localStorage.setItem('fse_draft_'+irq,JSON.stringify(draft));
   }catch(e){console.error('Draft save error:',e);}
 }
 function restoreDraftFromSession(irq){
   if(!irq)return null;
   try{
-    var raw=sessionStorage.getItem('fse_draft_'+irq);
-    return raw?JSON.parse(raw):null;
+    var raw=localStorage.getItem('fse_draft_'+irq);
+    if(!raw)return null;
+    var draft=JSON.parse(raw);
+    if(draft.savedAt&&(Date.now()-new Date(draft.savedAt).getTime())>7200000){localStorage.removeItem('fse_draft_'+irq);return null;}
+    return draft;
   }catch(e){return null;}
 }
 function clearDraftFromSession(irq){
   if(!irq)return;
-  try{sessionStorage.removeItem('fse_draft_'+irq);}catch(e){}
+  try{localStorage.removeItem('fse_draft_'+irq);}catch(e){}
 }
 function applyDraftToForm(draft){
   if(!draft)return;
@@ -1167,6 +1170,45 @@ function applyDraftToForm(draft){
   }
   renderStages();
   toast('Recovered your unsaved inspection work from before','info');
+}
+function saveReqDraftToSession(){
+  try{
+    var draft={
+      job:(document.getElementById('reqJob')||{}).value||'',
+      client:(document.getElementById('reqClient')||{}).value||'',
+      instructions:(document.getElementById('reqInstructions')||{}).value||'',
+      supCode:(document.getElementById('reqSupCode')||{}).value||'',
+      items:reqItems,selectedInspTypes:selectedInspTypes,artisans:artisans,
+      reqPhotos:reqPhotos,urgency:reqUrgency,
+      savedAt:new Date().toISOString()
+    };
+    localStorage.setItem('fse_reqdraft_pending',JSON.stringify(draft));
+  }catch(e){console.error('Request draft save error:',e);}
+}
+function restoreReqDraftFromSession(){
+  try{
+    var raw=localStorage.getItem('fse_reqdraft_pending');
+    if(!raw)return null;
+    var draft=JSON.parse(raw);
+    if(draft.savedAt&&(Date.now()-new Date(draft.savedAt).getTime())>7200000){localStorage.removeItem('fse_reqdraft_pending');return null;}
+    return draft;
+  }catch(e){return null;}
+}
+function clearReqDraftFromSession(){
+  try{localStorage.removeItem('fse_reqdraft_pending');}catch(e){}
+}
+function applyReqDraftToForm(draft){
+  if(!draft)return;
+  var joEl=document.getElementById('reqJob');if(joEl&&draft.job)joEl.value=draft.job;
+  var clEl=document.getElementById('reqClient');if(clEl&&draft.client)clEl.value=draft.client;
+  var inEl=document.getElementById('reqInstructions');if(inEl&&draft.instructions)inEl.value=draft.instructions;
+  if(draft.items&&draft.items.length){reqItems=draft.items;renderReqItems();}
+  if(draft.selectedInspTypes&&draft.selectedInspTypes.length){selectedInspTypes=draft.selectedInspTypes;renderInspTypes();checkSubcontractorCard();}
+  if(draft.artisans&&draft.artisans.length){artisans=draft.artisans;renderArtisans();}
+  if(draft.reqPhotos&&draft.reqPhotos.length){reqPhotos=draft.reqPhotos;renderReqPhotos();}
+  if(draft.urgency){reqUrgency=draft.urgency;setUrgency(draft.urgency);}
+  var supEl=document.getElementById('reqSupCode');if(supEl&&draft.supCode){supEl.value=draft.supCode;validateReqSup();}
+  toast('Recovered your unsaved request from before','info');
 }
 var fabDims=['A','B','C','D','E','F','G','H','I','J','K','L','M'].map(function(l){return{label:l,lbl:'',draw:'',meas:'',pf:''};});
 var lastIRNs={};
@@ -1626,9 +1668,9 @@ function toggleCheck(i){
 }
 function addInspPhotos(input){
   if(!input.files)return;
-  if(inspPhotosArr.length>=40){toast('Maximum 40 photos allowed','err');return;}
+  if(inspPhotosArr.length>=20){toast('Maximum 20 photos allowed','err');return;}
   Array.from(input.files).forEach(function(file){
-    if(inspPhotosArr.length>=40){toast('Maximum 40 photos','err');return;}
+    if(inspPhotosArr.length>=20){toast('Maximum 20 photos','err');return;}
     compressImage(file,function(compressed){
       if(!compressed){toast('A photo failed to process — try again or use a smaller photo','err');return;}
       inspPhotosArr.push(compressed);
@@ -1648,7 +1690,7 @@ function renderInspPhotos(){
     html+='<button onclick="removeInspPhoto('+i+')" style="position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.6);border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">&times;</button>';
     html+='</div>';
   });
-  if(inspPhotosArr.length<40){
+  if(inspPhotosArr.length<20){
     html+='<label style="width:80px;height:80px;border:1.5px dashed #ccc;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:4px;background:#f9f9f7">';
     html+='<svg style="font-size:22px;color:#aaa" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>';
     html+='<span style="font-size:9px;color:#aaa">Camera</span>';
@@ -1765,6 +1807,8 @@ function initRequest(){
   renderInspTypes();
   renderReqPhotos();
   renderArtisans();
+  var _pendingReqDraft=restoreReqDraftFromSession();
+  if(_pendingReqDraft){setReqMode('full');applyReqDraftToForm(_pendingReqDraft);}
 }
 function addReqItem(){reqItems.push({id:'r'+reqItemCnt++,desc:'',qty:''});renderReqItems();}
 function removeReqItem(id){if(reqItems.length<=1)return;reqItems=reqItems.filter(function(i){return i.id!==id;});renderReqItems();}
@@ -1804,9 +1848,9 @@ function toggleInspType(t){
 }
 function addReqPhoto(input){
   if(!input.files)return;
-  if(reqPhotos.length>=40){toast('Maximum 40 photos allowed','err');return;}
+  if(reqPhotos.length>=20){toast('Maximum 20 photos allowed','err');return;}
   Array.from(input.files).forEach(function(file){
-    if(reqPhotos.length>=40){toast('Maximum 40 photos','err');return;}
+    if(reqPhotos.length>=20){toast('Maximum 20 photos','err');return;}
     compressImage(file,function(compressed){
       if(!compressed){toast('A photo failed to process — try again or use a smaller photo','err');return;}
       reqPhotos.push(compressed);
@@ -1825,7 +1869,7 @@ function renderReqPhotos(){
     html+='<button style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;color:#fff;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center" data-pi="'+pi+'" onclick="removeReqPhoto(parseInt(this.dataset.pi))">×</button>';
     html+='</div>';
   });
-  if(reqPhotos.length<40){
+  if(reqPhotos.length<20){
     html+='<label style="width:80px;height:80px;border:1.5px dashed #ccc;border-radius:6px;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:4px;background:var(--color-background-secondary);vertical-align:top">';
     html+='<svg style="font-size:22px;color:#aaa" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>';
     html+='<span style="font-size:9px;color:#aaa">Add photo</span>';
@@ -1912,7 +1956,7 @@ function getRequestData(){
     supervisor:reqSupName,
     artisans:artisans.filter(function(a){return a.name.trim();}).map(function(a){return a.name.trim();}),
     photos:reqPhotos.length,
-    reqPhotoData:reqPhotos.slice(0,40)
+    reqPhotoData:reqPhotos.slice(0,20)
   };
 }
 async function submitRequest(){
@@ -1937,6 +1981,7 @@ async function submitRequest(){
     return;
   }
   if(_b){_b.dataset.busy='1';_b.disabled=true;var _t=_b.innerHTML;_b.innerHTML='Sending request&hellip;';}
+  saveReqDraftToSession();
   var _guard=setTimeout(function(){if(_b&&_b.dataset.busy==='1'){_b.dataset.busy='';_b.disabled=false;_b.style.background='';_b.innerHTML=_t;toast('Slow connection - request may still be sending in background','err');}},15000);
   try{
   var wasEdit=!!(window._editReqMode&&window._editReqFirebaseId);
@@ -1976,10 +2021,12 @@ async function submitRequest(){
   var _reqSaveOk=window.saveRequestToFirebase?await window.saveRequestToFirebase(d):false;
   if(!_reqSaveOk){
     clearTimeout(_guard);
-    toast('Request failed to save — check your connection and try again. QC was not notified.','err');
+    alert('Could not send — please move to an area with a stronger network signal and try again.\n\nYour request details (job, items, photos) have been kept — you do not need to redo it. Just tap Submit again once you have signal.');
+    toast('Not sent — move to a stronger signal area and try again','err');
     if(_b){_b.dataset.busy='';_b.disabled=false;_b.style.background='';_b.innerHTML=_t;}
     return;
   }
+  clearReqDraftFromSession();
   toast('Request IRQ-'+d.reqNo+' sent to QC','ok');
   var _mp=window.sendAppMessage?window.sendAppMessage({to:'QC',from:d.supervisor||'Supervisor',fromCode:d.supCode||'',kind:'request',irq:d.reqNo,text:msg}):Promise.resolve('');
   if(window.sendPushToRole)Promise.resolve(_mp).then(function(mid){window.sendPushToRole('qc',(d.urgency==='urgent'?'\u26A1 URGENT - ':'')+'New inspection request IRQ-'+d.reqNo,d.job+(d.client?' | '+d.client:'')+' - '+(d.inspTypes||''),liveLink,d.urgency==='urgent'?{repeat:3,intervalSec:25,msgId:(typeof mid==='string'?mid:''),senderCode:d.supCode||''}:null);});
@@ -2181,7 +2228,8 @@ async function submitQuickRequest(){
   var _qrSaveOk=window.saveRequestToFirebase?await window.saveRequestToFirebase(d):false;
   if(!_qrSaveOk){
     clearTimeout(_qguard);
-    toast('Request failed to save — check your connection and try again. QC was not notified.','err');
+    alert('Could not send — please move to an area with a stronger network signal and try again.\n\nYour details are still filled in below — just tap Send again once you have signal.');
+    toast('Not sent — move to a stronger signal area and try again','err');
     if(_qb){_qb.dataset.busy='';_qb.disabled=false;_qb.innerHTML=_qt;}
     return;
   }
@@ -2456,7 +2504,7 @@ function getForm(){
   b.items=JSON.parse(JSON.stringify(items));
   b.stageStates=JSON.parse(JSON.stringify(ss));
   b.fabDims=JSON.parse(JSON.stringify(fabDims));
-  b.inspPhotoData=inspPhotosArr.slice(0,40);
+  b.inspPhotoData=inspPhotosArr.slice(0,20);
   b.irqRef=_irqParam||'';
   b.reqSupervisor=_urlReq?(_urlReq.supervisor||''):'';
   b.reqDate=_urlReq?(_urlReq.date||''):'';
