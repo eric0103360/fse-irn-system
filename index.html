@@ -4012,7 +4012,7 @@ setTimeout(function(){
 
 renderItems();renderStages();renderFab();
 showFormOrWaiting();
-if(window.loadCodesFromFirebase)window.loadCodesFromFirebase();
+(function waitForCodesLoader(){if(window.loadCodesFromFirebase){window.loadCodesFromFirebase().then(function(){if(typeof renderCodeTables==='function')renderCodeTables();});}else{setTimeout(waitForCodesLoader,50);}})();
 document.getElementById('irnDate').value=new Date().toISOString().split('T')[0];
 initRequest();
 setUrgency('normal');
