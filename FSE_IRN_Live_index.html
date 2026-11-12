@@ -309,7 +309,12 @@ window.updateIRNInFirebase=async function(firebaseId,data){
   try{
     var s=Object.assign({},data);
     if(s.stageStates){var cs={};Object.keys(s.stageStates).forEach(function(k){var st=Object.assign({},s.stageStates[k]);st.photos=[];cs[k]=st;});s.stageStates=cs;}
-    if(s.inspPhotoData&&s.inspPhotoData.length>0){s.inspPhotoData=s.inspPhotoData.slice(0,20);}
+    if(s.inspPhotoData&&s.inspPhotoData.length>0){
+      var keepP=[],freshP=[];
+      s.inspPhotoData.slice(0,20).forEach(function(p){if(String(p).indexOf('data:')===0)freshP.push(p);else keepP.push(p);});
+      if(freshP.length){var newU=await window.uploadPhotosToStorage(freshP,'irn_photos/'+Date.now(),function(n,total){if(typeof toast==='function')toast('Uploading photo '+n+' of '+total+'…','info');});keepP=keepP.concat(newU);}
+      s.inspPhotoData=keepP;
+    }
     s.amendedAt=new Date().toISOString();
     s.amended=true;
     var r=doc(db,'irns',firebaseId);
@@ -984,6 +989,13 @@ window.addEventListener('DOMContentLoaded',function(){
       <div id="mgMonthlyTable"><div style="font-size:12px;color:#aaa;text-align:center;padding:12px">No data yet</div></div>
     </div>
 
+    <!-- Inspection outcomes per month -->
+    <div style="background:#fff;border:0.5px solid #eee;border-radius:10px;padding:12px;margin-bottom:10px">
+      <div style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Inspection outcomes per month</div>
+      <div style="font-size:10px;color:#888;margin-bottom:10px">Every IRN issued: passed, genuine holds (concessions) and rejects. Client hold points are not counted as holds.</div>
+      <div id="mgOutcomeChart"><div style="font-size:12px;color:#aaa;text-align:center;padding:12px">No data yet</div></div>
+    </div>
+
     <!-- Stage pass rate chart -->
     <div style="background:#fff;border:0.5px solid #eee;border-radius:10px;padding:12px;margin-bottom:10px">
       <div style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Stage pass rate</div>
@@ -1215,6 +1227,7 @@ var fabDims=['A','B','C','D','E','F','G','H','I','J','K','L','M'].map(function(l
 var lastIRNs={};
 
 var STAGES=[
+  {id:'sm',num:'M',label:'Material inspection',gate:'Material inspection complete',criteria:['Material (grade, size, thickness) correct as per order / drawing','Cast / heat number clearly visible on material','Material test certificate available','Cast / heat number on material matches the certificate','Material free of damage, corrosion and laminations']},
   {id:'s0',num:0,label:'Pre-weld — Tack stage',gate:'Pre-weld tack inspection complete',criteria:['Material certificate verified','Correct material used as per drawing','Dimensions correct as per drawing','Fit-up and alignment acceptable','Joint preparation correct (bevel/gap)','Tack welds acceptable (size/spacing)']},
   {id:'s2',num:2,label:'S2: Welding',gate:'Welding inspection complete',criteria:['Correct WPS / welder assigned','Visual weld inspection acceptable','No cracks, porosity or undercut','Weld size and profile acceptable','Distortion within acceptable limits','All welds completed as per drawing','Spatter removed and cleaned']},
   {id:'s2b',num:2,label:'S2B: NDT',gate:'NDT inspection complete',criteria:['NDT method confirmed correct','NDT test results acceptable','NDT report available and signed','No indications found / all indications within acceptance criteria']},
@@ -1233,6 +1246,7 @@ var STAGES=[
 
 // Maps inspection type labels to stage IDs
 var INSP_TYPE_STAGE_MAP={
+  'Material inspection':['sm'],
   'Prior to welding (pre-stage)':['s0'],
   'Pre-weld — Tack stage':['s0'],
   'S2: Welding':['s2'],
@@ -1617,7 +1631,7 @@ var reqUrgency='normal';
 var reqSupValidated=false;
 var reqSupName='';
 var reqItemCnt=2;
-var REQ_INSP_TYPES=['Prior to welding (pre-stage)','S2: Welding','S2B: NDT','S3: Trial assembly','S4: Match-marking','S5: Cleaning','S6: Shot blasting','S7: After primer','S8: Final paint','Final release / despatch','Release TO PWHT','Release FROM PWHT','Release TO Balancing','Release FROM Balancing','Alignment','Release TO Machining','Release FROM Machining'];
+var REQ_INSP_TYPES=['Material inspection','Prior to welding (pre-stage)','S2: Welding','S2B: NDT','S3: Trial assembly','S4: Match-marking','S5: Cleaning','S6: Shot blasting','S7: After primer','S8: Final paint','Final release / despatch','Release TO PWHT','Release FROM PWHT','Release TO Balancing','Release FROM Balancing','Alignment','Release TO Machining','Release FROM Machining'];
 
 function setDrawing(state){
   var okBtn=document.getElementById('drawOkBtn');
@@ -2776,7 +2790,13 @@ function renderReg(){
     var ch='<div style="font-size:11px;font-weight:600;color:#1a3a5c;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Pass rate per stage</div>';
     STAGES.forEach(function(s){
       var sp=0,st2=0;
-      reg.forEach(function(r){if(r.stageStates&&r.stageStates[s.id]){var x=r.stageStates[s.id];if(!x.na){st2++;var allTicked=x.crit&&x.crit.length>0&&x.crit.every(Boolean);if(x.gate||allTicked)sp++;}}});
+      reg.forEach(function(r){
+        if(r.cancelled)return;
+        var x=r.stageStates&&r.stageStates[s.id];
+        var touched=!!(x&&!x.na&&(x.gate||(x.crit&&x.crit.some(Boolean))));
+        var named=!!(r.stageName&&String(r.stageName).split(', ').indexOf(s.label)>=0);
+        if(touched||named){st2++;if(r.result==='accept')sp++;}
+      });
       if(st2===0)return;
       var pct=Math.round(sp/st2*100);var fp=100-pct;
       ch+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><div style="width:100px;font-size:11px;color:#666;text-align:right;flex-shrink:0">'+s.label+'</div><div style="flex:1;background:#f0f0f0;border-radius:4px;height:18px;overflow:hidden;display:flex"><div style="width:'+pct+'%;background:#1D9E75;height:100%;display:flex;align-items:center;justify-content:flex-end;padding-right:4px">'+(pct>15?'<span style="font-size:10px;color:#fff;font-weight:600">'+pct+'%</span>':'')+'</div><div style="width:'+fp+'%;background:#E24B4A;height:100%"></div></div><div style="width:40px;font-size:11px;color:#888;text-align:right">'+sp+'/'+st2+'</div></div>';
@@ -2824,8 +2844,8 @@ function renderReg(){
   }
 
   // Build clean card list
-  var stageIds=['s0','s2','s2b','s3','s4','s5','s6','s7','s8','s9','s10','s11','s12','s13'];
-  var stageShort=['Pre','S2','NDT','S3','S4','S5','S6','S7','S8','Fin','Bal','Alg','PWHT','Mch'];
+  var stageIds=['sm','s0','s2','s2b','s3','s4','s5','s6','s7','s8','s9','s10','s11','s12','s13'];
+  var stageShort=['Mat','Pre','S2','NDT','S3','S4','S5','S6','S7','S8','Fin','Bal','Alg','PWHT','Mch'];
   var html='';
 
   filtered.forEach(function(entry){
@@ -3478,7 +3498,7 @@ function amendIRN(btn){
     var prEl=document.getElementById('project');if(prEl)prEl.value=r.project||'';
     var poEl=document.getElementById('po');if(poEl)poEl.value=r.po||'';
     var drEl=document.getElementById('drawing');if(drEl)drEl.value=r.drawing||'';
-    var dtEl=document.getElementById('irnDate');if(dtEl)dtEl.value=r.date||'';
+    var dtEl=document.getElementById('irnDate');if(dtEl){var dv=String(r.date||'').replace(/\//g,'-');if(/^\d{2}-\d{2}-\d{4}$/.test(dv)){dv=dv.split('-').reverse().join('-');}dtEl.value=/^\d{4}-\d{2}-\d{2}$/.test(dv)?dv:'';}
     var ntEl=document.getElementById('notes');if(ntEl)ntEl.value=r.notes||'';
     var rnEl=document.getElementById('reportNo');if(rnEl){rnEl.value=irnNo;rnEl.style.color='rgba(255,255,255,0.6)';}
     // Restore result
@@ -3491,6 +3511,9 @@ function amendIRN(btn){
       var hrEl=document.getElementById('holdReason');if(hrEl)hrEl.value=r.holdReason||'';
       var haEl=document.getElementById('holdAction');if(haEl)haEl.value=r.holdAction||'';
     }
+    var cnEl=document.getElementById('clientName');if(cnEl)cnEl.value=r.client||'';
+    var ccEl=document.getElementById('clientCo');if(ccEl)ccEl.value=r.clientCo||'';
+    if(r.fabDims&&r.fabDims.length){fabDims=JSON.parse(JSON.stringify(r.fabDims));renderFab();}
     // Restore items
     if(r.items&&r.items.length){items=JSON.parse(JSON.stringify(r.items));renderItems();}
     // Restore stage states
@@ -3697,7 +3720,43 @@ function buildAnalyticsHTML(a){
   return h;
 }
 var _anEntries=null;
+function renderOutcomeChart(entries){
+  var el=document.getElementById('mgOutcomeChart');if(!el)return;
+  var monLab=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var months={},tot={p:0,h:0,r:0};
+  entries.forEach(function(e){
+    if(e.req&&e.req.status==='cancelled')return;
+    (e.irns||[]).forEach(function(r){
+      if(r.cancelled)return;
+      var dt=new Date(r.date||'');if(isNaN(dt))return;
+      var k=dt.getFullYear()+'-'+('0'+(dt.getMonth()+1)).slice(-2);
+      if(!months[k])months[k]={lab:monLab[dt.getMonth()]+' '+dt.getFullYear(),p:0,h:0,r:0};
+      if(r.result==='accept'){months[k].p++;tot.p++;}
+      else if(r.result==='hold'){months[k].h++;tot.h++;}
+      else if(r.result==='reject'){months[k].r++;tot.r++;}
+    });
+  });
+  var keys=Object.keys(months).sort().slice(-6);
+  if(!keys.length){el.innerHTML='<div style="font-size:12px;color:#aaa;text-align:center;padding:12px">No data yet</div>';return;}
+  var max=1;keys.forEach(function(k){var m=months[k];max=Math.max(max,m.p,m.h,m.r);});
+  var all=tot.p+tot.h+tot.r||1;
+  var h='<div style="display:flex;gap:8px;margin-bottom:12px">';
+  [['Passed',tot.p,'#1D9E75','#EAF3DE'],['Genuine holds',tot.h,'#BA7517','#FAEEDA'],['Rejected',tot.r,'#E24B4A','#FCEBEB']].forEach(function(c){
+    h+='<div style="flex:1;background:'+c[3]+';border-radius:8px;padding:8px 6px;text-align:center"><div style="font-size:20px;font-weight:700;color:'+c[2]+'">'+c[1]+'</div><div style="font-size:9px;color:#555;text-transform:uppercase">'+c[0]+'</div><div style="font-size:9px;color:#888">'+Math.round(c[1]/all*100)+'% of all IRNs</div></div>';
+  });
+  h+='</div>';
+  keys.forEach(function(k){
+    var m=months[k];
+    h+='<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:600;color:#1a3a5c;margin-bottom:3px">'+m.lab+'</div>';
+    [['Passed',m.p,'#1D9E75'],['Holds',m.h,'#EF9F27'],['Rejected',m.r,'#E24B4A']].forEach(function(b){
+      h+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px"><div style="width:52px;font-size:9px;color:#777;text-align:right">'+b[0]+'</div><div style="flex:1;background:#f4f4f2;border-radius:3px;height:12px;overflow:hidden"><div style="width:'+(b[1]/max*100)+'%;background:'+b[2]+';height:100%"></div></div><div style="width:30px;font-size:10px;font-weight:600;color:#444">'+b[1]+'</div></div>';
+    });
+    h+='</div>';
+  });
+  el.innerHTML=h;
+}
 function renderMonthlyTable(entries){
+  renderOutcomeChart(entries);
   var el=document.getElementById('mgMonthlyTable');if(!el)return;
   var rows=computeMonthlyTable(entries);
   if(!rows.length){el.innerHTML='<div style="font-size:12px;color:#aaa;text-align:center;padding:12px">No data yet</div>';return;}
@@ -3790,10 +3849,11 @@ function renderMgmt(){
     STAGES.forEach(function(s){
       var sp=0,st2=0;
       reg.forEach(function(r){
-        if(r.stageStates&&r.stageStates[s.id]){
-          var x=r.stageStates[s.id];
-          if(!x.na){st2++;if(x.gate||(x.crit&&x.crit.every(Boolean)))sp++;}
-        }
+        if(r.cancelled)return;
+        var x=r.stageStates&&r.stageStates[s.id];
+        var touched=!!(x&&!x.na&&(x.gate||(x.crit&&x.crit.some(Boolean))));
+        var named=!!(r.stageName&&String(r.stageName).split(', ').indexOf(s.label)>=0);
+        if(touched||named){st2++;if(r.result==='accept')sp++;}
       });
       if(st2===0)return;
       var pct=Math.round(sp/st2*100);
